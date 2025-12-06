@@ -3,7 +3,7 @@ declare var google: any;
 
 // Função para buscar o ID salvo ou usar o placeholder
 const getClientId = () => {
-  return localStorage.getItem('petgestor_client_id') || 'YOUR_GOOGLE_CLIENT_ID_HERE';
+  return localStorage.getItem('petgestor_client_id') || '283638384975-nt1pilc761qt69otu2dapf8ek0n6hvac.apps.googleusercontent.com';
 };
 
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets.readonly';
@@ -16,7 +16,7 @@ export const googleService = {
       const clientId = getClientId();
       
       // Só inicializa se tiver um ID que não seja o placeholder padrão
-      if (clientId === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
+      if (clientId === '283638384975-nt1pilc761qt69otu2dapf8ek0n6hvac.apps.googleusercontent.com') {
         console.warn('Google Client ID não configurado.');
         return;
       }
@@ -34,7 +34,7 @@ export const googleService = {
   login: () => {
     // Verifica novamente antes de tentar logar
     const clientId = getClientId();
-    if (clientId === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
+    if (clientId === '283638384975-nt1pilc761qt69otu2dapf8ek0n6hvac.apps.googleusercontent.com') {
         alert('Por favor, vá em Clientes > Configurações e configure seu ID do Cliente Google (OAuth) primeiro.');
         return;
     }
