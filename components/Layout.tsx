@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ViewState, GoogleUser } from '../types';
 import { LayoutDashboard, Users, Calendar, Scissors, Menu, X, LogIn, LogOut } from 'lucide-react';
@@ -79,11 +78,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
                     <LogIn size={16} /> Conectar Google
                 </button>
             )}
-
-            <div className="bg-brand-50 p-3 rounded-lg text-xs text-brand-700">
-                <p className="font-semibold">Plano Pro</p>
-                <p>Gemini AI Ativado</p>
-            </div>
         </div>
       </aside>
 

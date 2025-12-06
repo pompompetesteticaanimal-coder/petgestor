@@ -1,32 +1,15 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { db } from './services/db';
-import { generateMessage, analyzeDay } from './services/gemini';
 import { googleService } from './services/googleCalendar';
 import { Client, Service, Appointment, ViewState, Pet, GoogleUser } from './types';
 import { 
-  Plus, Trash2, Edit2, Search, Check, X, 
-  MessageCircle, Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
-  RefreshCw, ExternalLink, Settings, PawPrint, Ruler, Scissors as ScissorsIcon
+  Plus, Trash2, Check, X, 
+  Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
+  RefreshCw, ExternalLink, Settings, PawPrint
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-
-const COMMON_BREEDS = [
-  "SRD (Vira-lata)", "Akita", "Basset Hound", "Beagle", "Bernese Mountain Dog", 
-  "Bichon Frisé", "Boiadeiro Australiano", "Border Collie", "Boston Terrier", 
-  "Boxer", "Buldogue Francês", "Buldogue Inglês", "Bull Terrier", "Cane Corso", 
-  "Cavalier King Charles Spaniel", "Chihuahua", "Chow Chow", "Cocker Spaniel", 
-  "Dachshund (Salsicha)", "Dálmata", "Doberman", "Dogo Argentino", "Fila Brasileiro", 
-  "Fox Paulistinha", "Golden Retriever", "Husky Siberiano", "Jack Russell Terrier", 
-  "Labrador Retriever", "Lhasa Apso", "Maltês", "Mastiff", "Papillon", 
-  "Pastor Alemão", "Pastor Belga", "Pastor de Shetland", "Pequinês", "Pinscher", 
-  "Pit Bull", "Pointer Inglês", "Poodle", "Pug", "Rottweiler", "Samoieda", 
-  "São Bernardo", "Schnauzer", "Shar Pei", "Shiba Inu", "Shih Tzu", 
-  "Spitz Alemão (Lulu)", "Staffordshire Bull Terrier", "Weimaraner", "Yorkshire Terrier",
-  "Gato"
-].sort();
 
 // --- Sub-Components ---
 
@@ -36,9 +19,6 @@ const Dashboard: React.FC<{
   services: Service[];
   clients: Client[];
 }> = ({ appointments, services, clients }) => {
-  const [aiSummary, setAiSummary] = useState<string>("");
-  const [loadingAi, setLoadingAi] = useState(false);
-
   const today = new Date().toISOString().split('T')[0];
   const todaysAppointments = appointments.filter(a => a.date.startsWith(today));
   
@@ -49,17 +29,6 @@ const Dashboard: React.FC<{
 
   const pending = todaysAppointments.filter(a => a.status === 'agendado').length;
   const completed = todaysAppointments.filter(a => a.status === 'concluido').length;
-
-  const handleAiAnalysis = async () => {
-    setLoadingAi(true);
-    const enrichedApps = todaysAppointments.map(a => ({
-        ...a,
-        serviceName: services.find(s => s.id === a.serviceId)?.name
-    }));
-    const summary = await analyzeDay(enrichedApps, totalRevenue);
-    setAiSummary(summary);
-    setLoadingAi(false);
-  };
 
   const chartData = [
     { name: 'Agendados', value: pending },
@@ -105,49 +74,22 @@ const Dashboard: React.FC<{
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         {/* Chart Section */}
-         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-64 flex flex-col">
-            <h3 className="font-semibold text-gray-700 mb-4">Status dos Agendamentos (Hoje)</h3>
-            <div className="flex-1">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                        <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
-                        <Tooltip cursor={{fill: 'transparent'}} />
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                            {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : index === 1 ? '#22c55e' : '#ef4444'} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-         </div>
-
-         {/* AI Assistant Section */}
-         <div className="bg-gradient-to-br from-brand-500 to-brand-700 p-6 rounded-xl shadow-lg text-white">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                    <Sparkles className="text-yellow-300" />
-                    Assistente Gemini
-                </h3>
-                <button 
-                    onClick={handleAiAnalysis}
-                    disabled={loadingAi}
-                    className="bg-white/20 hover:bg-white/30 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm transition"
-                >
-                    {loadingAi ? 'Analisando...' : 'Analisar Dia'}
-                </button>
-            </div>
-            <div className="bg-white/10 rounded-lg p-4 min-h-[120px] backdrop-blur-md border border-white/10">
-                {aiSummary ? (
-                    <p className="text-sm leading-relaxed text-brand-50">{aiSummary}</p>
-                ) : (
-                    <p className="text-sm text-brand-100 italic">Clique em "Analisar Dia" para obter insights sobre o desempenho de hoje e dicas de gestão.</p>
-                )}
-            </div>
-         </div>
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-64 flex flex-col">
+        <h3 className="font-semibold text-gray-700 mb-4">Status dos Agendamentos (Hoje)</h3>
+        <div className="flex-1">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                    <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                    <Tooltip cursor={{fill: 'transparent'}} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : index === 1 ? '#22c55e' : '#ef4444'} />
+                        ))}
+                    </Bar>
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
@@ -194,19 +136,6 @@ const ClientManager: React.FC<{
         return;
       }
 
-      // Expected Order based on Form:
-      // 0: Timestamp
-      // 1: Nome Cliente (Nome e último sobrenome)
-      // 2: Telefone
-      // 3: Endereço
-      // 4: Complemento
-      // 5: Nome do Pet
-      // 6: Idade
-      // 7: Sexo (Macho/Fêmea)
-      // 8: Raça
-      // 9: Porte (Pequeno/Médio/Grande)
-      // 10: Pelagem (Curto/Longo)
-      // 11: Obs
       const clientsMap = new Map<string, Client>();
 
       // Skip header row
@@ -221,7 +150,7 @@ const ClientManager: React.FC<{
           petAge, 
           petGender,
           petBreed, 
-          petSize,
+          petSize, 
           petCoat,
           notes
         ] = row;
@@ -376,7 +305,6 @@ const ClientManager: React.FC<{
                         {client.address} {client.complement && ` - ${client.complement}`}
                         </p>
                     </div>
-                    {/* Deleting locally only removes from app cache, not sheet */}
                     <button onClick={() => onDeleteClient(client.id)} className="text-red-400 hover:text-red-600" title="Remover da visualização (não apaga da planilha)"><Trash2 size={16} /></button>
                 </div>
                 <div className="space-y-2">
@@ -489,10 +417,6 @@ const ScheduleManager: React.FC<{
     const [selService, setSelService] = useState('');
     const [selTime, setSelTime] = useState('09:00');
 
-    // AI Message State
-    const [generatingMsg, setGeneratingMsg] = useState<string | null>(null);
-    const [generatedText, setGeneratedText] = useState<string | null>(null);
-
     const filteredApps = appointments.filter(a => a.date.startsWith(selectedDate)).sort((a,b) => a.date.localeCompare(b.date));
 
     const handleCreate = () => {
@@ -507,25 +431,6 @@ const ScheduleManager: React.FC<{
             });
             setShowModal(false);
         }
-    };
-
-    const handleAiMessage = async (app: Appointment, type: 'reminder' | 'completion') => {
-        setGeneratingMsg(app.id);
-        const client = clients.find(c => c.id === app.clientId);
-        const pet = client?.pets.find(p => p.id === app.petId);
-        const service = services.find(s => s.id === app.serviceId);
-
-        if(client && pet && service) {
-            const msg = await generateMessage(type, {
-                clientName: client.name,
-                petName: pet.name,
-                serviceName: service.name,
-                price: service.price,
-                date: app.date
-            });
-            setGeneratedText(msg);
-        }
-        setGeneratingMsg(null);
     };
 
     return (
@@ -551,15 +456,6 @@ const ScheduleManager: React.FC<{
                      <CalendarIcon size={14} />
                      Sincronização com Google Calendar ativa.
                    </div>
-                )}
-
-                {generatedText && (
-                    <div className="bg-green-50 border border-green-200 p-4 rounded-xl animate-fade-in relative">
-                        <h4 className="text-green-800 font-bold mb-2 text-sm flex items-center gap-2"><Sparkles size={14}/> Mensagem Gerada:</h4>
-                        <textarea readOnly className="w-full bg-white p-2 text-sm text-gray-700 rounded border border-green-100 h-32 focus:outline-none" value={generatedText}></textarea>
-                        <button onClick={() => setGeneratedText(null)} className="absolute top-2 right-2 text-green-400 hover:text-green-600"><X size={16}/></button>
-                        <button onClick={() => {navigator.clipboard.writeText(generatedText); alert('Copiado!');}} className="mt-2 w-full bg-green-600 text-white text-xs py-2 rounded hover:bg-green-700">Copiar para WhatsApp</button>
-                    </div>
                 )}
             </div>
 
@@ -600,17 +496,14 @@ const ScheduleManager: React.FC<{
                                     <div className="flex items-center gap-2">
                                         {app.status === 'agendado' && (
                                             <>
-                                                <button onClick={() => handleAiMessage(app, 'reminder')} title="Gerar Lembrete" className="p-2 text-blue-500 hover:bg-blue-50 rounded-full">
-                                                    {generatingMsg === app.id ? <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div> : <MessageCircle size={18} />}
-                                                </button>
                                                 <button onClick={() => onUpdateStatus(app.id, 'concluido')} title="Concluir" className="p-2 text-green-500 hover:bg-green-50 rounded-full"><Check size={18} /></button>
                                                 <button onClick={() => onUpdateStatus(app.id, 'cancelado')} title="Cancelar" className="p-2 text-red-500 hover:bg-red-50 rounded-full"><X size={18} /></button>
                                             </>
                                         )}
                                         {app.status === 'concluido' && (
-                                            <button onClick={() => handleAiMessage(app, 'completion')} className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1 hover:bg-green-200">
-                                                <Sparkles size={12}/> Avisar Cliente
-                                            </button>
+                                            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">
+                                                Concluído
+                                            </span>
                                         )}
                                         {app.status === 'cancelado' && <span className="text-red-500 text-sm font-medium">Cancelado</span>}
                                     </div>

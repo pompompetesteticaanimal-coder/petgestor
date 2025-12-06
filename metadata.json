@@ -1,4 +1,4 @@
 {
-  "name": "PetGestor AI",
-  "description": "Sistema inteligente para gestão de Petshops com agendamento, controle de clientes e assistente virtual via Gemini."
+  "name": "PetGestor",
+  "description": "Sistema para gestão de Petshops com agendamento integrado ao Google Calendar e controle de clientes via Google Sheets."
 }
