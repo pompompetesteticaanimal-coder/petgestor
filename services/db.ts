@@ -15,7 +15,16 @@ const seedClients: Client[] = [
     phone: '(11) 99999-9999',
     address: 'Rua das Flores, 123',
     complement: 'Casa 2',
-    pets: [{ id: 'p1', name: 'Rex', breed: 'Golden Retriever', age: '3 anos', notes: 'Alergia a perfume' }]
+    pets: [{ 
+      id: 'p1', 
+      name: 'Rex', 
+      breed: 'Golden Retriever', 
+      age: '3 anos', 
+      gender: 'Macho',
+      size: 'Grande',
+      coat: 'Longo',
+      notes: 'Alergia a perfume' 
+    }]
   },
   {
     id: '2',
@@ -23,7 +32,16 @@ const seedClients: Client[] = [
     phone: '(11) 98888-8888',
     address: 'Av. Paulista, 1000',
     complement: 'Apto 45',
-    pets: [{ id: 'p2', name: 'Mia', breed: 'Gato', age: '2 anos', notes: 'Arisca' }]
+    pets: [{ 
+      id: 'p2', 
+      name: 'Mia', 
+      breed: 'Gato', 
+      age: '2 anos', 
+      gender: 'Fêmea',
+      size: 'Pequeno',
+      coat: 'Curto',
+      notes: 'Arisca' 
+    }]
   }
 ];
 

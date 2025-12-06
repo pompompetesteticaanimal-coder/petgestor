@@ -9,7 +9,7 @@ import { Client, Service, Appointment, ViewState, Pet, GoogleUser } from './type
 import { 
   Plus, Trash2, Edit2, Search, Check, X, 
   MessageCircle, Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
-  RefreshCw, ExternalLink, Settings
+  RefreshCw, ExternalLink, Settings, PawPrint, Ruler, Scissors as ScissorsIcon
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -185,8 +185,8 @@ const ClientManager: React.FC<{
 
     setIsSyncing(true);
     try {
-      // Fetch all data from Sheet1
-      const rows = await googleService.getSheetValues(accessToken, sheetId, 'Página1!A:I'); // Assume Sheet1 aka Página1
+      // Fetch all data from Sheet1, extended range for new fields
+      const rows = await googleService.getSheetValues(accessToken, sheetId, 'Página1!A:M'); 
       
       if (!rows || rows.length < 2) {
         alert("Planilha vazia ou formato inválido.");
@@ -195,13 +195,36 @@ const ClientManager: React.FC<{
       }
 
       // Expected Order based on Form:
-      // Timestamp, Name, Phone, Address, Complement, Pet Name, Pet Breed, Pet Age, Notes
+      // 0: Timestamp
+      // 1: Nome Cliente
+      // 2: Telefone
+      // 3: Endereço
+      // 4: Complemento
+      // 5: Nome Pet
+      // 6: Idade
+      // 7: Sexo
+      // 8: Raça
+      // 9: Porte
+      // 10: Pelagem
+      // 11: Obs
       const clientsMap = new Map<string, Client>();
 
       // Skip header row
       rows.slice(1).forEach((row: string[], index: number) => {
-        // Safe access to columns
-        const [timestamp, name, phone, address, complement, petName, petBreed, petAge, notes] = row;
+        const [
+          timestamp, 
+          name, 
+          phone, 
+          address, 
+          complement, 
+          petName, 
+          petAge, 
+          petGender,
+          petBreed, 
+          petSize,
+          petCoat,
+          notes
+        ] = row;
         
         if (!name || !phone) return; // Skip invalid rows
 
@@ -227,6 +250,9 @@ const ClientManager: React.FC<{
             name: petName,
             breed: petBreed || 'SRD',
             age: petAge || '',
+            gender: petGender || '',
+            size: petSize || '',
+            coat: petCoat || '',
             notes: notes || ''
           });
         }
@@ -285,15 +311,23 @@ const ClientManager: React.FC<{
             <Settings size={18} /> Configuração de Integração
           </h3>
           
-          <div className="space-y-4 mb-4 text-sm text-gray-700">
-             <p>Para usar o cadastro via Google Forms:</p>
-             <ol className="list-decimal list-inside space-y-1 ml-2">
-                <li>Crie um Google Form com as seguintes perguntas na ordem: 
-                    <strong> Nome, Telefone, Endereço, Complemento, Nome do Pet, Raça, Idade do Pet, Obs</strong>.</li>
-                <li>Vincule o formulário a uma Planilha Google.</li>
-                <li>Copie o <strong>ID da Planilha</strong> da URL (a parte entre /d/ e /edit).</li>
-                <li>Cole o ID abaixo e o link do formulário para acesso rápido.</li>
+          <div className="bg-white p-4 rounded border border-yellow-100 mb-4 text-sm text-gray-700">
+             <p className="font-bold mb-2">Para usar o cadastro via Google Forms, crie as perguntas EXATAMENTE nesta ordem:</p>
+             <ol className="list-decimal list-inside space-y-1 ml-2 text-xs md:text-sm">
+                <li>Nome do cliente (Nome e sobrenome)</li>
+                <li>Telefone</li>
+                <li>Endereço</li>
+                <li>Complemento</li>
+                <li>---------------- (Seção Pet)</li>
+                <li>Nome do Pet</li>
+                <li>Idade</li>
+                <li>Sexo (Macho/Fêmea)</li>
+                <li>Raça</li>
+                <li>Porte (Pequeno/Médio/Grande)</li>
+                <li>Pelagem (Curto/Longo)</li>
+                <li>Obs (Doenças/Cuidados)</li>
              </ol>
+             <p className="mt-2 text-xs text-gray-500">* As perguntas de 1 a 4 são sobre o dono. De 5 a 11 são sobre o Pet.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
@@ -347,11 +381,26 @@ const ClientManager: React.FC<{
                 </div>
                 <div className="space-y-2">
                     {client.pets.map(pet => (
-                        <div key={pet.id} className="bg-brand-50 p-2 rounded text-sm flex items-center justify-between text-brand-800">
-                            <div className="flex flex-col">
-                            <span>🐾 <strong>{pet.name}</strong> <span className="text-xs opacity-75">({pet.breed})</span></span>
-                            {pet.age && <span className="text-xs text-brand-600 ml-5">Idade: {pet.age}</span>}
+                        <div key={pet.id} className="bg-brand-50 p-3 rounded-lg text-sm space-y-1">
+                            <div className="flex justify-between items-center border-b border-brand-100 pb-1 mb-1">
+                                <span className="font-bold text-brand-800 flex items-center gap-1">
+                                    <PawPrint size={12} /> {pet.name}
+                                </span>
+                                <span className="text-xs bg-white px-2 py-0.5 rounded text-brand-600 border border-brand-100">{pet.breed}</span>
                             </div>
+                            
+                            <div className="grid grid-cols-2 gap-x-2 text-xs text-gray-600">
+                                {pet.gender && <div>Sexo: {pet.gender}</div>}
+                                {pet.age && <div>Idade: {pet.age}</div>}
+                                {pet.size && <div>Porte: {pet.size}</div>}
+                                {pet.coat && <div>Pelo: {pet.coat}</div>}
+                            </div>
+                            
+                            {pet.notes && (
+                                <div className="text-xs italic text-red-500 mt-1 bg-red-50 p-1 rounded border border-red-100">
+                                    Obs: {pet.notes}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

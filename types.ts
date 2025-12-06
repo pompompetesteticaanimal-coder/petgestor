@@ -4,6 +4,9 @@ export interface Pet {
   name: string;
   breed: string;
   age: string;
+  gender: string; // 'Macho' | 'Fêmea'
+  size: string;   // 'Pequeno' | 'Médio' | 'Grande'
+  coat: string;   // 'Curto' | 'Longo'
   notes: string;
 }
 
