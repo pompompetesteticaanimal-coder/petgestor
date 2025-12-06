@@ -196,16 +196,16 @@ const ClientManager: React.FC<{
 
       // Expected Order based on Form:
       // 0: Timestamp
-      // 1: Nome Cliente
+      // 1: Nome Cliente (Nome e último sobrenome)
       // 2: Telefone
       // 3: Endereço
       // 4: Complemento
-      // 5: Nome Pet
+      // 5: Nome do Pet
       // 6: Idade
-      // 7: Sexo
+      // 7: Sexo (Macho/Fêmea)
       // 8: Raça
-      // 9: Porte
-      // 10: Pelagem
+      // 9: Porte (Pequeno/Médio/Grande)
+      // 10: Pelagem (Curto/Longo)
       // 11: Obs
       const clientsMap = new Map<string, Client>();
 
@@ -314,20 +314,20 @@ const ClientManager: React.FC<{
           <div className="bg-white p-4 rounded border border-yellow-100 mb-4 text-sm text-gray-700">
              <p className="font-bold mb-2">Para usar o cadastro via Google Forms, crie as perguntas EXATAMENTE nesta ordem:</p>
              <ol className="list-decimal list-inside space-y-1 ml-2 text-xs md:text-sm">
-                <li>Nome do cliente (Nome e sobrenome)</li>
-                <li>Telefone</li>
+                <li>Nome do cliente (Nome e último sobrenome)</li>
+                <li>Telefone (com DDD)</li>
                 <li>Endereço</li>
                 <li>Complemento</li>
-                <li>---------------- (Seção Pet)</li>
+                <li className="font-bold pt-2 border-t mt-2">--- Seção DADOS DO PET ---</li>
                 <li>Nome do Pet</li>
                 <li>Idade</li>
-                <li>Sexo (Macho/Fêmea)</li>
+                <li>Sexo (Tipo: Lista Suspensa: Macho, Fêmea)</li>
                 <li>Raça</li>
-                <li>Porte (Pequeno/Médio/Grande)</li>
-                <li>Pelagem (Curto/Longo)</li>
-                <li>Obs (Doenças/Cuidados)</li>
+                <li>Porte (Tipo: Lista Suspensa: Pequeno, Médio, Grande)</li>
+                <li>Pelagem (Tipo: Lista Suspensa: Curto, Longo)</li>
+                <li>Obs (Doenças ou cuidados especiais)</li>
              </ol>
-             <p className="mt-2 text-xs text-gray-500">* As perguntas de 1 a 4 são sobre o dono. De 5 a 11 são sobre o Pet.</p>
+             <p className="mt-2 text-xs text-gray-500">* Seção 1 (Dados do cliente) e Seção 2 (Dados do Pet).</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
@@ -389,8 +389,8 @@ const ClientManager: React.FC<{
                                 <span className="text-xs bg-white px-2 py-0.5 rounded text-brand-600 border border-brand-100">{pet.breed}</span>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-x-2 text-xs text-gray-600">
-                                {pet.gender && <div>Sexo: {pet.gender}</div>}
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-600">
+                                {pet.gender && <div>Sexo: <span className="font-semibold">{pet.gender}</span></div>}
                                 {pet.age && <div>Idade: {pet.age}</div>}
                                 {pet.size && <div>Porte: {pet.size}</div>}
                                 {pet.coat && <div>Pelo: {pet.coat}</div>}
