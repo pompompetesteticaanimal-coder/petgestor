@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PomPomPet</title>
+    <title>PetGestor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
@@ -12,35 +12,18 @@
           extend: {
             colors: {
               brand: {
-                50: '#fff1f2',  /* Rosa bem clarinho (fundo) */
-                100: '#ffe4e6', /* Rosa claro */
-                200: '#fecdd3',
-                300: '#fda4af',
-                400: '#fb7185',
-                500: '#f43f5e', /* A cor do texto POMPOM (Rosa/Salmão) */
-                600: '#e11d48', /* Hover */
-                700: '#be123c', /* Texto forte */
-              },
-              accent: {
-                100: '#e0f2fe', /* Azul do Banho e Tosa */
-                500: '#38bdf8',
+                50: '#f0f9ff',
+                100: '#e0f2fe',
+                500: '#0ea5e9',
                 600: '#0284c7',
-              }
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.3s ease-out',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
+                700: '#0369a1',
               }
             }
           }
         }
       }
     </script>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.1",
@@ -54,9 +37,11 @@
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-[#fffdfd] text-gray-900 font-sans antialiased">
+  <body class="bg-gray-50 text-gray-900 font-sans antialiased">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>
