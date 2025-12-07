@@ -1229,6 +1229,261 @@ const ScheduleManager: React.FC<{
     );
 };
 
+// 7. Payment Manager
+const PaymentManager: React.FC<{ 
+  appointments: Appointment[]; 
+  clients: Client[]; 
+  services: Service[]; 
+  onUpdateAppointment: (app: Appointment) => void; 
+  accessToken: string | null; 
+  sheetId: string | null; 
+}> = ({ appointments, clients, services, onUpdateAppointment, accessToken, sheetId }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'pending' | 'paid' | 'all'>('pending');
+
+  const filteredApps = appointments.filter(app => {
+     if (app.status === 'cancelado') return false;
+     const client = clients.find(c => c.id === app.clientId);
+     const matchSearch = client?.name.toLowerCase().includes(searchTerm.toLowerCase());
+     const isPaid = app.paymentMethod && app.paymentMethod !== '';
+     const matchStatus = filterStatus === 'all' ? true : filterStatus === 'paid' ? isPaid : !isPaid;
+     return matchSearch && matchStatus;
+  }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const handlePayment = async (app: Appointment, method: any, amount: number) => {
+      const updatedApp = { ...app, paymentMethod: method, paidAmount: amount };
+      
+      // Update Sheet logic simplified
+      if (accessToken && sheetId && app.id.startsWith('sheet_')) {
+          const idx = parseInt(app.id.split('_')[1]);
+          const row = idx + 2;
+          try {
+             await googleService.updateSheetValues(accessToken, sheetId, `Agendamento!R${row}:S${row}`, [amount, method]);
+          } catch(e) {
+             console.error('Failed to update sheet payment', e);
+          }
+      }
+      onUpdateAppointment(updatedApp);
+  };
+
+  return (
+      <div className="space-y-6 animate-fade-in pb-10">
+          <h1 className="text-2xl font-bold text-gray-800">Gerenciar Pagamentos</h1>
+          <div className="flex gap-4 mb-4">
+              <input 
+                 className="flex-1 border p-3 rounded-xl" 
+                 placeholder="Buscar cliente..." 
+                 value={searchTerm} 
+                 onChange={e => setSearchTerm(e.target.value)} 
+              />
+              <select className="border p-3 rounded-xl" value={filterStatus} onChange={(e:any) => setFilterStatus(e.target.value)}>
+                  <option value="pending">Pendentes</option>
+                  <option value="paid">Pagos</option>
+                  <option value="all">Todos</option>
+              </select>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+               {filteredApps.map(app => {
+                   const client = clients.find(c => c.id === app.clientId);
+                   const pet = client?.pets.find(p => p.id === app.petId);
+                   const service = services.find(s => s.id === app.serviceId);
+                   const total = (service?.price || 0) + (app.additionalServiceIds?.reduce((acc, curr) => {
+                       const s = services.find(x => x.id === curr);
+                       return acc + (s?.price || 0);
+                   }, 0) || 0);
+                   
+                   const isPaid = app.paymentMethod && app.paymentMethod !== '';
+
+                   return (
+                       <div key={app.id} className="p-4 border-b last:border-0 flex flex-col md:flex-row justify-between items-center gap-4">
+                           <div>
+                               <div className="font-bold text-gray-800">{client?.name} - {pet?.name}</div>
+                               <div className="text-sm text-gray-500">{new Date(app.date).toLocaleDateString()} - {service?.name}</div>
+                               <div className="font-bold text-brand-600">Total: R$ {total.toFixed(2)}</div>
+                           </div>
+                           <div className="flex items-center gap-2">
+                               {isPaid ? (
+                                   <div className="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-bold text-sm flex items-center gap-2">
+                                       <CheckCircle size={16}/> Pago ({app.paymentMethod})
+                                   </div>
+                               ) : (
+                                   <div className="flex gap-2">
+                                       <select 
+                                         className="border p-2 rounded-lg text-sm"
+                                         onChange={(e) => {
+                                             if(e.target.value) {
+                                                if(confirm(`Confirmar pagamento em ${e.target.value}?`)) {
+                                                    handlePayment(app, e.target.value, total);
+                                                }
+                                                e.target.value = '';
+                                             }
+                                         }}
+                                         defaultValue=""
+                                       >
+                                           <option value="" disabled>Receber...</option>
+                                           <option value="Pix">Pix</option>
+                                           <option value="Dinheiro">Dinheiro</option>
+                                           <option value="Cartão">Cartão</option>
+                                       </select>
+                                   </div>
+                               )}
+                           </div>
+                       </div>
+                   )
+               })}
+               {filteredApps.length === 0 && <div className="p-8 text-center text-gray-500">Nenhum agendamento encontrado.</div>}
+          </div>
+      </div>
+  )
+};
+
+// 8. Client Manager
+const ClientManager: React.FC<{
+    clients: Client[];
+    onDeleteClient: (id: string) => void;
+    googleUser: GoogleUser | null;
+    accessToken: string | null;
+}> = ({ clients, onDeleteClient }) => {
+    const [search, setSearch] = useState('');
+    
+    const filtered = clients.filter(c => 
+        c.name.toLowerCase().includes(search.toLowerCase()) || 
+        c.phone.includes(search) || 
+        c.pets.some(p => p.name.toLowerCase().includes(search.toLowerCase()))
+    );
+
+    return (
+        <div className="space-y-6 animate-fade-in pb-10">
+            <h1 className="text-2xl font-bold text-gray-800">Clientes</h1>
+            <div className="relative">
+                <Search className="absolute left-3 top-3 text-gray-400" size={20}/>
+                <input 
+                    className="w-full pl-10 p-3 rounded-xl border border-gray-200 focus:ring-2 ring-brand-200 outline-none" 
+                    placeholder="Buscar por nome, telefone ou pet..." 
+                    value={search} 
+                    onChange={e => setSearch(e.target.value)}
+                />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map(client => (
+                    <div key={client.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 relative group">
+                        <div className="flex items-start justify-between mb-2">
+                            <div>
+                                <h3 className="font-bold text-gray-800">{client.name}</h3>
+                                <div className="text-sm text-gray-500 flex items-center gap-1"><Phone size={12}/> {client.phone}</div>
+                            </div>
+                            <button onClick={() => confirm('Excluir cliente?') && onDeleteClient(client.id)} className="text-gray-300 hover:text-red-500 transition">
+                                <Trash2 size={16}/>
+                            </button>
+                        </div>
+                        <div className="space-y-2 mt-3 pt-3 border-t border-gray-100">
+                             {client.pets.map(pet => (
+                                 <div key={pet.id} className="bg-gray-50 p-2 rounded-lg text-sm flex justify-between items-center">
+                                     <span className="font-medium text-gray-700">{pet.name}</span>
+                                     <span className="text-xs text-gray-400">{pet.breed}</span>
+                                 </div>
+                             ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// 9. Service Manager
+const ServiceManager: React.FC<{
+    services: Service[];
+    onAddService: (s: Service) => void;
+    onDeleteService: (id: string) => void;
+    onSyncServices: (silent: boolean) => void;
+    accessToken: string | null;
+    sheetId: string | null;
+}> = ({ services, onAddService, onDeleteService, onSyncServices }) => {
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [newService, setNewService] = useState<Partial<Service>>({ category: 'principal', durationMin: 60 });
+
+    const handleSubmit = () => {
+        if (newService.name && newService.price) {
+            onAddService({
+                id: `local_${Date.now()}`,
+                name: newService.name,
+                price: parseFloat(newService.price.toString()),
+                durationMin: newService.durationMin || 60,
+                description: newService.description || '',
+                category: newService.category as any,
+                targetSize: newService.targetSize || 'Todos',
+                targetCoat: newService.targetCoat || 'Todos'
+            });
+            setIsFormOpen(false);
+            setNewService({ category: 'principal', durationMin: 60 });
+        }
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in pb-10">
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold text-gray-800">Serviços</h1>
+                <div className="flex gap-2">
+                     <button onClick={() => onSyncServices(false)} className="px-4 py-2 bg-blue-50 text-blue-600 font-bold rounded-lg hover:bg-blue-100 flex items-center gap-2">
+                        <Sparkles size={16}/> Sincronizar
+                    </button>
+                    <button onClick={() => setIsFormOpen(true)} className="px-4 py-2 bg-brand-600 text-white font-bold rounded-lg hover:bg-brand-700 flex items-center gap-2">
+                        <Plus size={16}/> Novo Serviço
+                    </button>
+                </div>
+            </div>
+
+            {isFormOpen && (
+                <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 mb-6 animate-fade-in">
+                    <h3 className="font-bold text-lg mb-4">Adicionar Serviço</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <input className="border p-2 rounded-lg" placeholder="Nome" value={newService.name || ''} onChange={e => setNewService({...newService, name: e.target.value})} />
+                        <input className="border p-2 rounded-lg" type="number" placeholder="Preço" value={newService.price || ''} onChange={e => setNewService({...newService, price: parseFloat(e.target.value)})} />
+                        <select className="border p-2 rounded-lg" value={newService.category} onChange={e => setNewService({...newService, category: e.target.value as any})}>
+                            <option value="principal">Principal</option>
+                            <option value="adicional">Adicional</option>
+                        </select>
+                        <input className="border p-2 rounded-lg" type="number" placeholder="Duração (min)" value={newService.durationMin || ''} onChange={e => setNewService({...newService, durationMin: parseInt(e.target.value)})} />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <button onClick={() => setIsFormOpen(false)} className="px-4 py-2 text-gray-500 font-bold">Cancelar</button>
+                        <button onClick={handleSubmit} className="px-4 py-2 bg-brand-600 text-white font-bold rounded-lg">Salvar</button>
+                    </div>
+                </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th className="p-4 text-xs font-bold text-gray-500 uppercase">Nome</th>
+                            <th className="p-4 text-xs font-bold text-gray-500 uppercase">Categoria</th>
+                            <th className="p-4 text-xs font-bold text-gray-500 uppercase">Preço</th>
+                            <th className="p-4 text-xs font-bold text-gray-500 uppercase text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {services.map(s => (
+                            <tr key={s.id} className="hover:bg-gray-50">
+                                <td className="p-4 text-sm font-bold text-gray-800">{s.name}</td>
+                                <td className="p-4 text-sm text-gray-500 capitalize">{s.category}</td>
+                                <td className="p-4 text-sm font-bold text-green-600">R$ {s.price.toFixed(2)}</td>
+                                <td className="p-4 text-right">
+                                    <button onClick={() => confirm('Excluir serviço?') && onDeleteService(s.id)} className="text-gray-300 hover:text-red-500">
+                                        <Trash2 size={16}/>
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('payments');
   const [clients, setClients] = useState<Client[]>([]);
