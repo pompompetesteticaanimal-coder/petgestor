@@ -59,11 +59,6 @@ const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void }> = ({ o
     const currentOrigin = window.location.origin;
     const isTemporaryLink = currentOrigin.includes('vercel.app') && (currentOrigin.split('-').length > 2);
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(currentOrigin);
-        alert('Link copiado!');
-    };
-
     return (
         <div className="min-h-screen bg-brand-50 flex flex-col items-center justify-center p-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
@@ -82,18 +77,9 @@ const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void }> = ({ o
                 {isTemporaryLink && (
                     <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-left text-xs text-orange-800 mb-4">
                         <p className="font-bold mb-1 flex items-center gap-1"><AlertTriangle size={14}/> Atenção: Link Temporário</p>
-                        <p>Você está acessando por um link temporário. Recomenda-se usar o link principal do projeto.</p>
+                        <p>Você está acessando por um link temporário. Recomenda-se usar o link principal do projeto para evitar erros de login.</p>
                     </div>
                 )}
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-left text-xs text-yellow-800">
-                    <p className="font-bold mb-2 flex items-center gap-1"><ShieldAlert size={14}/> Erro de Login?</p>
-                    <p className="mb-2">Autorize este link no Google Cloud:</p>
-                    <div className="flex items-center gap-2 bg-white border border-yellow-300 rounded p-2 mb-2">
-                        <code className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-gray-600">{currentOrigin}</code>
-                        <button onClick={copyToClipboard} className="text-brand-600 font-bold hover:text-brand-800"><Copy size={14}/></button>
-                    </div>
-                </div>
 
                 <button onClick={onReset} className="mt-8 text-xs text-gray-400 hover:text-red-500 underline">
                     Alterar ID do Cliente
