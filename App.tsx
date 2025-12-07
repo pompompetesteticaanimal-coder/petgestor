@@ -116,7 +116,7 @@ const Dashboard: React.FC<{
 
           totalPets++;
 
-          // Calcular se tem Tosa
+          // 1. Calcular se tem Tosa
           const mainSvc = services.find(s => s.id === app.serviceId);
           let hasTosa = mainSvc?.name.toLowerCase().includes('tosa') || false;
           
@@ -128,11 +128,25 @@ const Dashboard: React.FC<{
           }
           if (hasTosa) totalTosas++;
 
-          // Calcular Financeiro
-          if (app.paidAmount && app.paidAmount > 0) {
-              paidRevenue += app.paidAmount;
+          // 2. Calcular Financeiro
+          // Regra: Se tem paymentMethod (Coluna S), é PAGO. Se não tem, é PENDENTE.
+          const isPaid = app.paymentMethod && app.paymentMethod.trim() !== '';
+
+          if (isPaid) {
+              // Se está pago, usamos o valor registrado ou calculamos o valor do serviço se não houver registro
+              paidRevenue += (app.paidAmount || 0);
+              // Fallback: Se por algum motivo estiver marcado como pago mas valor for 0, somamos o valor do serviço
+              if (!app.paidAmount || app.paidAmount === 0) {
+                   let val = mainSvc?.price || 0;
+                   app.additionalServiceIds?.forEach(id => {
+                       const s = services.find(srv => srv.id === id);
+                       if (s) val += s.price;
+                   });
+                   paidRevenue += val;
+              }
           } else {
-              // Calcular pendente (valor esperado)
+              // Se não tem forma de pagamento, é PENDENTE
+              // Calculamos o valor esperado (Preço do Serviço Principal + Adicionais)
               let expected = mainSvc?.price || 0;
               app.additionalServiceIds?.forEach(id => {
                   const s = services.find(srv => srv.id === id);
@@ -177,7 +191,7 @@ const Dashboard: React.FC<{
                   type="date" 
                   value={selectedDate} 
                   onChange={e => setSelectedDate(e.target.value)}
-                  className="bg-white border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-brand-200 outline-none"
+                  className="bg-white border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-brand-200 outline-none shadow-sm"
               />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -198,14 +212,14 @@ const Dashboard: React.FC<{
                   value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} 
                   icon={CheckCircle} 
                   colorClass="bg-green-100 text-green-600" 
-                  subValue="Já recebido"
+                  subValue="Com baixa na planilha"
               />
               <StatCard 
                   title="Faturamento Pendente" 
                   value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} 
                   icon={AlertCircle} 
-                  colorClass="bg-yellow-100 text-yellow-600" 
-                  subValue="A receber"
+                  colorClass="bg-red-100 text-red-600" 
+                  subValue="Sem forma de pagamento"
               />
           </div>
       </section>
@@ -222,7 +236,7 @@ const Dashboard: React.FC<{
                   type="month" 
                   value={selectedMonth} 
                   onChange={e => setSelectedMonth(e.target.value)}
-                  className="bg-white border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-purple-200 outline-none"
+                  className="bg-white border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-purple-200 outline-none shadow-sm"
               />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -285,6 +299,7 @@ const PaymentManager: React.FC<{
     const todayStr = new Date().toISOString().split('T')[0];
     
     // 1. Pending (Past & Unpaid)
+    // Pendente = Data passada E sem método de pagamento
     const pendingApps = appointments.filter(a => {
         const appDate = a.date.split('T')[0];
         const isPast = appDate < todayStr;
