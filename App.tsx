@@ -936,11 +936,37 @@ const App: React.FC = () => {
 
   const SHEET_ID = localStorage.getItem('petgestor_sheet_id') || PREDEFINED_SHEET_ID;
 
+  // Persistence Constants
+  const STORAGE_KEY_TOKEN = 'petgestor_access_token';
+  const STORAGE_KEY_EXPIRY = 'petgestor_token_expiry';
+  const STORAGE_KEY_USER = 'petgestor_user_profile';
+
   useEffect(() => {
     setClients(db.getClients());
     setServices(db.getServices());
     setAppointments(db.getAppointments());
+    
+    // Check Config
     if (!localStorage.getItem('petgestor_client_id')) localStorage.setItem('petgestor_client_id', DEFAULT_CLIENT_ID);
+    
+    // Check Persisted Session
+    const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
+    const storedExpiry = localStorage.getItem(STORAGE_KEY_EXPIRY);
+    const storedUser = localStorage.getItem(STORAGE_KEY_USER);
+
+    if (storedToken && storedExpiry && storedUser) {
+        if (Date.now() < parseInt(storedExpiry)) {
+            // Restore Session
+            setAccessToken(storedToken);
+            setGoogleUser(JSON.parse(storedUser));
+        } else {
+            // Expired: Clear storage
+            localStorage.removeItem(STORAGE_KEY_TOKEN);
+            localStorage.removeItem(STORAGE_KEY_EXPIRY);
+            localStorage.removeItem(STORAGE_KEY_USER);
+        }
+    }
+
     initAuthLogic();
   }, []);
 
@@ -948,15 +974,36 @@ const App: React.FC = () => {
     if ((window as any).google) {
         googleService.init(async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
-                setAccessToken(tokenResponse.access_token);
-                const profile = await googleService.getUserProfile(tokenResponse.access_token);
-                if (profile) setGoogleUser({ id: profile.id, name: profile.name, email: profile.email, picture: profile.picture });
+                const token = tokenResponse.access_token;
+                const expiresIn = tokenResponse.expires_in || 3599; // Default 1 hour
+                
+                // Save Session
+                localStorage.setItem(STORAGE_KEY_TOKEN, token);
+                localStorage.setItem(STORAGE_KEY_EXPIRY, (Date.now() + (expiresIn * 1000)).toString());
+                
+                setAccessToken(token);
+                
+                const profile = await googleService.getUserProfile(token);
+                if (profile) {
+                    const user = { id: profile.id, name: profile.name, email: profile.email, picture: profile.picture };
+                    setGoogleUser(user);
+                    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+                }
             }
         });
     } else {
         setTimeout(initAuthLogic, 1000);
     }
   };
+
+  const handleLogout = () => {
+      setAccessToken(null);
+      setGoogleUser(null);
+      localStorage.removeItem(STORAGE_KEY_TOKEN);
+      localStorage.removeItem(STORAGE_KEY_EXPIRY);
+      localStorage.removeItem(STORAGE_KEY_USER);
+      if((window as any).google) (window as any).google.accounts.id.disableAutoSelect();
+  }
 
   const handleSaveConfig = (id: string) => {
       localStorage.setItem('petgestor_client_id', id);
@@ -1178,7 +1225,7 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
-      <Layout currentView={currentView} setView={setCurrentView} googleUser={googleUser} onLogin={() => googleService.login()} onLogout={() => { setAccessToken(null); setGoogleUser(null); }}>
+      <Layout currentView={currentView} setView={setCurrentView} googleUser={googleUser} onLogin={() => googleService.login()} onLogout={handleLogout}>
         {currentView === 'dashboard' && <Dashboard appointments={appointments} services={services} clients={clients} />}
         {currentView === 'clients' && <ClientManager clients={clients} onSyncClients={handleSyncClients} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
         {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} />}
