@@ -1000,10 +1000,11 @@ const ClientManager: React.FC<{
 }> = ({ clients, onDeleteClient }) => {
     const [searchTerm, setSearchTerm] = useState('');
     
+    // ATENÇÃO: Adicionado .sort para ordem alfabética
     const filteredClients = clients.filter(c => 
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.pets.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    ).sort((a, b) => a.name.localeCompare(b.name));
 
     return (
         <div className="space-y-4 animate-fade-in h-full flex flex-col">
@@ -1079,9 +1080,92 @@ const ServiceManager: React.FC<{
     onSyncServices: (silent: boolean) => void;
     accessToken: string | null;
     sheetId: string;
-}> = ({ services, onSyncServices, sheetId }) => {
+}> = ({ services, onAddService, onDeleteService, onSyncServices, sheetId, accessToken }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingService, setEditingService] = useState<Service | null>(null);
+    const [formData, setFormData] = useState({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' });
+    const [contextMenu, setContextMenu] = useState<{x: number, y: number, service: Service} | null>(null);
+
+    const resetForm = () => {
+        setFormData({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' });
+        setEditingService(null);
+        setIsModalOpen(false);
+    };
+
+    const handleEditStart = (s: Service) => {
+        setEditingService(s);
+        setFormData({
+            name: s.name,
+            price: s.price.toString(),
+            category: s.category,
+            size: s.targetSize || 'Todos',
+            coat: s.targetCoat || 'Todos'
+        });
+        setIsModalOpen(true);
+        setContextMenu(null);
+    };
+
+    const handleSave = async () => {
+        if(!accessToken || !sheetId) return alert('Necessário estar logado para salvar.');
+        
+        const priceNum = parseFloat(formData.price.replace(',', '.'));
+        const rowData = [
+            formData.name,
+            formData.category,
+            formData.size,
+            formData.coat,
+            priceNum.toString().replace('.', ',')
+        ];
+
+        try {
+            if(editingService) {
+                // Edit Logic: Extract index from ID "sheet_svc_{index}_{timestamp}"
+                const parts = editingService.id.split('_');
+                if(parts.length >= 3) {
+                     const index = parseInt(parts[2]);
+                     const row = index + 2; // +2 because sheet is 1-based and has header
+                     const range = `Serviço!A${row}:E${row}`;
+                     await googleService.updateSheetValues(accessToken, sheetId, range, rowData);
+                     alert('Serviço atualizado!');
+                }
+            } else {
+                // Add Logic
+                await googleService.appendSheetValues(accessToken, sheetId, 'Serviço!A:E', rowData);
+                alert('Serviço criado!');
+            }
+            onSyncServices(true); // Silent sync to refresh local state with new IDs
+            resetForm();
+        } catch(e) {
+            console.error(e);
+            alert('Erro ao salvar na planilha.');
+        }
+    };
+
+    const handleDelete = async (service: Service) => {
+        if(!confirm(`Excluir ${service.name}?`)) return;
+        setContextMenu(null);
+
+        if(service.id.startsWith('sheet_svc_') && accessToken && sheetId) {
+             const parts = service.id.split('_');
+             if(parts.length >= 3) {
+                  const index = parseInt(parts[2]);
+                  const row = index + 2;
+                  try {
+                      await googleService.clearSheetValues(accessToken, sheetId, `Serviço!A${row}:E${row}`);
+                      onSyncServices(true);
+                      return;
+                  } catch(e) {
+                      console.error(e);
+                      alert('Erro ao excluir da planilha.');
+                  }
+             }
+        }
+        // Fallback local delete
+        onDeleteService(service.id);
+    };
+
     return (
-        <div className="space-y-4 animate-fade-in h-full flex flex-col">
+        <div className="space-y-4 animate-fade-in h-full flex flex-col relative" onClick={() => setContextMenu(null)}>
             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex-shrink-0">
                 <div>
                     <h2 className="text-xl font-bold text-gray-800">Serviços</h2>
@@ -1098,9 +1182,15 @@ const ServiceManager: React.FC<{
                     </a>
                     <button 
                         onClick={() => onSyncServices(false)} 
-                        className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-brand-700 transition shadow-sm text-sm"
+                        className="bg-brand-50 text-brand-700 border border-brand-200 px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-brand-100 transition shadow-sm text-sm"
                     >
                         <Sparkles size={16} /> Sincronizar
+                    </button>
+                    <button 
+                        onClick={() => { resetForm(); setIsModalOpen(true); }}
+                        className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-brand-700 transition shadow-sm text-sm"
+                    >
+                        <Plus size={16} /> Novo
                     </button>
                 </div>
             </div>
@@ -1108,7 +1198,14 @@ const ServiceManager: React.FC<{
             <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {services.map(service => (
-                        <div key={service.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                        <div 
+                            key={service.id} 
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                setContextMenu({ x: e.clientX, y: e.clientY, service });
+                            }}
+                            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer hover:shadow-md transition select-none"
+                        >
                             <div>
                                 <div className="flex justify-between items-start mb-2">
                                     <h3 className="font-bold text-gray-800">{service.name}</h3>
@@ -1116,7 +1213,6 @@ const ServiceManager: React.FC<{
                                         {service.category}
                                     </span>
                                 </div>
-                                <p className="text-xs text-gray-500 mb-2 line-clamp-2">{service.description}</p>
                                 <div className="flex flex-wrap gap-1 mb-3">
                                     <span className="text-[10px] bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-100">Porte: {service.targetSize}</span>
                                     <span className="text-[10px] bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-100">Pelo: {service.targetCoat}</span>
@@ -1129,6 +1225,72 @@ const ServiceManager: React.FC<{
                     ))}
                 </div>
             </div>
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <div 
+                    className="fixed bg-white shadow-xl border border-gray-200 rounded-lg z-[100] py-1 min-w-[150px]"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                >
+                    <button onClick={() => handleEditStart(contextMenu.service)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex items-center gap-2">
+                        <Edit2 size={14}/> Editar
+                    </button>
+                    <button onClick={() => handleDelete(contextMenu.service)} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-sm flex items-center gap-2">
+                        <Trash2 size={14}/> Excluir
+                    </button>
+                </div>
+            )}
+
+            {/* Add/Edit Modal */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">{editingService ? 'Editar Serviço' : 'Novo Serviço'}</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome</label>
+                                <input value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} className="w-full border p-2 rounded-lg" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Preço (R$)</label>
+                                    <input value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} className="w-full border p-2 rounded-lg" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
+                                    <select value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value})} className="w-full border p-2 rounded-lg">
+                                        <option value="principal">Principal</option>
+                                        <option value="adicional">Adicional</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Porte Alvo</label>
+                                    <select value={formData.size} onChange={e=>setFormData({...formData, size: e.target.value})} className="w-full border p-2 rounded-lg">
+                                        <option value="Todos">Todos</option>
+                                        <option value="Pequeno">Pequeno</option>
+                                        <option value="Médio">Médio</option>
+                                        <option value="Grande">Grande</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Pelagem Alvo</label>
+                                    <select value={formData.coat} onChange={e=>setFormData({...formData, coat: e.target.value})} className="w-full border p-2 rounded-lg">
+                                        <option value="Todos">Todos</option>
+                                        <option value="Curto">Curto</option>
+                                        <option value="Longo">Longo</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 mt-6 justify-end">
+                            <button onClick={resetForm} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-bold text-sm">Cancelar</button>
+                            <button onClick={handleSave} className="px-6 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700">Salvar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
