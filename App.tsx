@@ -1521,14 +1521,14 @@ const ScheduleManager: React.FC<{
                                 return (
                                     <div 
                                         key={`${dateStr}-${h}`} 
-                                        className="flex-1 border-r border-gray-100 relative p-1 group hover:bg-gray-50 flex gap-1"
+                                        className="flex-1 border-r border-gray-100 relative p-1 group hover:bg-gray-50 flex flex-col md:flex-row gap-1 min-w-0"
                                         onClick={() => {
                                             setDate(dateStr);
                                             setTime(`${String(h).padStart(2,'0')}:00`);
                                             setIsModalOpen(true);
                                         }}
                                     >
-                                        {/* Render Apps Stacked Laterally (Flex) */}
+                                        {/* Render Apps Stacked Vertically on Mobile (Flex Col) and Laterally on Desktop (Flex Row) */}
                                         {slotApps.map(app => {
                                             const client = clients.find(c => c.id === app.clientId);
                                             const pet = client?.pets.find(p => p.id === app.petId);
@@ -1543,7 +1543,7 @@ const ScheduleManager: React.FC<{
                                                 <div 
                                                     key={app.id}
                                                     onClick={(e) => { e.stopPropagation(); /* Add Edit Logic Here */ }}
-                                                    className={`relative flex-1 rounded p-1 border text-[10px] leading-tight overflow-hidden shadow-sm ${color} z-20 h-full`}
+                                                    className={`relative flex-1 w-full md:w-auto rounded p-1 border text-[10px] leading-tight shadow-sm ${color} z-20 min-h-[40px]`}
                                                 >
                                                     <div className="font-bold truncate">{new Date(app.date).getMinutes() > 0 ? `:${new Date(app.date).getMinutes()} ` : ''}{pet?.name}</div>
                                                     <div className="truncate opacity-75">{s?.name}</div>
@@ -1595,7 +1595,7 @@ const ScheduleManager: React.FC<{
             {/* Modal for New Appointment */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                    <div className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
                         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                             <h3 className="font-bold text-lg text-gray-800">Novo Agendamento</h3>
                             <button onClick={resetForm}><X size={24} className="text-gray-400 hover:text-gray-600"/></button>
