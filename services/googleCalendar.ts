@@ -91,44 +91,6 @@ export const googleService = {
     }
   },
 
-  updateEvent: async (accessToken: string, eventId: string, eventDetails: {
-    summary: string;
-    description: string;
-    startTime: string; // ISO string
-    durationMin: number;
-  }) => {
-    const start = new Date(eventDetails.startTime);
-    const end = new Date(start.getTime() + eventDetails.durationMin * 60000);
-
-    const event = {
-      summary: eventDetails.summary,
-      description: eventDetails.description,
-      start: {
-        dateTime: start.toISOString(),
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-      end: {
-        dateTime: end.toISOString(),
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-    };
-
-    try {
-      const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(event),
-      });
-      return await response.json();
-    } catch (error) {
-      console.error('Error updating calendar event', error);
-      return null;
-    }
-  },
-
   deleteEvent: async (accessToken: string, eventId: string) => {
     try {
       const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
