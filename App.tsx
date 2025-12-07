@@ -431,13 +431,17 @@ const ServiceManager: React.FC<{
   services: Service[];
   onAddService: (s: Service) => void;
   onDeleteService: (id: string) => void;
-}> = ({ services, onAddService, onDeleteService }) => {
+  onSyncServices: (s: Service[]) => void;
+  accessToken: string | null;
+  sheetId: string;
+}> = ({ services, onAddService, onDeleteService, onSyncServices, accessToken, sheetId }) => {
     const [name, setName] = useState('');
     const [price, setPrice] = useState('');
     const [desc, setDesc] = useState('');
     const [category, setCategory] = useState<'principal' | 'adicional'>('principal');
     const [size, setSize] = useState('Todos');
     const [coat, setCoat] = useState('Todos');
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const handleAdd = () => {
         if(name && price) {
@@ -455,6 +459,61 @@ const ServiceManager: React.FC<{
         }
     }
 
+    const handleSync = async () => {
+        if (!accessToken || !sheetId) {
+            alert("Erro: Faça login e configure a planilha primeiro.");
+            return;
+        }
+
+        setIsSyncing(true);
+        try {
+            // Lendo a aba "Serviço" colunas A até E
+            const rows = await googleService.getSheetValues(accessToken, sheetId, 'Serviço!A:E');
+            
+            if(!rows || rows.length < 2) {
+                alert("Aba 'Serviço' vazia ou não encontrada. Verifique se o nome da aba está correto (sem 's' no final).");
+                return;
+            }
+
+            const newServices: Service[] = [];
+            
+            rows.slice(1).forEach((row: string[], idx: number) => {
+                const sName = row[0];
+                const sCat = (row[1] || 'principal').toLowerCase().includes('adicional') ? 'adicional' : 'principal';
+                // Regra: Se estiver vazio, considera "Todos"
+                const sSize = row[2] && row[2].trim() !== '' ? row[2] : 'Todos';
+                const sCoat = row[3] && row[3].trim() !== '' ? row[3] : 'Todos';
+                const sPrice = parseFloat(row[4] || '0');
+
+                if (sName) {
+                    newServices.push({
+                        id: `sheet_svc_${idx}_${Date.now()}`,
+                        name: sName,
+                        category: sCat as any,
+                        targetSize: sSize,
+                        targetCoat: sCoat,
+                        price: sPrice,
+                        description: `Importado da planilha`,
+                        durationMin: 60
+                    });
+                }
+            });
+
+            if (newServices.length > 0) {
+                onSyncServices(newServices);
+                alert(`${newServices.length} serviços importados com sucesso! Preços atualizados.`);
+            } else {
+                alert("Nenhum serviço válido encontrado na planilha.");
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert("Erro ao sincronizar serviços. Verifique a aba 'Serviço' na planilha.");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     // Group services for display
     const groupedServices = services.reduce((acc, curr) => {
         const key = curr.category === 'principal' ? 'Principais' : 'Adicionais';
@@ -465,9 +524,20 @@ const ServiceManager: React.FC<{
 
     return (
         <div className="space-y-6">
-             <h2 className="text-2xl font-bold text-gray-800">Catálogo de Serviços</h2>
+             <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-800">Catálogo de Serviços</h2>
+                <button 
+                    onClick={handleSync} 
+                    disabled={isSyncing}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm transition disabled:opacity-70"
+                >
+                    <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
+                    {isSyncing ? 'Importando...' : 'Sincronizar da Planilha'}
+                </button>
+             </div>
+
              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-sm font-bold text-gray-500 uppercase mb-4">Adicionar Novo Serviço</h3>
+                <h3 className="text-sm font-bold text-gray-500 uppercase mb-4">Adicionar Novo Serviço Manualmente</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div className="md:col-span-2">
                         <label className="text-xs font-semibold text-gray-500">Nome do Serviço</label>
@@ -1078,9 +1148,18 @@ const ScheduleManager: React.FC<{
 
                             <div className="border-t pt-2">
                                 <p className="text-xs font-bold text-gray-500 mb-2">Serviços Adicionais (Opcional)</p>
-                                <select value={selAdd1} onChange={e => setSelAdd1(e.target.value)} className="w-full border p-2 rounded mb-2 text-sm" disabled={!selPet}><option value="">Adicional 1...</option>{availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}</select>
-                                <select value={selAdd2} onChange={e => setSelAdd2(e.target.value)} className="w-full border p-2 rounded mb-2 text-sm" disabled={!selPet}><option value="">Adicional 2...</option>{availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}</select>
-                                <select value={selAdd3} onChange={e => setSelAdd3(e.target.value)} className="w-full border p-2 rounded text-sm" disabled={!selPet}><option value="">Adicional 3...</option>{availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}</select>
+                                <select value={selAdd1} onChange={e => setSelAdd1(e.target.value)} className="w-full border p-2 rounded mb-2 text-sm" disabled={!selPet}>
+                                    <option value="">Adicional 1...</option>
+                                    {availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}
+                                </select>
+                                <select value={selAdd2} onChange={e => setSelAdd2(e.target.value)} className="w-full border p-2 rounded mb-2 text-sm" disabled={!selPet}>
+                                    <option value="">Adicional 2...</option>
+                                    {availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}
+                                </select>
+                                <select value={selAdd3} onChange={e => setSelAdd3(e.target.value)} className="w-full border p-2 rounded text-sm" disabled={!selPet}>
+                                    <option value="">Adicional 3...</option>
+                                    {availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}
+                                </select>
                             </div>
                         </div>
 
@@ -1210,6 +1289,11 @@ const App: React.FC = () => {
     db.saveServices(updated);
   }
 
+  const handleSyncServices = (newServices: Service[]) => {
+      setServices(newServices);
+      db.saveServices(newServices);
+  }
+
   // Sync APPOINTMENTS (Read from Sheet)
   const handleSyncAppointments = async () => {
       if (!accessToken || !SHEET_ID) return;
@@ -1286,6 +1370,17 @@ const App: React.FC = () => {
 
               // Find Service
               const service = services.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || services[0];
+              
+              // Find Additional Services
+              const addServiceIds: string[] = [];
+              const addSvcNames = [row[8], row[9], row[10]];
+              
+              addSvcNames.forEach(name => {
+                  if (name) {
+                      const foundSvc = services.find(s => s.name.toLowerCase() === name.toLowerCase().trim());
+                      if (foundSvc) addServiceIds.push(foundSvc.id);
+                  }
+              });
 
               if(client && pet) {
                   loadedApps.push({
@@ -1293,7 +1388,7 @@ const App: React.FC = () => {
                       clientId: client.id,
                       petId: pet.id,
                       serviceId: service?.id || 'unknown',
-                      additionalServiceIds: [], 
+                      additionalServiceIds: addServiceIds, 
                       date: isoDate,
                       status: 'agendado', 
                       notes: row[13],
@@ -1421,7 +1516,7 @@ const App: React.FC = () => {
       <Layout currentView={currentView} setView={setCurrentView} googleUser={googleUser} onLogin={() => googleService.login()} onLogout={handleLogout}>
         {currentView === 'dashboard' && <Dashboard appointments={appointments} services={services} clients={clients} />}
         {currentView === 'clients' && <ClientManager clients={clients} onSyncClients={handleSyncClients} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
-        {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} />}
+        {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={handleSyncServices} accessToken={accessToken} sheetId={SHEET_ID} />}
         {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onUpdateStatus={handleUpdateAppStatus} onDelete={handleDeleteApp} onSync={handleSyncAppointments} googleUser={googleUser} isSyncing={isSyncing} />}
       </Layout>
     </HashRouter>
