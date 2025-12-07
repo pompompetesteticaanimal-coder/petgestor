@@ -185,7 +185,11 @@ const RevenueView: React.FC<{
           if (isPaid) paidRevenue += gross;
           else pendingRevenue += gross;
       });
-      return { totalPets, totalTosas, paidRevenue, pendingRevenue, grossRevenue: paidRevenue + pendingRevenue };
+      
+      const grossRevenue = paidRevenue + pendingRevenue;
+      const averageTicket = totalPets > 0 ? grossRevenue / totalPets : 0;
+
+      return { totalPets, totalTosas, paidRevenue, pendingRevenue, grossRevenue, averageTicket };
   };
 
   // --- Chart Data Generators ---
@@ -410,6 +414,56 @@ const RevenueView: React.FC<{
                       <StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" />
                       <StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" />
                   </div>
+
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-6 animate-fade-in">
+                        <h3 className="p-4 text-sm font-bold text-gray-700 border-b border-gray-100 flex items-center gap-2">
+                            <FileText size={16}/> Detalhamento do Dia
+                        </h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
+                                    <tr>
+                                        <th className="p-3">Horário</th>
+                                        <th className="p-3">Cliente</th>
+                                        <th className="p-3">Pet</th>
+                                        <th className="p-3">Serviços</th>
+                                        <th className="p-3 text-right">Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {dailyApps.length === 0 ? (
+                                        <tr><td colSpan={5} className="p-4 text-center text-gray-400">Nenhum agendamento neste dia.</td></tr>
+                                    ) : (
+                                        dailyApps.sort((a,b) => a.date.localeCompare(b.date)).map(app => {
+                                            const client = clients.find(c => c.id === app.clientId);
+                                            const pet = client?.pets.find(p => p.id === app.petId);
+                                            const mainSvc = services.find(s => s.id === app.serviceId);
+                                            const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x=>x);
+                                            const val = calculateGrossRevenue(app);
+                                            return (
+                                                <tr key={app.id} className="hover:bg-gray-50">
+                                                    <td className="p-3 font-mono text-xs text-gray-600">
+                                                        {new Date(app.date).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
+                                                    </td>
+                                                    <td className="p-3 font-medium text-gray-800">{client?.name}</td>
+                                                    <td className="p-3 text-gray-600">{pet?.name}</td>
+                                                    <td className="p-3 text-xs text-gray-500">
+                                                        <span className="font-bold text-brand-600">{mainSvc?.name}</span>
+                                                        {addSvcs && addSvcs.length > 0 && (
+                                                            <span className="text-gray-400"> + {addSvcs.map(s => s?.name).join(', ')}</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3 text-right font-bold text-green-600">
+                                                        R$ {val.toFixed(2)}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                  </div>
               </section>
           )}
 
@@ -422,7 +476,7 @@ const RevenueView: React.FC<{
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                       <StatCard title="Pets da Semana" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-indigo-500" />
-                      <StatCard title="Tosas da Semana" value={weeklyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" />
+                      <StatCard title="Ticket Médio" value={`R$ ${weeklyStats.averageTicket.toFixed(2)}`} icon={DollarSign} colorClass="bg-teal-500" subValue="Por Pet" />
                       <StatCard title="Total Pago" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-500" />
                       <StatCard title="Pendente" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-rose-500" />
                   </div>
@@ -452,7 +506,7 @@ const RevenueView: React.FC<{
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                       <StatCard title="Total de Pets" value={monthlyStats.totalPets} icon={PawPrint} colorClass="bg-purple-500" />
-                      <StatCard title="Total de Tosas" value={monthlyStats.totalTosas} icon={Scissors} colorClass="bg-pink-500" />
+                      <StatCard title="Ticket Médio" value={`R$ ${monthlyStats.averageTicket.toFixed(2)}`} icon={DollarSign} colorClass="bg-teal-500" subValue="Por Pet" />
                       <StatCard title="Receita Paga" value={`R$ ${monthlyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-500" />
                       <StatCard title="A Receber" value={`R$ ${monthlyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-red-500" />
                   </div>
@@ -484,7 +538,7 @@ const RevenueView: React.FC<{
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                       <StatCard title="Total Pets" value={yearlyStats.totalPets} icon={PawPrint} colorClass="bg-sky-500" />
-                      <StatCard title="Total Tosas" value={yearlyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" />
+                      <StatCard title="Ticket Médio" value={`R$ ${yearlyStats.averageTicket.toFixed(2)}`} icon={DollarSign} colorClass="bg-teal-500" subValue="Por Pet" />
                       <StatCard title="Faturamento Total" value={`R$ ${yearlyStats.grossRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-green-500" />
                       <StatCard title="Pendência Total" value={`R$ ${yearlyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" />
                   </div>
