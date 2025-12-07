@@ -104,19 +104,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         </div>
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {/* Dashboard Group */}
+          {/* Operacional Group (Moved to Top) */}
           <div className="pb-2">
-            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Dashboard</p>
-            <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-            <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-          </div>
-
-          <div className="border-t border-gray-100 pt-2">
              <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Operacional</p>
              <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
              <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
              <NavItem view="clients" current={currentView} icon={Users} label="Clientes & Pets" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
              <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+          </div>
+
+          {/* Dashboard Group (Moved to Bottom) */}
+          <div className="border-t border-gray-100 pt-2">
+            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Dashboard</p>
+            <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+            <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
           </div>
         </nav>
         

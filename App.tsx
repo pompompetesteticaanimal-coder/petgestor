@@ -1767,7 +1767,7 @@ const ScheduleManager: React.FC<{
 };
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewState>('revenue');
+  const [currentView, setCurrentView] = useState<ViewState>('payments');
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
