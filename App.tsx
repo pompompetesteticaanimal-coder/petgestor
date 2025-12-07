@@ -13,7 +13,10 @@ import {
   Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
   Scissors, TrendingUp, AlertOctagon
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
+  LineChart, Line, CartesianGrid, Legend 
+} from 'recharts';
 
 // --- CONSTANTS ---
 const PREDEFINED_SHEET_ID = '1qbb0RoKxFfrdyTCyHd5rJRbLNBPcOEk4Y_ctyy-ujLw';
@@ -105,6 +108,23 @@ const Dashboard: React.FC<{
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
 
   // --- Helper Calculadora ---
+  const calculateRevenue = (app: Appointment) => {
+      // Retorna o valor TOTAL (Pago + Pendente) deste agendamento para fins de gráfico
+      if (app.status === 'cancelado') return 0;
+      
+      // Se tiver valor pago explícito, usa ele (assumindo que cobre tudo ou é o valor final acordado)
+      if (app.paymentMethod && app.paidAmount) return app.paidAmount;
+
+      // Se não, calcula o esperado
+      const mainSvc = services.find(s => s.id === app.serviceId);
+      let total = mainSvc?.price || 0;
+      app.additionalServiceIds?.forEach(id => {
+          const s = services.find(srv => srv.id === id);
+          if (s) total += s.price;
+      });
+      return total;
+  };
+
   const calculateStats = (apps: Appointment[]) => {
       let totalPets = 0;
       let totalTosas = 0;
@@ -139,9 +159,7 @@ const Dashboard: React.FC<{
           const isPaid = app.paymentMethod && app.paymentMethod.trim() !== '';
 
           if (isPaid) {
-              // Se está pago, usamos o valor registrado ou calculamos o valor do serviço se não houver registro
               paidRevenue += (app.paidAmount || 0);
-              // Fallback: Se por algum motivo estiver marcado como pago mas valor for 0, somamos o valor do serviço
               if (!app.paidAmount || app.paidAmount === 0) {
                    let val = mainSvc?.price || 0;
                    app.additionalServiceIds?.forEach(id => {
@@ -151,8 +169,6 @@ const Dashboard: React.FC<{
                    paidRevenue += val;
               }
           } else {
-              // Se não tem forma de pagamento, é PENDENTE
-              // Calculamos o valor esperado (Preço do Serviço Principal + Adicionais)
               let expected = mainSvc?.price || 0;
               app.additionalServiceIds?.forEach(id => {
                   const s = services.find(srv => srv.id === id);
@@ -165,12 +181,73 @@ const Dashboard: React.FC<{
       return { totalPets, totalTosas, paidRevenue, pendingRevenue };
   };
 
+  // --- Dados para Gráficos ---
+
+  // Gráfico Semanal (baseado na data selecionada)
+  const getWeeklyChartData = () => {
+      const date = new Date(selectedDate);
+      const day = date.getDay(); // 0 (Domingo) - 6 (Sábado)
+      const diff = date.getDate() - day; // Ajusta para o Domingo da semana
+      const startOfWeek = new Date(date);
+      startOfWeek.setDate(diff);
+
+      const data = [];
+      const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+      for (let i = 0; i < 7; i++) {
+          const current = new Date(startOfWeek);
+          current.setDate(startOfWeek.getDate() + i);
+          const dateStr = current.toISOString().split('T')[0];
+          
+          const dailyApps = appointments.filter(a => a.date.startsWith(dateStr));
+          const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateRevenue(app), 0);
+
+          data.push({
+              name: weekDays[i],
+              faturamento: totalRevenue,
+              date: dateStr
+          });
+      }
+      return data;
+  };
+
+  // Gráfico Mensal (Semanas do Mês)
+  const getMonthlyChartData = () => {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      
+      // Agrupar por semana (1 a 5)
+      const weeksData = [
+          { name: 'Sem 1', faturamento: 0 },
+          { name: 'Sem 2', faturamento: 0 },
+          { name: 'Sem 3', faturamento: 0 },
+          { name: 'Sem 4', faturamento: 0 },
+          { name: 'Sem 5', faturamento: 0 },
+      ];
+
+      appointments.forEach(app => {
+          if (!app.date.startsWith(selectedMonth)) return;
+          
+          const day = parseInt(app.date.split('T')[0].split('-')[2]);
+          const weekIndex = Math.ceil(day / 7) - 1; // 1-7 -> 0, 8-14 -> 1, etc.
+          
+          if (weekIndex >= 0 && weekIndex < 5) {
+              weeksData[weekIndex].faturamento += calculateRevenue(app);
+          }
+      });
+
+      return weeksData.filter(w => w.faturamento > 0 || w.name === 'Sem 1'); // Mostra pelo menos a sem 1 ou as que tem valor
+  };
+
   // --- Filtros ---
   const dailyApps = appointments.filter(a => a.date.startsWith(selectedDate));
   const monthlyApps = appointments.filter(a => a.date.startsWith(selectedMonth));
 
   const dailyStats = calculateStats(dailyApps);
   const monthlyStats = calculateStats(monthlyApps);
+  
+  const weeklyChartData = getWeeklyChartData();
+  const monthlyChartData = getMonthlyChartData();
 
   const StatCard = ({ title, value, icon: Icon, colorClass, subValue }: any) => (
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
@@ -202,7 +279,7 @@ const Dashboard: React.FC<{
                   className="bg-white border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-brand-200 outline-none shadow-sm"
               />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard 
                   title="Total de Pets" 
                   value={dailyStats.totalPets} 
@@ -231,6 +308,20 @@ const Dashboard: React.FC<{
                   subValue="Sem forma de pagamento"
               />
           </div>
+          
+          {/* GRÁFICO DIÁRIO (SEMANAL) */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-64">
+              <h3 className="text-sm font-bold text-gray-500 mb-4">Faturamento da Semana (Total)</h3>
+              <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={weeklyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} />
+                      <Tooltip formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Faturamento']} />
+                      <Line type="monotone" dataKey="faturamento" stroke="#0ea5e9" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                  </LineChart>
+              </ResponsiveContainer>
+          </div>
       </section>
 
       <div className="border-t border-gray-200"></div>
@@ -248,7 +339,7 @@ const Dashboard: React.FC<{
                   className="bg-white border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-purple-200 outline-none shadow-sm"
               />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard 
                   title="Total de Pets (Mês)" 
                   value={monthlyStats.totalPets} 
@@ -276,6 +367,20 @@ const Dashboard: React.FC<{
                   colorClass="bg-red-100 text-red-600" 
                   subValue="Ainda não pago"
               />
+          </div>
+
+           {/* GRÁFICO MENSAL (SEMANAS) */}
+           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-64">
+              <h3 className="text-sm font-bold text-gray-500 mb-4">Performance por Semana</h3>
+              <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} />
+                      <Tooltip formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Faturamento']} />
+                      <Line type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                  </LineChart>
+              </ResponsiveContainer>
           </div>
       </section>
     </div>
