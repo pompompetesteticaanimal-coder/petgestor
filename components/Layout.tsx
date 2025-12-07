@@ -1,7 +1,6 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { ViewState, GoogleUser } from '../types';
-import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronRight, ChevronLeft, TrendingUp, TrendingDown } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Menu } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -46,7 +45,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
   const touchStart = useRef<number | null>(null);
   const touchEnd = useRef<number | null>(null);
 
-  // --- SWIPE LOGIC ---
+  // --- SWIPE LOGIC (Only for Closing) ---
   const minSwipeDistance = 50;
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -62,9 +61,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
     if (!touchStart.current || !touchEnd.current) return;
     const distance = touchStart.current - touchEnd.current;
     const isLeftSwipe = distance > minSwipeDistance;
-    // const isRightSwipe = distance < -minSwipeDistance; // Logic removed requested by user
-
-    // Only allow closing via swipe, not opening
+    
+    // Only allow closing via swipe (Left Swipe), never opening
     if (isLeftSwipe && isSidebarOpen) {
       setIsSidebarOpen(false);
     }
@@ -94,8 +92,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       `}>
         <div className="p-6 flex items-center justify-between border-b border-gray-100 h-[72px]">
             <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">P</div>
-                <h1 className="text-xl font-bold text-gray-800">PetGestor</h1>
+                <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" onError={(e) => {
+                    // Fallback if image fails
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                }}/>
+                <div className="hidden w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">P</div>
+                <h1 className="text-xl font-bold text-gray-800">PomPomPet</h1>
             </div>
             {/* Close button inside sidebar on mobile */}
             <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-500">
@@ -104,7 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         </div>
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {/* Operacional Group (Moved to Top) */}
+          {/* Operacional Group */}
           <div className="pb-2">
              <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Operacional</p>
              <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
@@ -113,9 +116,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
              <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
           </div>
 
-          {/* Dashboard Group (Moved to Bottom) */}
+          {/* Dashboard Group */}
           <div className="border-t border-gray-100 pt-2">
-            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Dashboard</p>
+            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Gerencial</p>
             <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
             <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
           </div>
@@ -144,13 +147,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         </div>
       </aside>
 
-      {/* Floating Toggle Button (Mobile Only) */}
+      {/* Floating Toggle Button (Mobile Only) - ARROW ONLY */}
       <button 
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className={`
             md:hidden fixed bottom-6 left-4 z-50 
             w-12 h-12 rounded-full shadow-lg flex items-center justify-center 
-            transition-all duration-300
+            transition-all duration-300 border border-white/20
             ${isSidebarOpen ? 'bg-white text-gray-800' : 'bg-brand-600 text-white'}
         `}
       >
@@ -159,19 +162,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden w-full bg-gray-50">
-        {/* Mobile Header Title (Optional, keeping it clean) */}
-        <div className="md:hidden h-16 bg-white border-b flex items-center justify-center px-4 flex-shrink-0">
-             <h2 className="font-bold text-gray-800 text-lg">
-                {currentView === 'revenue' && 'Faturamento'}
-                {currentView === 'costs' && 'Custo Mensal'}
-                {currentView === 'payments' && 'Pagamentos'}
-                {currentView === 'schedule' && 'Agenda'}
-                {currentView === 'clients' && 'Clientes'}
-                {currentView === 'services' && 'Serviços'}
-             </h2>
-        </div>
-
-        <div className="flex-1 overflow-auto p-4 md:p-8 pb-24 md:pb-8">
+        <div className="flex-1 overflow-auto p-3 md:p-8 pb-24 md:pb-8">
             {children}
         </div>
       </main>
