@@ -548,15 +548,35 @@ const ScheduleManager: React.FC<{
     const [expandedDays, setExpandedDays] = useState<string[]>([todayStr]);
     const [showModal, setShowModal] = useState(false);
     
+    // Estado de Busca na Agenda
+    const [searchTerm, setSearchTerm] = useState('');
+
     // Form State (Agora inclui data)
     const [selDate, setSelDate] = useState(todayStr);
     const [selTime, setSelTime] = useState('09:00');
     const [selClient, setSelClient] = useState('');
     const [selPet, setSelPet] = useState('');
     const [selService, setSelService] = useState('');
+    const [searchClientModal, setSearchClientModal] = useState('');
 
-    // Agrupa agendamentos por dia
-    const groupedApps = appointments.reduce((acc, app) => {
+    // Filtrar agendamentos ANTES de agrupar
+    const filteredAppointments = appointments.filter(app => {
+        if (!searchTerm) return true;
+        
+        const client = clients.find(c => c.id === app.clientId);
+        const pet = client?.pets.find(p => p.id === app.petId);
+        const service = services.find(s => s.id === app.serviceId);
+        const term = searchTerm.toLowerCase();
+
+        return (
+            client?.name.toLowerCase().includes(term) ||
+            pet?.name.toLowerCase().includes(term) ||
+            service?.name.toLowerCase().includes(term)
+        );
+    });
+
+    // Agrupa agendamentos (filtrados) por dia
+    const groupedApps = filteredAppointments.reduce((acc, app) => {
         const date = app.date.split('T')[0];
         if (!acc[date]) acc[date] = [];
         acc[date].push(app);
@@ -565,6 +585,13 @@ const ScheduleManager: React.FC<{
 
     // Ordena as chaves (datas) cronologicamente
     const sortedDates = Object.keys(groupedApps).sort();
+
+    // Expande automaticamente dias encontrados na busca
+    useEffect(() => {
+        if(searchTerm) {
+            setExpandedDays(sortedDates);
+        }
+    }, [searchTerm, sortedDates.length]);
 
     const toggleDay = (date: string) => {
         if (expandedDays.includes(date)) {
@@ -585,6 +612,7 @@ const ScheduleManager: React.FC<{
                 status: 'agendado'
             });
             setShowModal(false);
+            setSearchClientModal('');
             // Auto expande o dia onde o agendamento foi criado
             if (!expandedDays.includes(selDate)) {
                 setExpandedDays(prev => [...prev, selDate]);
@@ -592,9 +620,15 @@ const ScheduleManager: React.FC<{
         }
     };
 
+    // Filtro para busca de cliente no MODAL
+    const filteredClientsForModal = clients.filter(c => 
+        c.name.toLowerCase().includes(searchClientModal.toLowerCase()) || 
+        c.phone.includes(searchClientModal)
+    );
+
     return (
         <div className="h-full flex flex-col gap-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                      <h2 className="text-2xl font-bold text-gray-800">Agenda</h2>
                      {googleUser && (
@@ -605,13 +639,24 @@ const ScheduleManager: React.FC<{
                 </div>
                 <button 
                     onClick={() => {
-                        setSelDate(todayStr); // Reset data para hoje ao abrir modal
+                        setSelDate(todayStr); 
                         setShowModal(true);
                     }} 
-                    className="bg-brand-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-brand-700 transition flex items-center justify-center gap-2 font-bold"
+                    className="bg-brand-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-brand-700 transition flex items-center justify-center gap-2 font-bold w-full md:w-auto"
                 >
                     <Plus /> Novo Agendamento
                 </button>
+            </div>
+
+            {/* Barra de Pesquisa da Agenda */}
+            <div className="relative">
+                <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+                <input 
+                    className="w-full pl-10 p-2.5 border rounded-lg focus:ring-2 ring-brand-200 outline-none bg-white shadow-sm"
+                    placeholder="Buscar na agenda (cliente, pet ou serviço)..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                />
             </div>
 
             {/* Timeline agrupada por dias */}
@@ -620,7 +665,7 @@ const ScheduleManager: React.FC<{
                     {sortedDates.length === 0 ? (
                         <div className="text-center text-gray-400 mt-10">
                             <CalendarIcon size={48} className="mx-auto mb-2 opacity-20"/>
-                            <p>Nenhum agendamento encontrado.</p>
+                            <p>{searchTerm ? 'Nenhum agendamento encontrado para esta busca.' : 'Nenhum agendamento encontrado.'}</p>
                         </div>
                     ) : (
                         sortedDates.map(date => {
@@ -695,17 +740,17 @@ const ScheduleManager: React.FC<{
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* Modal Novo Agendamento */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl animate-fade-in-down">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl animate-fade-in-down max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4 border-b pb-2">
                             <h3 className="text-lg font-bold text-gray-800">Novo Agendamento</h3>
                             <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
                         </div>
                         
                         <div className="space-y-4">
-                            {/* Data e Hora dentro do Modal */}
+                            {/* Data e Hora */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Data</label>
@@ -722,13 +767,47 @@ const ScheduleManager: React.FC<{
                                 </div>
                             </div>
 
+                            {/* Busca Inteligente de Cliente */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Cliente</label>
-                                <select value={selClient} onChange={e => {setSelClient(e.target.value); setSelPet('');}} className="w-full border p-2 rounded mt-1">
-                                    <option value="">Selecione...</option>
-                                    {clients.map(c => <option key={c.id} value={c.name}>{c.name} - {c.phone}</option>)}
-                                </select>
-                                {clients.length === 0 && <p className="text-xs text-red-500 mt-1">Sincronize a planilha de clientes primeiro.</p>}
+                                {!selClient ? (
+                                    <div className="mt-1 relative">
+                                        <Search className="absolute left-3 top-3 text-gray-400" size={16} />
+                                        <input 
+                                            className="w-full pl-9 p-2 border rounded focus:ring-2 ring-brand-200 outline-none"
+                                            placeholder="Buscar cliente..."
+                                            value={searchClientModal}
+                                            onChange={e => setSearchClientModal(e.target.value)}
+                                            autoFocus
+                                        />
+                                        {searchClientModal.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 bg-white border shadow-lg rounded mt-1 max-h-40 overflow-y-auto z-10">
+                                                {filteredClientsForModal.length === 0 ? (
+                                                    <div className="p-2 text-xs text-gray-500">Nenhum cliente encontrado.</div>
+                                                ) : (
+                                                    filteredClientsForModal.map(c => (
+                                                        <button 
+                                                            key={c.id} 
+                                                            onClick={() => { setSelClient(c.id); setSelPet(''); setSearchClientModal(''); }}
+                                                            className="w-full text-left p-2 hover:bg-brand-50 text-sm border-b last:border-0"
+                                                        >
+                                                            <div className="font-bold">{c.name}</div>
+                                                            <div className="text-xs text-gray-500">{c.phone}</div>
+                                                        </button>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
+                                        {clients.length === 0 && <p className="text-xs text-red-500 mt-1">Sincronize a planilha primeiro.</p>}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between p-3 bg-brand-50 border border-brand-200 rounded mt-1">
+                                        <span className="font-bold text-brand-800 text-sm">
+                                            {clients.find(c => c.id === selClient)?.name}
+                                        </span>
+                                        <button onClick={() => { setSelClient(''); setSelPet(''); }} className="text-red-500 hover:text-red-700 text-xs font-bold">Trocar</button>
+                                    </div>
+                                )}
                             </div>
 
                             {selClient && (
@@ -736,7 +815,7 @@ const ScheduleManager: React.FC<{
                                     <label className="block text-sm font-medium text-gray-700">Pet</label>
                                     <select value={selPet} onChange={e => setSelPet(e.target.value)} className="w-full border p-2 rounded mt-1">
                                         <option value="">Selecione...</option>
-                                        {clients.find(c => c.name === selClient)?.pets.map(p => (
+                                        {clients.find(c => c.id === selClient)?.pets.map(p => (
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
                                     </select>
