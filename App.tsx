@@ -11,7 +11,7 @@ import {
   ExternalLink, Settings, PawPrint, LogIn, ShieldAlert, Lock, Copy,
   ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
   Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
-  Scissors, TrendingUp, AlertOctagon, BarChart2
+  Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
@@ -106,39 +106,21 @@ const Dashboard: React.FC<{
 }> = ({ appointments, services, clients }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // --- Helper Calculadora de Status (Pago vs Pendente) para os CARDS ---
-  const calculateRevenueStatus = (app: Appointment) => {
-      if (app.status === 'cancelado') return { paid: 0, pending: 0 };
-      
-      const mainSvc = services.find(s => s.id === app.serviceId);
-      let expectedTotal = mainSvc?.price || 0;
-      app.additionalServiceIds?.forEach(id => {
-          const s = services.find(srv => srv.id === id);
-          if (s) expectedTotal += s.price;
-      });
-
-      // Se tiver valor explícito na planilha (Col R), usa ele como base de cálculo
-      if (app.paidAmount && app.paidAmount > 0) expectedTotal = app.paidAmount;
-
-      const isPaid = app.paymentMethod && app.paymentMethod.trim() !== '';
-
-      if (isPaid) {
-          return { paid: app.paidAmount || expectedTotal, pending: 0 };
-      } else {
-          return { paid: 0, pending: expectedTotal };
-      }
+  // --- Helpers ---
+  const getISOWeek = (date: Date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
   };
 
-  // --- Helper Calculadora de Faturamento BRUTO para os GRÁFICOS ---
-  // Ignora se está pago ou não (Col S), considera o valor do serviço ou o valor registrado na Col R
   const calculateGrossRevenue = (app: Appointment) => {
       if (app.status === 'cancelado') return 0;
-      
-      // 1. Se tiver valor na coluna R (PaidAmount), usa ele (preço negociado/real)
       if (app.paidAmount && app.paidAmount > 0) return app.paidAmount;
 
-      // 2. Se não tiver, calcula valor de tabela
       const mainSvc = services.find(s => s.id === app.serviceId);
       let total = mainSvc?.price || 0;
       app.additionalServiceIds?.forEach(id => {
@@ -155,11 +137,10 @@ const Dashboard: React.FC<{
       let pendingRevenue = 0;
 
       apps.forEach(app => {
-          if (app.status === 'cancelado') return; // Ignora cancelados
+          if (app.status === 'cancelado') return;
 
           totalPets++;
 
-          // 1. Calcular se tem Tosa (Apenas Normal e Tesoura)
           const isTargetTosa = (name?: string) => {
               if (!name) return false;
               const n = name.toLowerCase();
@@ -177,63 +158,39 @@ const Dashboard: React.FC<{
           }
           if (hasTosa) totalTosas++;
 
-          // 2. Calcular Financeiro (Pago vs Pendente)
-          const { paid, pending } = calculateRevenueStatus(app);
-          paidRevenue += paid;
-          pendingRevenue += pending;
+          const gross = calculateGrossRevenue(app);
+          const isPaid = app.paymentMethod && app.paymentMethod.trim() !== '';
+
+          if (isPaid) paidRevenue += gross;
+          else pendingRevenue += gross;
       });
 
-      return { totalPets, totalTosas, paidRevenue, pendingRevenue };
+      return { totalPets, totalTosas, paidRevenue, pendingRevenue, grossRevenue: paidRevenue + pendingRevenue };
   };
 
-  // --- Helper Semana ---
-  const getStartEndOfWeek = (dateStr: string) => {
-      const date = new Date(dateStr);
-      // Ajustar fuso horário para garantir dia correto
-      const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-      const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
-      
-      const day = adjustedDate.getDay(); // 0 (Dom) - 6 (Sab)
-      const diff = adjustedDate.getDate() - day; // Ajusta para o domingo
-      
-      const start = new Date(adjustedDate.setDate(diff));
-      start.setHours(0,0,0,0);
-      
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
-      end.setHours(23,59,59,999);
-      
-      return { start, end };
-  };
-
-  // --- Dados para Gráficos ---
-
-  // Gráfico Semanal (baseado na data selecionada)
+  // --- Gráfico Semanal (Terça a Sábado) ---
   const getWeeklyChartData = () => {
       const date = new Date(selectedDate);
-      const day = date.getDay(); // 0 (Domingo) - 6 (Sábado)
-      const diff = date.getDate() - day; // Ajusta para o Domingo da semana
+      const day = date.getDay(); 
+      // Ajustar para inicio da semana (Domingo) para poder calcular os dias
+      const diff = date.getDate() - day;
       const startOfWeek = new Date(date);
       startOfWeek.setDate(diff);
 
       const data = [];
-      const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+      const businessDays = [2, 3, 4, 5, 6]; // Ter, Qua, Qui, Sex, Sab
+      const weekDaysLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-      for (let i = 0; i < 7; i++) {
+      businessDays.forEach(dayIndex => {
           const current = new Date(startOfWeek);
-          current.setDate(startOfWeek.getDate() + i);
+          current.setDate(startOfWeek.getDate() + dayIndex);
           const dateStr = current.toISOString().split('T')[0];
           
           const dailyApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado');
-          
-          // USAR GROSS REVENUE (Independente de pagamento)
           const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateGrossRevenue(app), 0);
 
-          // Formato: 06/12/24 (Sex)
-          const formattedDate = current.toLocaleDateString('pt-BR', {
-              day: '2-digit', month: '2-digit', year: '2-digit'
-          });
-          const label = `${formattedDate} (${weekDays[i]})`;
+          const formattedDate = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+          const label = `${formattedDate} (${weekDaysLabels[dayIndex]})`;
 
           data.push({
               name: label,
@@ -241,57 +198,142 @@ const Dashboard: React.FC<{
               petsCount: dailyApps.length,
               date: dateStr
           });
+      });
+      return data;
+  };
+
+  // --- Gráfico Mensal (Por Semana do Ano com Comparação) ---
+  const getMonthlyChartData = () => {
+      const [yearStr, monthStr] = selectedMonth.split('-');
+      const year = parseInt(yearStr);
+      const month = parseInt(monthStr) - 1; // 0-indexed
+
+      // Helper para pegar dados de uma semana específica (Ano e Numero)
+      const getWeekData = (targetYear: number, targetWeek: number) => {
+          const apps = appointments.filter(app => {
+             if (app.status === 'cancelado') return false;
+             const d = new Date(app.date);
+             return getISOWeek(d) === targetWeek && d.getFullYear() === targetYear;
+          });
+          return apps.reduce((acc, app) => acc + calculateGrossRevenue(app), 0);
+      };
+
+      // Identificar quais semanas estão neste mês
+      const weeksInMonth = new Set<number>();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      for(let d=1; d<=daysInMonth; d++) {
+          const date = new Date(year, month, d);
+          weeksInMonth.add(getISOWeek(date));
+      }
+
+      const sortedWeeks = Array.from(weeksInMonth).sort((a,b) => a-b);
+      const chartData = [];
+
+      // Para comparação: Mês anterior
+      const prevMonthDate = new Date(year, month - 1, 1);
+      const prevMonthWeeks = new Set<number>();
+      const daysInPrevMonth = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0).getDate();
+      for(let d=1; d<=daysInPrevMonth; d++) {
+          prevMonthWeeks.add(getISOWeek(new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), d)));
+      }
+      const sortedPrevWeeks = Array.from(prevMonthWeeks).sort((a,b) => a-b);
+
+      sortedWeeks.forEach((weekNum, index) => {
+          const currentRevenue = getWeekData(year, weekNum);
+          
+          // Comparar com a mesma "ordem" de semana do mês anterior
+          // Ex: 1ª semana de Out com 1ª semana de Set
+          let growth = 0;
+          let prevRevenue = 0;
+          
+          if (sortedPrevWeeks[index]) {
+             prevRevenue = getWeekData(prevMonthDate.getFullYear(), sortedPrevWeeks[index]);
+             if (prevRevenue > 0) {
+                 growth = ((currentRevenue - prevRevenue) / prevRevenue) * 100;
+             }
+          }
+
+          chartData.push({
+              name: `W${weekNum}`,
+              fullName: `Semana ${weekNum}`,
+              faturamento: currentRevenue,
+              petsCount: appointments.filter(a => getISOWeek(new Date(a.date)) === weekNum && new Date(a.date).getFullYear() === year && a.status !== 'cancelado').length,
+              growth: growth,
+              hasPrev: prevRevenue > 0
+          });
+      });
+
+      return chartData;
+  };
+
+  // --- Gráfico Anual ---
+  const getYearlyChartData = () => {
+      const data = [];
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+      for (let i = 0; i < 12; i++) {
+          const monthApps = appointments.filter(a => {
+              const d = new Date(a.date);
+              return d.getFullYear() === selectedYear && d.getMonth() === i && a.status !== 'cancelado';
+          });
+          
+          const stats = calculateStats(monthApps);
+          
+          // Comparação com mês anterior
+          let revGrowth = 0;
+          let petsGrowth = 0;
+          
+          if (i > 0) {
+              const prevApps = appointments.filter(a => {
+                  const d = new Date(a.date);
+                  return d.getFullYear() === selectedYear && d.getMonth() === (i - 1) && a.status !== 'cancelado';
+              });
+              const prevStats = calculateStats(prevApps);
+              
+              if(prevStats.grossRevenue > 0) revGrowth = ((stats.grossRevenue - prevStats.grossRevenue) / prevStats.grossRevenue) * 100;
+              if(prevStats.totalPets > 0) petsGrowth = ((stats.totalPets - prevStats.totalPets) / prevStats.totalPets) * 100;
+          }
+
+          data.push({
+              name: monthNames[i],
+              faturamento: stats.grossRevenue,
+              petsCount: stats.totalPets,
+              revGrowth: i > 0 ? revGrowth : 0,
+              petsGrowth: i > 0 ? petsGrowth : 0
+          });
       }
       return data;
   };
 
-  // Gráfico Mensal (Semanas do Mês)
-  const getMonthlyChartData = () => {
-      const [yearStr, monthStr] = selectedMonth.split('-');
-      const yearShort = yearStr.slice(-2);
-      
-      // Agrupar por semana (1 a 5)
-      const weeksData = [
-          { name: `S1/${yearShort}`, faturamento: 0, petsCount: 0 },
-          { name: `S2/${yearShort}`, faturamento: 0, petsCount: 0 },
-          { name: `S3/${yearShort}`, faturamento: 0, petsCount: 0 },
-          { name: `S4/${yearShort}`, faturamento: 0, petsCount: 0 },
-          { name: `S5/${yearShort}`, faturamento: 0, petsCount: 0 },
-      ];
-
-      appointments.forEach(app => {
-          if (!app.date.startsWith(selectedMonth) || app.status === 'cancelado') return;
-          
-          const day = parseInt(app.date.split('T')[0].split('-')[2]);
-          const weekIndex = Math.ceil(day / 7) - 1; // 1-7 -> 0, 8-14 -> 1, etc.
-          
-          if (weekIndex >= 0 && weekIndex < 5) {
-              // USAR GROSS REVENUE
-              weeksData[weekIndex].faturamento += calculateGrossRevenue(app);
-              weeksData[weekIndex].petsCount += 1;
-          }
-      });
-
-      return weeksData.filter(w => w.faturamento > 0 || w.name.startsWith('S1')); 
-  };
-
-  // --- Filtros ---
+  // --- Calculations for Cards ---
   const dailyApps = appointments.filter(a => a.date.startsWith(selectedDate));
-  const monthlyApps = appointments.filter(a => a.date.startsWith(selectedMonth));
-  
-  // Weekly Apps
-  const { start: weekStart, end: weekEnd } = getStartEndOfWeek(selectedDate);
+  const dailyStats = calculateStats(dailyApps);
+
+  const { start: weekStart, end: weekEnd } = (() => {
+      const date = new Date(selectedDate);
+      const day = date.getDay();
+      const diff = date.getDate() - day;
+      const start = new Date(date); start.setDate(diff); // Domingo
+      const end = new Date(start); end.setDate(start.getDate() + 6); // Sabado
+      return { start, end };
+  })();
+
   const weeklyApps = appointments.filter(a => {
       const d = new Date(a.date);
       return d >= weekStart && d <= weekEnd;
   });
-
-  const dailyStats = calculateStats(dailyApps);
   const weeklyStats = calculateStats(weeklyApps);
+
+  const monthlyApps = appointments.filter(a => a.date.startsWith(selectedMonth));
   const monthlyStats = calculateStats(monthlyApps);
-  
+
+  const yearlyApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
+  const yearlyStats = calculateStats(yearlyApps);
+
   const weeklyChartData = getWeeklyChartData();
   const monthlyChartData = getMonthlyChartData();
+  const yearlyChartData = getYearlyChartData();
 
   const StatCard = ({ title, value, icon: Icon, colorClass, subValue }: any) => (
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition">
@@ -308,8 +350,19 @@ const Dashboard: React.FC<{
       </div>
   );
 
+  const GrowthBadge = ({ val, hasPrev = true }: {val: number, hasPrev?: boolean}) => {
+      if(!hasPrev) return <span className="text-[10px] text-gray-400">Sem dados ant.</span>;
+      const isPos = val >= 0;
+      return (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 ${isPos ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {isPos ? <TrendingUp size={10}/> : <TrendingDown size={10}/>}
+              {Math.abs(val).toFixed(1)}%
+          </span>
+      )
+  };
+
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 animate-fade-in pb-10">
       {/* SEÇÃO DIA */}
       <section>
           <div className="flex justify-between items-center mb-4">
@@ -324,98 +377,44 @@ const Dashboard: React.FC<{
               />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard 
-                  title="Total de Pets" 
-                  value={dailyStats.totalPets} 
-                  icon={PawPrint} 
-                  colorClass="bg-blue-100 text-blue-600" 
-              />
-              <StatCard 
-                  title="Total de Tosas" 
-                  value={dailyStats.totalTosas} 
-                  icon={Scissors} 
-                  colorClass="bg-orange-100 text-orange-600" 
-                  subValue="Normal e Tesoura"
-              />
-              <StatCard 
-                  title="Receita Paga" 
-                  value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} 
-                  icon={CheckCircle} 
-                  colorClass="bg-green-100 text-green-600" 
-              />
-              <StatCard 
-                  title="Receita Pendente" 
-                  value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} 
-                  icon={AlertCircle} 
-                  colorClass="bg-red-100 text-red-600" 
-              />
+              <StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-100 text-blue-600" />
+              <StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" subValue="Normal e Tesoura" />
+              <StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-100 text-green-600" />
+              <StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-100 text-red-600" />
           </div>
       </section>
 
       <div className="border-t border-gray-200"></div>
 
-      {/* SEÇÃO SEMANA (NOVA) */}
+      {/* SEÇÃO SEMANA */}
       <section>
           <div className="flex items-center gap-2 mb-4">
               <BarChart2 className="text-indigo-600" />
               <h2 className="text-xl font-bold text-gray-800">Visão Semanal</h2>
               <span className="text-xs text-gray-400 font-normal ml-2">
-                ({weekStart.toLocaleDateString('pt-BR')} até {weekEnd.toLocaleDateString('pt-BR')})
+                (Considerando Terça a Sábado)
               </span>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard 
-                  title="Pets da Semana" 
-                  value={weeklyStats.totalPets} 
-                  icon={PawPrint} 
-                  colorClass="bg-indigo-100 text-indigo-600" 
-              />
-              <StatCard 
-                  title="Tosas da Semana" 
-                  value={weeklyStats.totalTosas} 
-                  icon={Scissors} 
-                  colorClass="bg-orange-100 text-orange-600" 
-              />
-              <StatCard 
-                  title="Total Pago (Sem)" 
-                  value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} 
-                  icon={Wallet} 
-                  colorClass="bg-emerald-100 text-emerald-600" 
-              />
-              <StatCard 
-                  title="Pendente (Sem)" 
-                  value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} 
-                  icon={AlertOctagon} 
-                  colorClass="bg-rose-100 text-rose-600" 
-              />
+              <StatCard title="Pets da Semana" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-indigo-100 text-indigo-600" />
+              <StatCard title="Tosas da Semana" value={weeklyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" />
+              <StatCard title="Total Pago (Sem)" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-100 text-emerald-600" />
+              <StatCard title="Pendente (Sem)" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-rose-100 text-rose-600" />
           </div>
 
-          {/* GRÁFICO DIÁRIO DA SEMANA (Linha + Barras) */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
               <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
-                  <TrendingUp size={16}/> Evolução do Faturamento Bruto (Pago + Pendente)
+                  <TrendingUp size={16}/> Faturamento (Terça - Sábado)
               </h3>
               <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={weeklyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                      
-                      {/* Eixo Y da Esquerda (Dinheiro) */}
                       <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} />
-                      
-                      {/* Eixo Y da Direita (Qtd Pets) */}
                       <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-
-                      <Tooltip formatter={(value: number, name: string) => [
-                          name === 'faturamento' ? `R$ ${value.toFixed(2)}` : value, 
-                          name === 'faturamento' ? 'Faturamento Total' : 'Pets'
-                      ]} />
-                      
-                      {/* Barras (Pets) */}
+                      <Tooltip formatter={(value: number, name: string) => [name === 'faturamento' ? `R$ ${value.toFixed(2)}` : value, name === 'faturamento' ? 'Faturamento' : 'Pets']} />
                       <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#bfdbfe" radius={[4, 4, 0, 0]} barSize={30} />
-                      
-                      {/* Linha (Faturamento) */}
                       <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#4f46e5" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
                           <LabelList dataKey="faturamento" position="top" style={{fontSize: 10, fill: '#4f46e5', fontWeight: 'bold'}} formatter={(val: number) => `R$${val}`}/>
                       </Line>
@@ -440,58 +439,121 @@ const Dashboard: React.FC<{
               />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard 
-                  title="Total de Pets (Mês)" 
-                  value={monthlyStats.totalPets} 
-                  icon={PawPrint} 
-                  colorClass="bg-purple-100 text-purple-600" 
-              />
-              <StatCard 
-                  title="Total de Tosas (Mês)" 
-                  value={monthlyStats.totalTosas} 
-                  icon={Scissors} 
-                  colorClass="bg-pink-100 text-pink-600"
-                  subValue="Normal e Tesoura"
-              />
-              <StatCard 
-                  title="Receita Total Paga" 
-                  value={`R$ ${monthlyStats.paidRevenue.toFixed(2)}`} 
-                  icon={Wallet} 
-                  colorClass="bg-emerald-100 text-emerald-600" 
-                  subValue="Caixa confirmado"
-              />
-              <StatCard 
-                  title="Estimativa Pendente" 
-                  value={`R$ ${monthlyStats.pendingRevenue.toFixed(2)}`} 
-                  icon={AlertOctagon} 
-                  colorClass="bg-red-100 text-red-600" 
-                  subValue="Ainda não pago"
-              />
+              <StatCard title="Total de Pets (Mês)" value={monthlyStats.totalPets} icon={PawPrint} colorClass="bg-purple-100 text-purple-600" />
+              <StatCard title="Total de Tosas (Mês)" value={monthlyStats.totalTosas} icon={Scissors} colorClass="bg-pink-100 text-pink-600" subValue="Normal e Tesoura" />
+              <StatCard title="Receita Paga" value={`R$ ${monthlyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-100 text-emerald-600" />
+              <StatCard title="A Receber" value={`R$ ${monthlyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-red-100 text-red-600" />
           </div>
 
-           {/* GRÁFICO MENSAL (SEMANAS) - Linha + Barras */}
            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
               <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
-                  <TrendingUp size={16}/> Performance Total por Semana (SS/AA)
+                  <TrendingUp size={16}/> Comparativo Semanal (Semana Ano vs Mês Anterior)
               </h3>
               <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={monthlyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
-                      
                       <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} />
                       <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-
-                      <Tooltip formatter={(value: number, name: string) => [
-                          name === 'faturamento' ? `R$ ${value.toFixed(2)}` : value, 
-                          name === 'faturamento' ? 'Faturamento Total' : 'Pets'
-                      ]} />
-                      
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                    <div className="bg-white p-2 border shadow-sm rounded text-xs">
+                                        <p className="font-bold">{data.fullName}</p>
+                                        <p>Faturamento: R$ {data.faturamento.toFixed(2)}</p>
+                                        <p>Pets: {data.petsCount}</p>
+                                        <div className="mt-1 pt-1 border-t">
+                                            <span className="text-gray-500">vs Mês Ant: </span>
+                                            <GrowthBadge val={data.growth} hasPrev={data.hasPrev} />
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        }}
+                      />
                       <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={40} />
-                      
                       <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#9333ea" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
-                          <LabelList dataKey="faturamento" position="top" style={{fontSize: 10, fill: '#9333ea', fontWeight: 'bold'}} formatter={(val: number) => `R$${val}`}/>
+                          <LabelList dataKey="growth" position="top" content={(props: any) => {
+                              const { x, y, value, index } = props;
+                              const hasPrev = monthlyChartData[index]?.hasPrev;
+                              return (
+                                  <g transform={`translate(${x},${y - 15})`}>
+                                      <foreignObject width="60" height="20" x="-30">
+                                          <div className="flex justify-center">
+                                            <GrowthBadge val={value} hasPrev={hasPrev} />
+                                          </div>
+                                      </foreignObject>
+                                  </g>
+                              );
+                          }} />
                       </Line>
+                  </ComposedChart>
+              </ResponsiveContainer>
+          </div>
+      </section>
+
+      <div className="border-t border-gray-200"></div>
+
+      {/* SEÇÃO ANO (NOVA) */}
+      <section>
+          <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <Calendar className="text-sky-600"/> Visão Anual
+              </h2>
+              <select 
+                  value={selectedYear} 
+                  onChange={e => setSelectedYear(parseInt(e.target.value))}
+                  className="bg-white border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-sky-200 outline-none shadow-sm"
+              >
+                  {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard title="Total Pets (Ano)" value={yearlyStats.totalPets} icon={PawPrint} colorClass="bg-sky-100 text-sky-600" />
+              <StatCard title="Total Tosas (Ano)" value={yearlyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" />
+              <StatCard title="Faturamento Total" value={`R$ ${yearlyStats.grossRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-green-100 text-green-600" />
+              <StatCard title="Pendência Total" value={`R$ ${yearlyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-100 text-red-600" />
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
+              <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
+                  <TrendingUp size={16}/> Evolução Mensal (Comparativo MoM%)
+              </h3>
+              <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={yearlyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                      <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val/1000}k`} />
+                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                      
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                    <div className="bg-white p-2 border shadow-sm rounded text-xs w-40">
+                                        <p className="font-bold mb-1">{data.name}</p>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span>Fat: R${data.faturamento.toFixed(0)}</span>
+                                            <GrowthBadge val={data.revGrowth} hasPrev={data.name !== 'Jan'} />
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span>Pets: {data.petsCount}</span>
+                                            <GrowthBadge val={data.petsGrowth} hasPrev={data.name !== 'Jan'} />
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        }}
+                      />
+
+                      <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#bae6fd" radius={[4, 4, 0, 0]} barSize={30} />
+                      <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#0ea5e9" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
                   </ComposedChart>
               </ResponsiveContainer>
           </div>
