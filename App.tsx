@@ -388,7 +388,6 @@ const ClientManager: React.FC<{
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato / Endereço</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pet(s)</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -415,9 +414,6 @@ const ClientManager: React.FC<{
                                             </div>
                                         ))}
                                     </div>
-                                </td>
-                                <td className="px-6 py-4 text-right text-sm font-medium">
-                                    <button onClick={() => onDeleteClient(client.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
                                 </td>
                             </tr>
                         ))}
