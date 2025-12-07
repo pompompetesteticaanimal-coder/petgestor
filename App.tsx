@@ -1316,17 +1316,30 @@ const ScheduleManager: React.FC<{
     const [selectedService, setSelectedService] = useState<string>('');
     const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [time, setTime] = useState('');
+    const [time, setTime] = useState('09:00');
     const [notes, setNotes] = useState('');
 
     const resetForm = () => {
         setClientSearch(''); setSelectedClient(''); setSelectedPet(''); setSelectedService('');
-        setSelectedAddServices([]); setTime(''); setNotes('');
+        setSelectedAddServices([]); setTime('09:00'); setNotes('');
         setIsModalOpen(false);
     };
 
     const handleSave = () => {
         if (!selectedClient || !selectedPet || !selectedService || !date || !time) return;
+
+        // Check for Sunday (0) or Monday (1)
+        const d = new Date(date);
+        const day = d.getDay(); // 0-6 (Sun-Sat) -- Note: 'date' string is YYYY-MM-DD, parsing in local time might be tricky, use getUTCDay or explicit construction
+        // Construct date to check day correctly
+        const [y, m, dt] = date.split('-').map(Number);
+        const checkDate = new Date(y, m-1, dt);
+        const checkDay = checkDate.getDay();
+
+        if (checkDay === 0 || checkDay === 1) {
+            alert("A agenda está fechada Domingos e Segundas.");
+            return;
+        }
 
         const client = clients.find(c => c.id === selectedClient);
         const pet = client?.pets.find(p => p.id === selectedPet);
@@ -1381,6 +1394,19 @@ const ScheduleManager: React.FC<{
         setCurrentDate(newDate);
     };
 
+    // Generate Time Slots (09:00 - 18:00, 15 min intervals)
+    const generateTimeOptions = () => {
+        const slots = [];
+        for (let h = 9; h <= 18; h++) {
+            ['00', '15', '30', '45'].forEach(m => {
+                if(h === 18 && m !== '00') return; // Stop at 18:00
+                slots.push(`${String(h).padStart(2, '0')}:${m}`);
+            });
+        }
+        return slots;
+    };
+    const timeOptions = generateTimeOptions();
+
     // Calendar Renderers
     const renderCalendar = () => {
         const start = new Date(currentDate);
@@ -1410,9 +1436,10 @@ const ScheduleManager: React.FC<{
                          const dateStr = d.toISOString().split('T')[0];
                          const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado');
                          const isToday = dateStr === new Date().toISOString().split('T')[0];
+                         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
 
                          return (
-                             <div key={idx} className={`bg-white p-1 min-h-[80px] flex flex-col border border-gray-50 ${isToday ? 'bg-blue-50' : ''}`}>
+                             <div key={idx} className={`bg-white p-1 min-h-[80px] flex flex-col border border-gray-50 ${isToday ? 'bg-blue-50' : ''} ${isWeekend ? 'bg-gray-50/50' : ''}`}>
                                  <div className={`text-xs font-bold mb-1 ${isToday ? 'text-brand-600' : 'text-gray-500'}`}>{d.getDate()}</div>
                                  <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar">
                                      {dayApps.map(app => {
@@ -1436,25 +1463,29 @@ const ScheduleManager: React.FC<{
         }
 
         // --- WEEK/DAY VIEW ---
+        // Adjust Start of Week to always calculate from Sunday, but we will filter what we show
         const startOfWeek = new Date(start);
         startOfWeek.setDate(start.getDate() - start.getDay()); // Sunday
         
-        const daysToShow = viewMode === 'week' ? 7 : 1;
-        const colStart = viewMode === 'week' ? startOfWeek : start;
-
-        const hours = Array.from({length: 12}, (_, i) => i + 8); // 8:00 to 19:00
+        // Define Days to Show based on Mode
+        // If Week: Tue(2) to Sat(6)
+        // If Day: Just the current day (but if it's Sun/Mon, maybe show warning? For now just render it)
+        let daysIndices = viewMode === 'week' ? [2, 3, 4, 5, 6] : [start.getDay()];
+        
+        // Working Hours 9 to 18
+        const hours = Array.from({length: 10}, (_, i) => i + 9); 
 
         return (
             <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
                 {/* Header */}
                 <div className="flex border-b border-gray-200">
                     <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50"></div>
-                    {Array.from({length: daysToShow}).map((_, i) => {
-                        const d = new Date(colStart);
-                        d.setDate(d.getDate() + i);
+                    {daysIndices.map((dayIdx) => {
+                        const d = new Date(startOfWeek);
+                        d.setDate(d.getDate() + dayIdx);
                         const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
                         return (
-                            <div key={i} className={`flex-1 text-center py-2 border-r border-gray-200 ${isToday ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                            <div key={dayIdx} className={`flex-1 text-center py-2 border-r border-gray-200 ${isToday ? 'bg-blue-50' : 'bg-gray-50'}`}>
                                 <div className={`text-xs font-bold uppercase ${isToday ? 'text-brand-600' : 'text-gray-500'}`}>
                                     {d.toLocaleDateString('pt-BR', {weekday: 'short'})}
                                 </div>
@@ -1468,13 +1499,16 @@ const ScheduleManager: React.FC<{
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto">
                     {hours.map(h => (
-                        <div key={h} className="flex min-h-[60px] border-b border-gray-100 relative">
+                        <div key={h} className="flex min-h-[80px] border-b border-gray-100 relative">
+                            {/* Time Label */}
                             <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50 text-[10px] text-gray-400 font-medium p-1 text-right sticky left-0 z-10">
-                                {h}:00
+                                {String(h).padStart(2,'0')}:00
                             </div>
-                            {Array.from({length: daysToShow}).map((_, i) => {
-                                const d = new Date(colStart);
-                                d.setDate(d.getDate() + i);
+                            
+                            {/* Days Columns */}
+                            {daysIndices.map((dayIdx) => {
+                                const d = new Date(startOfWeek);
+                                d.setDate(d.getDate() + dayIdx);
                                 const dateStr = d.toISOString().split('T')[0];
                                 
                                 // Find apps in this hour slot
@@ -1487,17 +1521,20 @@ const ScheduleManager: React.FC<{
                                 return (
                                     <div 
                                         key={`${dateStr}-${h}`} 
-                                        className="flex-1 border-r border-gray-100 relative p-0.5 group hover:bg-gray-50"
+                                        className="flex-1 border-r border-gray-100 relative p-1 group hover:bg-gray-50 flex gap-1"
                                         onClick={() => {
                                             setDate(dateStr);
                                             setTime(`${String(h).padStart(2,'0')}:00`);
                                             setIsModalOpen(true);
                                         }}
                                     >
+                                        {/* Render Apps Stacked Laterally (Flex) */}
                                         {slotApps.map(app => {
                                             const client = clients.find(c => c.id === app.clientId);
                                             const pet = client?.pets.find(p => p.id === app.petId);
                                             const s = services.find(srv => srv.id === app.serviceId);
+                                            const s1 = app.additionalServiceIds?.[0] ? services.find(srv => srv.id === app.additionalServiceIds[0]) : null;
+
                                             const isTosa = s?.name.toLowerCase().includes('tosa');
                                             const isBath = s?.name.toLowerCase().includes('banho');
                                             const color = isTosa ? 'bg-orange-100 border-orange-200 text-orange-800' : isBath ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-purple-100 border-purple-200 text-purple-800';
@@ -1506,10 +1543,11 @@ const ScheduleManager: React.FC<{
                                                 <div 
                                                     key={app.id}
                                                     onClick={(e) => { e.stopPropagation(); /* Add Edit Logic Here */ }}
-                                                    className={`absolute top-0.5 left-0.5 right-0.5 bottom-0.5 rounded p-1 border text-[10px] leading-tight overflow-hidden shadow-sm ${color} z-20`}
+                                                    className={`relative flex-1 rounded p-1 border text-[10px] leading-tight overflow-hidden shadow-sm ${color} z-20 h-full`}
                                                 >
-                                                    <span className="font-bold">{new Date(app.date).getMinutes() > 0 ? `:${new Date(app.date).getMinutes()} ` : ''}{pet?.name}</span>
+                                                    <div className="font-bold truncate">{new Date(app.date).getMinutes() > 0 ? `:${new Date(app.date).getMinutes()} ` : ''}{pet?.name}</div>
                                                     <div className="truncate opacity-75">{s?.name}</div>
+                                                    {s1 && <div className="truncate opacity-90 font-bold mt-0.5 border-t border-black/10 pt-0.5">{s1.name}</div>}
                                                 </div>
                                             )
                                         })}
@@ -1688,7 +1726,11 @@ const ScheduleManager: React.FC<{
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hora</label>
-                                                <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full border p-3 rounded-xl bg-white outline-none focus:ring-2 ring-brand-200 text-sm font-medium" />
+                                                <select value={time} onChange={e => setTime(e.target.value)} className="w-full border p-3 rounded-xl bg-white outline-none focus:ring-2 ring-brand-200 text-sm font-medium">
+                                                    {timeOptions.map(t => (
+                                                        <option key={t} value={t}>{t}</option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
                                         
