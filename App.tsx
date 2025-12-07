@@ -30,9 +30,14 @@ const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => 
     const [clientId, setClientId] = useState(DEFAULT_CLIENT_ID);
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100 text-center">
-                <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center text-white font-bold text-3xl mx-auto mb-6">P</div>
+        <div className="min-h-screen bg-brand-50 flex flex-col items-center justify-center p-4">
+            <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-lg border border-gray-100 text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-300 to-brand-500"></div>
+                
+                <div className="flex justify-center mb-6">
+                    <img src="/logo.png" alt="PomPomPet" className="w-32 h-auto object-contain" />
+                </div>
+                
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">Configuração Inicial</h1>
                 <p className="text-gray-500 mb-6">ID do Cliente Google (OAuth 2.0)</p>
 
@@ -41,7 +46,7 @@ const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => 
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
                         placeholder="Ex: 1234...apps.googleusercontent.com"
-                        className="w-full border p-3 rounded-lg focus:ring-2 ring-brand-500 outline-none font-mono text-sm"
+                        className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-brand-500 focus:ring-4 ring-brand-100 outline-none font-mono text-sm transition-all"
                     />
                 </div>
 
@@ -50,7 +55,7 @@ const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => 
                         if(clientId.trim().length > 10) onSave(clientId);
                         else alert("ID inválido");
                     }}
-                    className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition"
+                    className="w-full bg-brand-500 text-white py-3.5 rounded-xl font-bold hover:bg-brand-600 transition shadow-lg shadow-brand-200"
                 >
                     Salvar e Continuar
                 </button>
@@ -65,29 +70,43 @@ const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void }> = ({ o
     const isTemporaryLink = currentOrigin.includes('vercel.app') && (currentOrigin.split('-').length > 2);
 
     return (
-        <div className="min-h-screen bg-brand-50 flex flex-col items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
-                <div className="w-20 h-20 bg-brand-600 rounded-3xl flex items-center justify-center text-white font-bold text-4xl mx-auto mb-6 shadow-lg shadow-brand-200">P</div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Bem-vindo</h1>
-                <p className="text-gray-500 mb-8">Faça login para acessar sua agenda e clientes.</p>
+        <div className="min-h-screen bg-[#fff1f2] flex flex-col items-center justify-center p-4">
+            <div className="bg-white p-10 rounded-[2rem] shadow-2xl shadow-brand-200/50 w-full max-w-md text-center border border-white">
+                
+                {/* Logo Section */}
+                <div className="flex flex-col items-center mb-8">
+                    <div className="relative w-40 h-40 mb-4 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-brand-50 rounded-full animate-pulse opacity-50"></div>
+                        <img 
+                            src="/logo.png" 
+                            alt="PomPomPet Logo" 
+                            className="w-full h-full object-contain relative z-10 drop-shadow-sm" 
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/fb7185/white?text=POMPOM';
+                            }}
+                        />
+                    </div>
+                    <h1 className="text-4xl font-extrabold text-brand-500 tracking-tight">PomPomPet</h1>
+                    <p className="text-gray-400 font-medium">Gestão de Banho e Tosa</p>
+                </div>
 
                 <button 
                     onClick={onLogin}
-                    className="w-full bg-white border-2 border-gray-200 hover:border-brand-500 hover:bg-brand-50 text-gray-700 font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all group mb-6"
+                    className="w-full bg-white border-2 border-gray-100 hover:border-brand-400 hover:bg-brand-50 text-gray-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all duration-300 group mb-6 shadow-sm hover:shadow-md"
                 >
-                    <div className="bg-white p-1 rounded-full"><LogIn className="text-brand-600 group-hover:scale-110 transition-transform" /></div>
-                    Entrar com Google
+                    <div className="bg-white p-1.5 rounded-full shadow-sm"><LogIn className="text-brand-500 group-hover:scale-110 transition-transform" /></div>
+                    <span className="text-lg">Entrar com Google</span>
                 </button>
 
                 {isTemporaryLink && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-left text-xs text-orange-800 mb-4">
-                        <p className="font-bold mb-1 flex items-center gap-1"><AlertTriangle size={14}/> Atenção: Link Temporário</p>
-                        <p>Você está acessando por um link temporário. Recomenda-se usar o link principal do projeto para evitar erros de login.</p>
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-left text-xs text-orange-800 mb-4">
+                        <p className="font-bold mb-1 flex items-center gap-1 text-sm"><AlertTriangle size={16}/> Link Temporário Detectado</p>
+                        <p className="leading-relaxed">Você está acessando por um link de deploy. Recomenda-se usar o domínio principal para evitar erros de autenticação do Google.</p>
                     </div>
                 )}
                 
-                <button onClick={onReset} className="mt-8 text-xs text-gray-400 hover:text-red-500 underline">
-                    Alterar ID do Cliente
+                <button onClick={onReset} className="mt-8 text-xs text-gray-400 hover:text-brand-500 underline decoration-brand-300 underline-offset-2">
+                    Configurações Avançadas
                 </button>
             </div>
         </div>
@@ -124,7 +143,14 @@ const CustomXAxisTick = ({ x, y, payload, data }: any) => {
     );
 };
 
-// 3. REVENUE DASHBOARD Component
+// ... (Rest of the file remains unchanged, only updating the components above)
+// Due to size limits, I'm only providing the changed components. 
+// The Rest of App.tsx logic (RevenueView, CostsView, PaymentManager, ClientManager, ServiceManager, ScheduleManager, Main App) 
+// is identical to previous version but will inherit the new styling from index.html and Layout.
+
+// However, I need to ensure the full file is returned to not break the app. 
+// I will include the full App.tsx content from the previous turn but with the LoginScreen and SetupScreen updated.
+
 const RevenueView: React.FC<{ 
   appointments: Appointment[]; 
   services: Service[];
@@ -544,7 +570,6 @@ const RevenueView: React.FC<{
   );
 };
 
-// 4. COSTS VIEW Component
 const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('yearly');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -605,8 +630,8 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold text-gray-800">Custo Mensal</h1>
                 <div className="flex bg-white rounded-lg p-1 border">
-                    <button onClick={() => setViewMode('monthly')} className={`px-4 py-1.5 text-xs font-bold rounded ${viewMode === 'monthly' ? 'bg-brand-600 text-white' : 'text-gray-600'}`}>Mês</button>
-                    <button onClick={() => setViewMode('yearly')} className={`px-4 py-1.5 text-xs font-bold rounded ${viewMode === 'yearly' ? 'bg-brand-600 text-white' : 'text-gray-600'}`}>Ano</button>
+                    <button onClick={() => setViewMode('monthly')} className={`px-4 py-1.5 text-xs font-bold rounded ${viewMode === 'monthly' ? 'bg-brand-500 text-white' : 'text-gray-600'}`}>Mês</button>
+                    <button onClick={() => setViewMode('yearly')} className={`px-4 py-1.5 text-xs font-bold rounded ${viewMode === 'yearly' ? 'bg-brand-500 text-white' : 'text-gray-600'}`}>Ano</button>
                 </div>
             </div>
 
@@ -706,7 +731,10 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     );
 };
 
-// 3.5 Payment Manager (TABS LAYOUT)
+// ... Include PaymentManager, ClientManager, ServiceManager, ScheduleManager, App ...
+// These components are reused from previous context but will now use the updated theme.
+// I will output the full file to ensure integrity.
+
 const PaymentManager: React.FC<{
     appointments: Appointment[];
     clients: Client[];
@@ -879,7 +907,7 @@ const PaymentManager: React.FC<{
                         </div>
                     </div>
                     <div className="text-right">
-                        <div className="text-lg font-bold text-brand-700">R$ {expected.toFixed(2)}</div>
+                        <div className="text-lg font-bold text-brand-500">R$ {expected.toFixed(2)}</div>
                         {isPaid ? (
                             <div className="inline-block bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                                 {app.paymentMethod}
@@ -991,7 +1019,6 @@ const PaymentManager: React.FC<{
     )
 };
 
-// 4. Client Manager
 const ClientManager: React.FC<{ 
     clients: Client[]; 
     onDeleteClient: (id: string) => void;
@@ -1024,7 +1051,7 @@ const ClientManager: React.FC<{
                         href={PREDEFINED_FORM_URL} 
                         target="_blank" 
                         rel="noreferrer"
-                        className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold hover:bg-brand-700 transition shadow-sm whitespace-nowrap"
+                        className="bg-brand-500 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold hover:bg-brand-600 transition shadow-sm whitespace-nowrap"
                     >
                         <Plus size={18} /> <span className="hidden md:inline">Novo</span>
                     </a>
@@ -1072,7 +1099,6 @@ const ClientManager: React.FC<{
     );
 };
 
-// 5. Service Manager
 const ServiceManager: React.FC<{
     services: Service[];
     onAddService: (s: Service) => void;
@@ -1188,7 +1214,7 @@ const ServiceManager: React.FC<{
                     </button>
                     <button 
                         onClick={() => { resetForm(); setIsModalOpen(true); }}
-                        className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-brand-700 transition shadow-sm text-sm"
+                        className="bg-brand-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-brand-600 transition shadow-sm text-sm"
                     >
                         <Plus size={16} /> Novo
                     </button>
@@ -1219,7 +1245,7 @@ const ServiceManager: React.FC<{
                                 </div>
                             </div>
                             <div className="flex justify-between items-center pt-3 border-t border-gray-50 mt-2">
-                                <span className="text-lg font-bold text-brand-600">R$ {service.price.toFixed(2)}</span>
+                                <span className="text-lg font-bold text-brand-500">R$ {service.price.toFixed(2)}</span>
                             </div>
                         </div>
                     ))}
@@ -1286,7 +1312,7 @@ const ServiceManager: React.FC<{
                         </div>
                         <div className="flex gap-2 mt-6 justify-end">
                             <button onClick={resetForm} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-bold text-sm">Cancelar</button>
-                            <button onClick={handleSave} className="px-6 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700">Salvar</button>
+                            <button onClick={handleSave} className="px-6 py-2 bg-brand-500 text-white rounded-lg font-bold text-sm hover:bg-brand-600">Salvar</button>
                         </div>
                     </div>
                 </div>
@@ -1295,7 +1321,6 @@ const ServiceManager: React.FC<{
     );
 };
 
-// 6. Schedule Manager (NEW CALENDAR UI)
 const ScheduleManager: React.FC<{
     appointments: Appointment[];
     clients: Client[];
@@ -1481,7 +1506,7 @@ const ScheduleManager: React.FC<{
 
                          return (
                              <div key={idx} className={`bg-white p-1 min-h-[100px] flex flex-col border border-gray-50 ${isToday ? 'bg-blue-50' : ''} ${isWeekend ? 'bg-gray-50/50' : ''}`}>
-                                 <div className={`text-xs font-bold mb-1 ${isToday ? 'text-brand-600' : 'text-gray-500'}`}>{d.getDate()}</div>
+                                 <div className={`text-xs font-bold mb-1 ${isToday ? 'text-brand-500' : 'text-gray-500'}`}>{d.getDate()}</div>
                                  <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar">
                                      {dayApps.map(app => (
                                          <AppointmentCard key={app.id} app={app} isSmall />
@@ -1514,10 +1539,10 @@ const ScheduleManager: React.FC<{
                         const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
                         return (
                             <div key={dayIdx} className={`flex-1 text-center py-2 border-r border-gray-200 ${isToday ? 'bg-blue-50' : 'bg-gray-50'}`}>
-                                <div className={`text-xs font-bold uppercase ${isToday ? 'text-brand-600' : 'text-gray-500'}`}>
+                                <div className={`text-xs font-bold uppercase ${isToday ? 'text-brand-500' : 'text-gray-500'}`}>
                                     {d.toLocaleDateString('pt-BR', {weekday: 'short'})}
                                 </div>
-                                <div className={`text-sm font-bold ${isToday ? 'text-brand-700' : 'text-gray-700'}`}>
+                                <div className={`text-sm font-bold ${isToday ? 'text-brand-600' : 'text-gray-700'}`}>
                                     {d.getDate()}
                                 </div>
                             </div>
@@ -1590,7 +1615,7 @@ const ScheduleManager: React.FC<{
                 </div>
                 <button 
                     onClick={() => { resetForm(); setIsModalOpen(true); }}
-                    className="w-full md:w-auto bg-brand-600 text-white px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-brand-700 transition flex items-center justify-center gap-2 text-sm"
+                    className="w-full md:w-auto bg-brand-500 text-white px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-brand-600 transition flex items-center justify-center gap-2 text-sm"
                 >
                     <Plus size={18} /> Novo Agendamento
                 </button>
@@ -1659,7 +1684,7 @@ const ScheduleManager: React.FC<{
                                 <div className="border-t pt-4">
                                      <p className="text-xs font-bold text-gray-400 uppercase mb-2">Serviços Contratados</p>
                                      <div className="flex flex-wrap gap-2">
-                                         <span className="px-3 py-1 bg-brand-100 text-brand-700 rounded-full text-xs font-bold">{s?.name}</span>
+                                         <span className="px-3 py-1 bg-brand-100 text-brand-600 rounded-full text-xs font-bold">{s?.name}</span>
                                          {addSvcs?.map(as => (
                                              <span key={as?.id} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-bold">{as?.name}</span>
                                          ))}
@@ -1833,7 +1858,7 @@ const ScheduleManager: React.FC<{
                             <button 
                                 onClick={handleSave} 
                                 disabled={!selectedClient || !selectedPet || !selectedService || !date || !time}
-                                className="px-6 py-2 bg-brand-600 text-white font-bold rounded-lg shadow-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm"
+                                className="px-6 py-2 bg-brand-500 text-white font-bold rounded-lg shadow-md hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm"
                             >
                                 Confirmar
                             </button>
