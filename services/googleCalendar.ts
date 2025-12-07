@@ -1,7 +1,8 @@
 
 declare var google: any;
 
-const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets.readonly';
+// ATENÇÃO: Alterado de .readonly para acesso completo para permitir salvar agendamentos
+const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets';
 export const DEFAULT_CLIENT_ID = '283638384975-nt1pilc761qt69otu2dapf8ek0n6hvac.apps.googleusercontent.com';
 
 export const googleService = {
@@ -9,10 +10,7 @@ export const googleService = {
   
   init: (callback: (tokenResponse: any) => void) => {
     if (typeof google !== 'undefined' && google.accounts) {
-      // Usa o ID salvo ou o padrão hardcoded
       const clientId = localStorage.getItem('petgestor_client_id') || DEFAULT_CLIENT_ID;
-      
-      // Salva no localStorage para consistência se estiver usando o padrão
       if (!localStorage.getItem('petgestor_client_id')) {
         localStorage.setItem('petgestor_client_id', DEFAULT_CLIENT_ID);
       }
@@ -29,9 +27,9 @@ export const googleService = {
 
   login: () => {
     if (googleService.tokenClient) {
-      googleService.tokenClient.requestAccessToken();
+      // Força o consentimento para garantir que o usuário aceite as novas permissões de escrita
+      googleService.tokenClient.requestAccessToken({ prompt: 'consent' });
     } else {
-      // Tenta recuperar caso tenha falhado na init
       const clientId = localStorage.getItem('petgestor_client_id') || DEFAULT_CLIENT_ID;
       if (!clientId) {
           alert('ID do cliente não encontrado. Reinicie a configuração.');
@@ -104,6 +102,28 @@ export const googleService = {
       return data.values;
     } catch (error) {
       console.error('Error fetching sheet data', error);
+      throw error;
+    }
+  },
+
+  appendSheetValues: async (accessToken: string, spreadsheetId: string, range: string, values: any[]) => {
+    try {
+      const body = {
+        values: [values]
+      };
+      
+      const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error appending sheet data', error);
       throw error;
     }
   }

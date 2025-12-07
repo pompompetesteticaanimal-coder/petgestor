@@ -9,7 +9,7 @@ import {
   Plus, Trash2, Check, X, 
   Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
   RefreshCw, ExternalLink, Settings, PawPrint, LogIn, ShieldAlert, Lock, Copy,
-  ChevronDown, ChevronRight, Search
+  ChevronDown, ChevronRight, Search, AlertTriangle
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -19,7 +19,7 @@ const PREDEFINED_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfnUDOsMjn
 
 // --- Sub-Components ---
 
-// 1. Setup Screen (Hidden by default now, accessible via reset)
+// 1. Setup Screen
 const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => {
     const [clientId, setClientId] = useState(DEFAULT_CLIENT_ID);
 
@@ -53,13 +53,14 @@ const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => 
     );
 };
 
-// 2. Login Screen (Gatekeeper)
+// 2. Login Screen
 const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void }> = ({ onLogin, onReset }) => {
     const currentOrigin = window.location.origin;
+    const isTemporaryLink = currentOrigin.includes('vercel.app') && (currentOrigin.split('-').length > 2);
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(currentOrigin);
-        alert('Link copiado! Cole nas "Origens JavaScript autorizadas" no Google Cloud Console.');
+        alert('Link copiado!');
     };
 
     return (
@@ -77,15 +78,20 @@ const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void }> = ({ o
                     Entrar com Google
                 </button>
 
-                {/* Área de Ajuda para Erro 400 */}
+                {isTemporaryLink && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-left text-xs text-orange-800 mb-4">
+                        <p className="font-bold mb-1 flex items-center gap-1"><AlertTriangle size={14}/> Atenção: Link Temporário</p>
+                        <p>Você está acessando por um link temporário. Recomenda-se usar o link principal do projeto.</p>
+                    </div>
+                )}
+
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-left text-xs text-yellow-800">
-                    <p className="font-bold mb-2 flex items-center gap-1"><ShieldAlert size={14}/> Deu erro 400?</p>
-                    <p className="mb-2">Você precisa autorizar este site no Google:</p>
+                    <p className="font-bold mb-2 flex items-center gap-1"><ShieldAlert size={14}/> Erro de Login?</p>
+                    <p className="mb-2">Autorize este link no Google Cloud:</p>
                     <div className="flex items-center gap-2 bg-white border border-yellow-300 rounded p-2 mb-2">
                         <code className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-gray-600">{currentOrigin}</code>
                         <button onClick={copyToClipboard} className="text-brand-600 font-bold hover:text-brand-800"><Copy size={14}/></button>
                     </div>
-                    <p>Adicione este link em <strong>"Origens JavaScript autorizadas"</strong> no seu projeto do Google Cloud.</p>
                 </div>
 
                 <button onClick={onReset} className="mt-8 text-xs text-gray-400 hover:text-red-500 underline">
@@ -106,8 +112,17 @@ const Dashboard: React.FC<{
   const todaysAppointments = appointments.filter(a => a.date.startsWith(today));
   
   const totalRevenue = todaysAppointments.reduce((acc, curr) => {
+    // Main Service
     const s = services.find(srv => srv.id === curr.serviceId);
-    return acc + (s?.price || 0);
+    let total = s?.price || 0;
+    // Additional Services
+    if (curr.additionalServiceIds) {
+        curr.additionalServiceIds.forEach(addId => {
+            const addS = services.find(srv => srv.id === addId);
+            if (addS) total += addS.price;
+        });
+    }
+    return acc + total;
   }, 0);
 
   const pending = todaysAppointments.filter(a => a.status === 'agendado').length;
@@ -192,10 +207,8 @@ const ClientManager: React.FC<{
   const [isSyncing, setIsSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Ordena clientes por data de criação (se existir) ou nome
   const sortedClients = [...clients].sort((a, b) => {
     if (a.createdAt && b.createdAt) {
-        // Data mais recente primeiro
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); 
     }
     return a.name.localeCompare(b.name);
@@ -226,7 +239,6 @@ const ClientManager: React.FC<{
 
     setIsSyncing(true);
     try {
-      // Leitura expandida até a coluna O (índice 14)
       const rows = await googleService.getSheetValues(accessToken, sheetId, 'CADASTRO!A:O'); 
       
       if (!rows || rows.length < 2) {
@@ -238,27 +250,11 @@ const ClientManager: React.FC<{
       const clientsMap = new Map<string, Client>();
 
       rows.slice(1).forEach((row: string[], index: number) => {
-        // Mapeamento baseado na lista fornecida pelo usuário:
-        // 0: Nome/pet (Ignorar ou usar como ref)
-        // 1: Carimbo (Timestamp)
-        // 2: Email
-        // 3: Nome Cliente
-        // 4: Telefone
-        // 5: Endereço
-        // 6: Nome Pet
-        // 7: Raça
-        // 8: Porte
-        // 9: Pelagem
-        // 10: Obs
-        // 11: Complemento
-        // 12: Idade
-        // 13: Sexo
-        
         const timestamp = row[1];
         const clientName = row[3];
         const phone = row[4];
         const address = row[5];
-        const complement = row[11]; // Complemento está na coluna L (index 11)
+        const complement = row[11];
         
         const petName = row[6];
         const petBreed = row[7];
@@ -273,7 +269,6 @@ const ClientManager: React.FC<{
         const cleanPhone = phone.replace(/\D/g, '');
         
         if (!clientsMap.has(cleanPhone)) {
-          // Converter data do sheets (ex: 12/06/2025 15:30:00) para ISO se possível
           let createdIso = new Date().toISOString(); 
           try {
              if(timestamp) {
@@ -316,7 +311,7 @@ const ClientManager: React.FC<{
 
     } catch (error) {
       console.error(error);
-      alert("Erro ao sincronizar. Verifique se o ID da planilha está correto, se a aba 'CADASTRO' existe e se você tem permissão de acesso.");
+      alert("Erro ao sincronizar. Verifique se o ID da planilha está correto e permissões.");
     } finally {
       setIsSyncing(false);
     }
@@ -327,34 +322,20 @@ const ClientManager: React.FC<{
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h2 className="text-2xl font-bold text-gray-800">Clientes e Pets</h2>
-            <p className="text-sm text-gray-500">Ordenado por data de cadastro (mais recentes no topo)</p>
+            <p className="text-sm text-gray-500">Ordenado por data de cadastro</p>
         </div>
         
         <div className="flex gap-2 w-full md:w-auto flex-wrap">
              {formUrl && (
-                <a 
-                  href={formUrl} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition text-sm flex-1 md:flex-none justify-center"
-                >
+                <a href={formUrl} target="_blank" rel="noreferrer" className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition text-sm flex-1 md:flex-none justify-center">
                   <ExternalLink size={16} /> Formulário
                 </a>
              )}
-             
-             <button 
-                onClick={handleSync} 
-                disabled={isSyncing}
-                className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition text-sm flex-1 md:flex-none justify-center disabled:opacity-70"
-             >
+             <button onClick={handleSync} disabled={isSyncing} className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition text-sm flex-1 md:flex-none justify-center disabled:opacity-70">
                 <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} /> 
                 {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
              </button>
-
-             <button 
-                onClick={() => setShowConfig(!showConfig)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-lg"
-             >
+             <button onClick={() => setShowConfig(!showConfig)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-lg">
                 <Settings size={20} />
              </button>
         </div>
@@ -378,19 +359,11 @@ const ClientManager: React.FC<{
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase mb-1">ID da Planilha Google</label>
-                <input 
-                    className="w-full border p-2 rounded focus:ring-2 ring-yellow-400 outline-none" 
-                    value={sheetId} 
-                    onChange={e => setSheetId(e.target.value)} 
-                />
+                <input className="w-full border p-2 rounded focus:ring-2 ring-yellow-400 outline-none" value={sheetId} onChange={e => setSheetId(e.target.value)} />
             </div>
             <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Link do Formulário</label>
-                <input 
-                    className="w-full border p-2 rounded focus:ring-2 ring-yellow-400 outline-none" 
-                    value={formUrl} 
-                    onChange={e => setFormUrl(e.target.value)} 
-                />
+                <input className="w-full border p-2 rounded focus:ring-2 ring-yellow-400 outline-none" value={formUrl} onChange={e => setFormUrl(e.target.value)} />
             </div>
           </div>
           <div className="flex justify-end gap-3 mt-4">
@@ -423,17 +396,12 @@ const ClientManager: React.FC<{
                             <tr key={client.id} className="hover:bg-gray-50 transition">
                                 <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                                     {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
-                                    <div className="text-[10px] text-gray-400">
-                                        {client.createdAt ? new Date(client.createdAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : ''}
-                                    </div>
                                 </td>
-                                <td className="px-6 py-4">
-                                    <div className="text-sm font-bold text-gray-900">{client.name}</div>
-                                </td>
+                                <td className="px-6 py-4"><div className="text-sm font-bold text-gray-900">{client.name}</div></td>
                                 <td className="px-6 py-4">
                                     <div className="text-sm text-gray-900">{client.phone}</div>
                                     <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                        <MapPin size={10} /> {client.address} {client.complement ? `, ${client.complement}` : ''}
+                                        <MapPin size={10} /> {client.address}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
@@ -444,25 +412,12 @@ const ClientManager: React.FC<{
                                                     <span className="flex items-center gap-1"><PawPrint size={10} /> {pet.name}</span>
                                                     <span>{pet.breed}</span>
                                                 </div>
-                                                <div className="text-gray-600 mt-1 grid grid-cols-2 gap-1">
-                                                    <span>{pet.gender}</span>
-                                                    <span>{pet.age}</span>
-                                                    <span>{pet.size}</span>
-                                                    <span>{pet.coat}</span>
-                                                </div>
-                                                {pet.notes && (
-                                                    <div className="mt-1 text-red-500 italic bg-white px-1 rounded border border-red-100">
-                                                        Obs: {pet.notes}
-                                                    </div>
-                                                )}
                                             </div>
                                         ))}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-right text-sm font-medium">
-                                    <button onClick={() => onDeleteClient(client.id)} className="text-red-400 hover:text-red-600">
-                                        <Trash2 size={16} />
-                                    </button>
+                                    <button onClick={() => onDeleteClient(client.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
                                 </td>
                             </tr>
                         ))}
@@ -487,13 +442,7 @@ const ServiceManager: React.FC<{
 
     const handleAdd = () => {
         if(name && price) {
-            onAddService({
-                id: Date.now().toString(),
-                name,
-                price: parseFloat(price),
-                description: desc,
-                durationMin: 60
-            });
+            onAddService({ id: Date.now().toString(), name, price: parseFloat(price), description: desc, durationMin: 60 });
             setName(''); setPrice(''); setDesc('');
         }
     }
@@ -516,7 +465,6 @@ const ServiceManager: React.FC<{
                 </div>
                 <button onClick={handleAdd} className="bg-brand-600 text-white px-6 py-2 rounded hover:bg-brand-700 h-[42px]">Adicionar</button>
              </div>
-
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {services.map(s => (
                     <div key={s.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex justify-between items-center group">
@@ -533,49 +481,41 @@ const ServiceManager: React.FC<{
     )
 }
 
-// 6. Schedule Manager - NEW STRUCTURE
+// 6. Schedule Manager
 const ScheduleManager: React.FC<{
   appointments: Appointment[];
   clients: Client[];
   services: Service[];
-  onAdd: (a: Appointment) => void;
+  onAdd: (a: Appointment, client: Client, pet: Pet, services: Service[]) => void;
   onUpdateStatus: (id: string, status: Appointment['status']) => void;
   onDelete: (id: string) => void;
+  onSync: () => void;
   googleUser: GoogleUser | null;
-}> = ({ appointments, clients, services, onAdd, onUpdateStatus, onDelete, googleUser }) => {
-    // Estado para controle de dias expandidos
+  isSyncing: boolean;
+}> = ({ appointments, clients, services, onAdd, onUpdateStatus, onDelete, onSync, googleUser, isSyncing }) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const [expandedDays, setExpandedDays] = useState<string[]>([todayStr]);
     const [showModal, setShowModal] = useState(false);
-    
-    // Estado de Busca na Agenda
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Form State (Agora inclui data)
+    // Form State
     const [selDate, setSelDate] = useState(todayStr);
     const [selTime, setSelTime] = useState('09:00');
     const [selClient, setSelClient] = useState('');
     const [selPet, setSelPet] = useState('');
     const [selService, setSelService] = useState('');
+    const [selAdd1, setSelAdd1] = useState('');
+    const [selAdd2, setSelAdd2] = useState('');
+    const [selAdd3, setSelAdd3] = useState('');
     const [searchClientModal, setSearchClientModal] = useState('');
 
-    // Filtrar agendamentos ANTES de agrupar
     const filteredAppointments = appointments.filter(app => {
         if (!searchTerm) return true;
-        
         const client = clients.find(c => c.id === app.clientId);
         const pet = client?.pets.find(p => p.id === app.petId);
-        const service = services.find(s => s.id === app.serviceId);
-        const term = searchTerm.toLowerCase();
-
-        return (
-            client?.name.toLowerCase().includes(term) ||
-            pet?.name.toLowerCase().includes(term) ||
-            service?.name.toLowerCase().includes(term)
-        );
+        return (client?.name.toLowerCase().includes(searchTerm.toLowerCase()) || pet?.name.toLowerCase().includes(searchTerm.toLowerCase()));
     });
 
-    // Agrupa agendamentos (filtrados) por dia
     const groupedApps = filteredAppointments.reduce((acc, app) => {
         const date = app.date.split('T')[0];
         if (!acc[date]) acc[date] = [];
@@ -583,48 +523,42 @@ const ScheduleManager: React.FC<{
         return acc;
     }, {} as Record<string, Appointment[]>);
 
-    // Ordena as chaves (datas) cronologicamente
     const sortedDates = Object.keys(groupedApps).sort();
 
-    // Expande automaticamente dias encontrados na busca
-    useEffect(() => {
-        if(searchTerm) {
-            setExpandedDays(sortedDates);
-        }
-    }, [searchTerm, sortedDates.length]);
+    useEffect(() => { if(searchTerm) setExpandedDays(sortedDates); }, [searchTerm, sortedDates.length]);
 
     const toggleDay = (date: string) => {
-        if (expandedDays.includes(date)) {
-            setExpandedDays(expandedDays.filter(d => d !== date));
-        } else {
-            setExpandedDays([...expandedDays, date]);
-        }
+        setExpandedDays(prev => prev.includes(date) ? prev.filter(d => d !== date) : [...prev, date]);
     };
 
     const handleCreate = () => {
         if(selClient && selPet && selService && selDate) {
+            const client = clients.find(c => c.id === selClient)!;
+            const pet = client.pets.find(p => p.id === selPet)!;
+            
+            const mainService = services.find(s => s.id === selService)!;
+            const addServices = [selAdd1, selAdd2, selAdd3]
+                .filter(id => id)
+                .map(id => services.find(s => s.id === id)!);
+
             onAdd({
                 id: Date.now().toString(),
                 clientId: selClient,
                 petId: selPet,
                 serviceId: selService,
+                additionalServiceIds: [selAdd1, selAdd2, selAdd3].filter(id => id),
                 date: `${selDate}T${selTime}`,
                 status: 'agendado'
-            });
+            }, client, pet, [mainService, ...addServices]);
+
             setShowModal(false);
             setSearchClientModal('');
-            // Auto expande o dia onde o agendamento foi criado
-            if (!expandedDays.includes(selDate)) {
-                setExpandedDays(prev => [...prev, selDate]);
-            }
+            setSelAdd1(''); setSelAdd2(''); setSelAdd3('');
+            if (!expandedDays.includes(selDate)) setExpandedDays(prev => [...prev, selDate]);
         }
     };
 
-    // Filtro para busca de cliente no MODAL
-    const filteredClientsForModal = clients.filter(c => 
-        c.name.toLowerCase().includes(searchClientModal.toLowerCase()) || 
-        c.phone.includes(searchClientModal)
-    );
+    const filteredClientsForModal = clients.filter(c => c.name.toLowerCase().includes(searchClientModal.toLowerCase()) || c.phone.includes(searchClientModal));
 
     return (
         <div className="h-full flex flex-col gap-6">
@@ -633,39 +567,36 @@ const ScheduleManager: React.FC<{
                      <h2 className="text-2xl font-bold text-gray-800">Agenda</h2>
                      {googleUser && (
                         <div className="text-xs text-blue-600 flex items-center gap-1">
-                            <CalendarIcon size={12} /> Sincronizado com Google Calendar
+                            <CalendarIcon size={12} /> Google Calendar & Sheets Integrados
                         </div>
                      )}
                 </div>
-                <button 
-                    onClick={() => {
-                        setSelDate(todayStr); 
-                        setShowModal(true);
-                    }} 
-                    className="bg-brand-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-brand-700 transition flex items-center justify-center gap-2 font-bold w-full md:w-auto"
-                >
-                    <Plus /> Novo Agendamento
-                </button>
+                <div className="flex gap-2 w-full md:w-auto">
+                    <button onClick={onSync} disabled={isSyncing} className="bg-white border border-brand-200 text-brand-600 px-4 py-3 rounded-xl shadow-sm hover:bg-brand-50 transition flex items-center justify-center gap-2 font-bold flex-1 md:flex-none disabled:opacity-50">
+                        <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
+                    </button>
+                    <button onClick={() => { setSelDate(todayStr); setShowModal(true); }} className="bg-brand-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-brand-700 transition flex items-center justify-center gap-2 font-bold flex-1 md:flex-none">
+                        <Plus /> Novo Agendamento
+                    </button>
+                </div>
             </div>
 
-            {/* Barra de Pesquisa da Agenda */}
             <div className="relative">
                 <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                 <input 
                     className="w-full pl-10 p-2.5 border rounded-lg focus:ring-2 ring-brand-200 outline-none bg-white shadow-sm"
-                    placeholder="Buscar na agenda (cliente, pet ou serviço)..."
+                    placeholder="Buscar na agenda..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                 />
             </div>
 
-            {/* Timeline agrupada por dias */}
             <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="flex-1 overflow-auto p-4 space-y-4">
                     {sortedDates.length === 0 ? (
                         <div className="text-center text-gray-400 mt-10">
                             <CalendarIcon size={48} className="mx-auto mb-2 opacity-20"/>
-                            <p>{searchTerm ? 'Nenhum agendamento encontrado para esta busca.' : 'Nenhum agendamento encontrado.'}</p>
+                            <p>{searchTerm ? 'Nenhum agendamento encontrado.' : 'Agenda vazia. Sincronize ou adicione um novo.'}</p>
                         </div>
                     ) : (
                         sortedDates.map(date => {
@@ -675,11 +606,7 @@ const ScheduleManager: React.FC<{
 
                             return (
                                 <div key={date} className="border border-gray-100 rounded-lg overflow-hidden">
-                                    {/* Header do Dia */}
-                                    <button 
-                                        onClick={() => toggleDay(date)}
-                                        className={`w-full flex items-center justify-between p-3 ${isToday ? 'bg-brand-50' : 'bg-gray-50'} hover:bg-gray-100 transition`}
-                                    >
+                                    <button onClick={() => toggleDay(date)} className={`w-full flex items-center justify-between p-3 ${isToday ? 'bg-brand-50' : 'bg-gray-50'} hover:bg-gray-100 transition`}>
                                         <div className="flex items-center gap-2">
                                             {isExpanded ? <ChevronDown size={18} className="text-gray-500"/> : <ChevronRight size={18} className="text-gray-500"/>}
                                             <span className={`font-bold ${isToday ? 'text-brand-700' : 'text-gray-700'}`}>
@@ -687,12 +614,9 @@ const ScheduleManager: React.FC<{
                                                 {isToday && <span className="ml-2 text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full">Hoje</span>}
                                             </span>
                                         </div>
-                                        <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border border-gray-200">
-                                            {apps.length} agendamentos
-                                        </span>
+                                        <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border border-gray-200">{apps.length} agendamentos</span>
                                     </button>
 
-                                    {/* Lista de Agendamentos (Colapsável) */}
                                     {isExpanded && (
                                         <div className="p-3 space-y-3 bg-white">
                                             {apps.map(app => {
@@ -700,33 +624,27 @@ const ScheduleManager: React.FC<{
                                                 const pet = client?.pets.find(p => p.id === app.petId);
                                                 const service = services.find(s => s.id === app.serviceId);
                                                 const time = app.date.split('T')[1];
+                                                const addCount = app.additionalServiceIds?.length || 0;
 
                                                 return (
-                                                    <div key={app.id} className={`p-4 rounded-lg border-l-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all
-                                                        ${app.status === 'concluido' ? 'border-green-500 bg-green-50/30' : 
-                                                          app.status === 'cancelado' ? 'border-red-500 bg-red-50/30' : 'border-brand-500 bg-white'}`}>
-                                                        
+                                                    <div key={app.id} className={`p-4 rounded-lg border-l-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${app.status === 'concluido' ? 'border-green-500 bg-green-50/30' : app.status === 'cancelado' ? 'border-red-500 bg-red-50/30' : 'border-brand-500 bg-white'}`}>
                                                         <div className="flex items-start gap-4">
                                                             <div className="text-xl font-bold text-gray-400">{time}</div>
                                                             <div>
                                                                 <h4 className="font-bold text-gray-800">{pet?.name} <span className="text-gray-500 font-normal">({client?.name})</span></h4>
-                                                                <p className="text-sm text-brand-600 font-medium">{service?.name}</p>
+                                                                <p className="text-sm text-brand-600 font-medium">
+                                                                    {service?.name} {addCount > 0 && <span className="text-xs bg-brand-100 px-1 rounded">+{addCount} extras</span>}
+                                                                </p>
                                                             </div>
                                                         </div>
-
                                                         <div className="flex items-center gap-2">
                                                             {app.status === 'agendado' && (
                                                                 <>
-                                                                    <button onClick={() => onUpdateStatus(app.id, 'concluido')} title="Concluir" className="p-2 text-green-500 hover:bg-green-50 rounded-full"><Check size={18} /></button>
-                                                                    <button onClick={() => onUpdateStatus(app.id, 'cancelado')} title="Cancelar" className="p-2 text-red-500 hover:bg-red-50 rounded-full"><X size={18} /></button>
+                                                                    <button onClick={() => onUpdateStatus(app.id, 'concluido')} className="p-2 text-green-500 hover:bg-green-50 rounded-full"><Check size={18} /></button>
+                                                                    <button onClick={() => onUpdateStatus(app.id, 'cancelado')} className="p-2 text-red-500 hover:bg-red-50 rounded-full"><X size={18} /></button>
                                                                 </>
                                                             )}
-                                                            {app.status === 'concluido' && (
-                                                                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">
-                                                                    Concluído
-                                                                </span>
-                                                            )}
-                                                            {app.status === 'cancelado' && <span className="text-red-500 text-sm font-medium">Cancelado</span>}
+                                                            {app.status !== 'agendado' && <span className="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-bold uppercase">{app.status}</span>}
                                                         </div>
                                                     </div>
                                                 );
@@ -750,61 +668,28 @@ const ScheduleManager: React.FC<{
                         </div>
                         
                         <div className="space-y-4">
-                            {/* Data e Hora */}
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Data</label>
-                                    <input 
-                                        type="date" 
-                                        value={selDate} 
-                                        onChange={e => setSelDate(e.target.value)} 
-                                        className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Horário</label>
-                                    <input type="time" value={selTime} onChange={e => setSelTime(e.target.value)} className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none" />
-                                </div>
+                                <div><label className="block text-sm font-medium text-gray-700">Data</label><input type="date" value={selDate} onChange={e => setSelDate(e.target.value)} className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700">Horário</label><input type="time" value={selTime} onChange={e => setSelTime(e.target.value)} className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none" /></div>
                             </div>
 
-                            {/* Busca Inteligente de Cliente */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Cliente</label>
                                 {!selClient ? (
                                     <div className="mt-1 relative">
                                         <Search className="absolute left-3 top-3 text-gray-400" size={16} />
-                                        <input 
-                                            className="w-full pl-9 p-2 border rounded focus:ring-2 ring-brand-200 outline-none"
-                                            placeholder="Buscar cliente..."
-                                            value={searchClientModal}
-                                            onChange={e => setSearchClientModal(e.target.value)}
-                                            autoFocus
-                                        />
+                                        <input className="w-full pl-9 p-2 border rounded focus:ring-2 ring-brand-200 outline-none" placeholder="Buscar cliente..." value={searchClientModal} onChange={e => setSearchClientModal(e.target.value)} autoFocus />
                                         {searchClientModal.length > 0 && (
                                             <div className="absolute top-full left-0 right-0 bg-white border shadow-lg rounded mt-1 max-h-40 overflow-y-auto z-10">
-                                                {filteredClientsForModal.length === 0 ? (
-                                                    <div className="p-2 text-xs text-gray-500">Nenhum cliente encontrado.</div>
-                                                ) : (
-                                                    filteredClientsForModal.map(c => (
-                                                        <button 
-                                                            key={c.id} 
-                                                            onClick={() => { setSelClient(c.id); setSelPet(''); setSearchClientModal(''); }}
-                                                            className="w-full text-left p-2 hover:bg-brand-50 text-sm border-b last:border-0"
-                                                        >
-                                                            <div className="font-bold">{c.name}</div>
-                                                            <div className="text-xs text-gray-500">{c.phone}</div>
-                                                        </button>
-                                                    ))
-                                                )}
+                                                {filteredClientsForModal.map(c => (
+                                                    <button key={c.id} onClick={() => { setSelClient(c.id); setSelPet(''); setSearchClientModal(''); }} className="w-full text-left p-2 hover:bg-brand-50 text-sm border-b last:border-0"><div className="font-bold">{c.name}</div><div className="text-xs text-gray-500">{c.phone}</div></button>
+                                                ))}
                                             </div>
                                         )}
-                                        {clients.length === 0 && <p className="text-xs text-red-500 mt-1">Sincronize a planilha primeiro.</p>}
                                     </div>
                                 ) : (
                                     <div className="flex items-center justify-between p-3 bg-brand-50 border border-brand-200 rounded mt-1">
-                                        <span className="font-bold text-brand-800 text-sm">
-                                            {clients.find(c => c.id === selClient)?.name}
-                                        </span>
+                                        <span className="font-bold text-brand-800 text-sm">{clients.find(c => c.id === selClient)?.name}</span>
                                         <button onClick={() => { setSelClient(''); setSelPet(''); }} className="text-red-500 hover:text-red-700 text-xs font-bold">Trocar</button>
                                     </div>
                                 )}
@@ -815,19 +700,24 @@ const ScheduleManager: React.FC<{
                                     <label className="block text-sm font-medium text-gray-700">Pet</label>
                                     <select value={selPet} onChange={e => setSelPet(e.target.value)} className="w-full border p-2 rounded mt-1">
                                         <option value="">Selecione...</option>
-                                        {clients.find(c => c.id === selClient)?.pets.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
+                                        {clients.find(c => c.id === selClient)?.pets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                     </select>
                                 </div>
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Serviço</label>
-                                <select value={selService} onChange={e => setSelService(e.target.value)} className="w-full border p-2 rounded mt-1">
+                                <label className="block text-sm font-medium text-gray-700">Serviço Principal</label>
+                                <select value={selService} onChange={e => setSelService(e.target.value)} className="w-full border p-2 rounded mt-1 bg-blue-50">
                                     <option value="">Selecione...</option>
                                     {services.map(s => <option key={s.id} value={s.id}>{s.name} - R$ {s.price}</option>)}
                                 </select>
+                            </div>
+
+                            <div className="border-t pt-2">
+                                <p className="text-xs font-bold text-gray-500 mb-2">Serviços Adicionais (Opcional)</p>
+                                <select value={selAdd1} onChange={e => setSelAdd1(e.target.value)} className="w-full border p-2 rounded mb-2 text-sm"><option value="">Adicional 1...</option>{services.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}</select>
+                                <select value={selAdd2} onChange={e => setSelAdd2(e.target.value)} className="w-full border p-2 rounded mb-2 text-sm"><option value="">Adicional 2...</option>{services.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}</select>
+                                <select value={selAdd3} onChange={e => setSelAdd3(e.target.value)} className="w-full border p-2 rounded text-sm"><option value="">Adicional 3...</option>{services.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}</select>
                             </div>
                         </div>
 
@@ -844,30 +734,21 @@ const ScheduleManager: React.FC<{
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
-  
-  // Data State
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  
-  // Auth State
   const [isConfigured, setIsConfigured] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  // Initial Load and Auth Check
+  const SHEET_ID = localStorage.getItem('petgestor_sheet_id') || PREDEFINED_SHEET_ID;
+
   useEffect(() => {
-    // 1. Load Local Data
     setClients(db.getClients());
     setServices(db.getServices());
     setAppointments(db.getAppointments());
-
-    // 2. Garante que o ID padrão está no localStorage para o serviço funcionar
-    if (!localStorage.getItem('petgestor_client_id')) {
-        localStorage.setItem('petgestor_client_id', DEFAULT_CLIENT_ID);
-    }
-    
-    // Inicia a lógica de autenticação imediatamente
+    if (!localStorage.getItem('petgestor_client_id')) localStorage.setItem('petgestor_client_id', DEFAULT_CLIENT_ID);
     initAuthLogic();
   }, []);
 
@@ -877,14 +758,7 @@ const App: React.FC = () => {
             if (tokenResponse && tokenResponse.access_token) {
                 setAccessToken(tokenResponse.access_token);
                 const profile = await googleService.getUserProfile(tokenResponse.access_token);
-                if (profile) {
-                    setGoogleUser({
-                        id: profile.id,
-                        name: profile.name,
-                        email: profile.email,
-                        picture: profile.picture
-                    });
-                }
+                if (profile) setGoogleUser({ id: profile.id, name: profile.name, email: profile.email, picture: profile.picture });
             }
         });
     } else {
@@ -895,7 +769,7 @@ const App: React.FC = () => {
   const handleSaveConfig = (id: string) => {
       localStorage.setItem('petgestor_client_id', id);
       setIsConfigured(true);
-      window.location.reload(); // Reload to ensure clean init
+      window.location.reload();
   };
 
   const handleResetConfig = () => {
@@ -904,7 +778,6 @@ const App: React.FC = () => {
       setGoogleUser(null);
   };
 
-  // Handlers
   const handleSyncClients = (newClients: Client[]) => {
       setClients(newClients);
       db.saveClients(newClients);
@@ -927,27 +800,122 @@ const App: React.FC = () => {
     db.saveServices(updated);
   }
 
-  const handleAddAppointment = async (app: Appointment) => {
+  // Sync APPOINTMENTS (Read from Sheet)
+  const handleSyncAppointments = async () => {
+      if (!accessToken || !SHEET_ID) return;
+      setIsSyncing(true);
+      try {
+          const rows = await googleService.getSheetValues(accessToken, SHEET_ID, 'Agendamento!A:O');
+          if(!rows || rows.length < 2) {
+              alert('Aba Agendamento vazia ou não encontrada.');
+              setIsSyncing(false);
+              return;
+          }
+
+          // Simple strategy: Rebuild appointments based on sheet to ensure sync
+          // Note: This matches clients by name/phone which is tricky, so we do best effort matching
+          const loadedApps: Appointment[] = [];
+          
+          rows.slice(1).forEach((row: string[], idx: number) => {
+              const petName = row[0];
+              const clientName = row[1];
+              const datePart = row[11]; // DD/MM/YYYY
+              const timePart = row[12]; // HH:MM
+              const serviceName = row[7];
+              
+              if(!clientName || !datePart) return;
+
+              // Find Client & Pet
+              const client = clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
+              const pet = client?.pets.find(p => p.name.toLowerCase() === petName.toLowerCase());
+              const service = services.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || services[0];
+
+              let isoDate = new Date().toISOString();
+              try {
+                  const [day, month, year] = datePart.split('/');
+                  isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`;
+              } catch(e) {}
+
+              if(client && pet) {
+                  loadedApps.push({
+                      id: `sheet_${idx}`,
+                      clientId: client.id,
+                      petId: pet.id,
+                      serviceId: service?.id || 'unknown',
+                      additionalServiceIds: [], // Hard to map names back to IDs if names changed, keeping simple
+                      date: isoDate,
+                      status: 'agendado', // Default
+                      notes: row[13]
+                  });
+              }
+          });
+          
+          if(loadedApps.length > 0) {
+              setAppointments(loadedApps);
+              db.saveAppointments(loadedApps);
+              alert(`${loadedApps.length} agendamentos carregados da planilha!`);
+          }
+
+      } catch (error) {
+          console.error(error);
+          alert('Erro ao sincronizar agendamentos.');
+      } finally {
+          setIsSyncing(false);
+      }
+  };
+
+  const handleAddAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[]) => {
+    // 1. Save Local
     const updated = [...appointments, app];
     setAppointments(updated);
     db.saveAppointments(updated);
 
     if (accessToken) {
-        const client = clients.find(c => c.id === app.clientId || c.name === app.clientId); 
-        const pet = client?.pets.find(p => p.id === app.petId);
-        const service = services.find(s => s.id === app.serviceId);
+        // 2. Save to Google Calendar
+        const mainService = appServices[0];
+        let totalDuration = mainService.durationMin;
+        const description = appServices.map(s => s.name).join(' + ');
 
-        if (client && pet && service) {
-            await googleService.createEvent(accessToken, {
-                summary: `Banho e Tosa: ${pet.name} (${client.name})`,
-                description: `Serviço: ${service.name}\nCliente: ${client.name}\nTelefone: ${client.phone}\nObs: ${pet.notes}`,
-                startTime: app.date,
-                durationMin: service.durationMin
-            });
-            alert('Agendamento sincronizado com Google Agenda!');
+        await googleService.createEvent(accessToken, {
+            summary: `Banho/Tosa: ${pet.name} - ${client.name}`,
+            description: `Serviços: ${description}\nObs: ${pet.notes}`,
+            startTime: app.date,
+            durationMin: totalDuration
+        });
+
+        // 3. Save to Google Sheets (Append Row)
+        // Order: Pet, Client, Phone, Address, Breed, Size, Coat, Svc, Add1, Add2, Add3, Date, Time, Obs, Duration
+        const dateObj = new Date(app.date);
+        const dateStr = dateObj.toLocaleDateString('pt-BR');
+        const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        
+        const rowData = [
+            pet.name,
+            client.name,
+            client.phone,
+            `${client.address} ${client.complement || ''}`,
+            pet.breed,
+            pet.size,
+            pet.coat,
+            appServices[0]?.name || '', // Main Service
+            appServices[1]?.name || '', // Add 1
+            appServices[2]?.name || '', // Add 2
+            appServices[3]?.name || '', // Add 3
+            dateStr,
+            timeStr,
+            pet.notes,
+            totalDuration
+        ];
+
+        try {
+            await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:O', rowData);
+            alert('Agendamento salvo no Calendar e na Planilha!');
+        } catch (e) {
+            alert('Erro ao salvar na planilha (verifique permissões). Salvo apenas localmente.');
         }
     }
   }
+
   const handleUpdateAppStatus = (id: string, status: Appointment['status']) => {
     const updated = appointments.map(a => a.id === id ? { ...a, status } : a);
     setAppointments(updated);
@@ -959,49 +927,16 @@ const App: React.FC = () => {
      db.saveAppointments(updated);
   }
 
-  // --- RENDER LOGIC ---
-
-  if (!isConfigured) {
-      return <SetupScreen onSave={handleSaveConfig} />;
-  }
-
-  if (!googleUser) {
-      return <LoginScreen onLogin={() => googleService.login()} onReset={handleResetConfig} />;
-  }
+  if (!isConfigured) return <SetupScreen onSave={handleSaveConfig} />;
+  if (!googleUser) return <LoginScreen onLogin={() => googleService.login()} onReset={handleResetConfig} />;
 
   return (
     <HashRouter>
-      <Layout 
-        currentView={currentView} 
-        setView={setCurrentView}
-        googleUser={googleUser}
-        onLogin={() => googleService.login()}
-        onLogout={() => { setAccessToken(null); setGoogleUser(null); }}
-      >
+      <Layout currentView={currentView} setView={setCurrentView} googleUser={googleUser} onLogin={() => googleService.login()} onLogout={() => { setAccessToken(null); setGoogleUser(null); }}>
         {currentView === 'dashboard' && <Dashboard appointments={appointments} services={services} clients={clients} />}
-        
-        {currentView === 'clients' && (
-            <ClientManager 
-                clients={clients} 
-                onSyncClients={handleSyncClients} 
-                onDeleteClient={handleDeleteClient}
-                googleUser={googleUser}
-                accessToken={accessToken}
-            />
-        )}
-
+        {currentView === 'clients' && <ClientManager clients={clients} onSyncClients={handleSyncClients} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
         {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} />}
-        {currentView === 'schedule' && (
-            <ScheduleManager 
-                appointments={appointments} 
-                clients={clients} 
-                services={services}
-                onAdd={handleAddAppointment}
-                onUpdateStatus={handleUpdateAppStatus}
-                onDelete={handleDeleteApp}
-                googleUser={googleUser}
-            />
-        )}
+        {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onUpdateStatus={handleUpdateAppStatus} onDelete={handleDeleteApp} onSync={handleSyncAppointments} googleUser={googleUser} isSyncing={isSyncing} />}
       </Layout>
     </HashRouter>
   );

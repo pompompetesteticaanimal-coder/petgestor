@@ -32,10 +32,12 @@ export interface Appointment {
   id: string;
   clientId: string;
   petId: string;
-  serviceId: string;
+  serviceId: string; // Serviço Principal
+  additionalServiceIds?: string[]; // Serviços Adicionais (até 3)
   date: string; // ISO String
   status: 'agendado' | 'concluido' | 'cancelado';
   notes?: string;
+  durationTotal?: number;
 }
 
 export interface GoogleUser {
