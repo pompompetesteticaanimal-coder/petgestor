@@ -46,6 +46,16 @@ export interface Appointment {
   paymentMethod?: 'Credito' | 'Debito' | 'Pix' | 'Dinheiro' | ''; // Forma de Pagamento
 }
 
+export interface CostItem {
+  id: string;
+  month: string;      // Col A
+  week: string;       // Col B
+  date: string;       // Col C (Data Custo)
+  category: string;   // Col D (Tipo)
+  amount: number;     // Col E (Custo)
+  status: string;     // Col F (Status - Pago ou Vazio)
+}
+
 export interface GoogleUser {
   id: string;
   name: string;

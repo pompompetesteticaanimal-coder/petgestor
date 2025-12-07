@@ -1,17 +1,19 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { db } from './services/db';
 import { googleService, DEFAULT_CLIENT_ID } from './services/googleCalendar';
-import { Client, Service, Appointment, ViewState, Pet, GoogleUser } from './types';
+import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem } from './types';
 import { 
   Plus, Trash2, Check, X, 
   Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
   ExternalLink, Settings, PawPrint, LogIn, ShieldAlert, Lock, Copy,
   ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
   Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
-  Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon
+  Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon,
+  ShoppingBag, Tag
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
@@ -93,12 +95,14 @@ const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void }> = ({ o
     );
 };
 
-// 3. Dashboard Component (REFORMULADO COM TABS)
+// 3. Dashboard Component (REFORMULADO COM TABS E SUB-ABAS)
 const Dashboard: React.FC<{ 
   appointments: Appointment[]; 
   services: Service[];
   clients: Client[];
-}> = ({ appointments, services, clients }) => {
+  costs: CostItem[];
+}> = ({ appointments, services, clients, costs }) => {
+  const [dashboardType, setDashboardType] = useState<'revenue' | 'costs'>('revenue');
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -113,6 +117,7 @@ const Dashboard: React.FC<{
     return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
   };
 
+  // --- REVENUE LOGIC ---
   const calculateGrossRevenue = (app: Appointment) => {
       if (app.status === 'cancelado') return 0;
       if (app.paidAmount && app.paidAmount > 0) return app.paidAmount;
@@ -164,7 +169,7 @@ const Dashboard: React.FC<{
       return { totalPets, totalTosas, paidRevenue, pendingRevenue, grossRevenue: paidRevenue + pendingRevenue };
   };
 
-  // --- Gráfico Semanal (Terça a Sábado) ---
+  // --- Gráficos de Faturamento ---
   const getWeeklyChartData = () => {
       const date = new Date(selectedDate);
       const day = date.getDay(); 
@@ -186,10 +191,6 @@ const Dashboard: React.FC<{
 
           const formattedDate = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
           const label = `${formattedDate} (${weekDaysLabels[dayIndex]})`;
-          
-          // Calculate growth compared to previous day (simple approximation)
-          // Ideally would look at same day previous week, but strictly for the table data row.
-          // Using 0 for now as daily variance is high.
 
           data.push({
               name: label,
@@ -202,11 +203,10 @@ const Dashboard: React.FC<{
       return data;
   };
 
-  // --- Gráfico Mensal (Por Semana do Ano com Comparação) ---
   const getMonthlyChartData = () => {
       const [yearStr, monthStr] = selectedMonth.split('-');
       const year = parseInt(yearStr);
-      const month = parseInt(monthStr) - 1; // 0-indexed
+      const month = parseInt(monthStr) - 1; 
 
       const getWeekData = (targetYear: number, targetWeek: number) => {
           const apps = appointments.filter(app => {
@@ -262,12 +262,9 @@ const Dashboard: React.FC<{
       return chartData;
   };
 
-  // --- Gráfico Anual ---
   const getYearlyChartData = () => {
       const data = [];
       const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      
-      // Começar em Agosto (Índice 7) se for 2024
       const startMonth = selectedYear === 2024 ? 7 : 0; 
 
       for (let i = startMonth; i < 12; i++) {
@@ -281,7 +278,6 @@ const Dashboard: React.FC<{
           let revGrowth = 0;
           let petsGrowth = 0;
           
-          // Só compara se não for o primeiro mês do período
           if (i > startMonth) {
               const prevApps = appointments.filter(a => {
                   const d = new Date(a.date);
@@ -305,50 +301,83 @@ const Dashboard: React.FC<{
       return data;
   };
 
-  // --- Dados de Pizza (Porte) ---
+  // --- COSTS LOGIC ---
+  const calculateCostStats = () => {
+    // Filter costs by current selected period based on activeTab logic (simplified for costs)
+    let filteredCosts = costs;
+    
+    // Simplification: Costs Dashboard usually focuses on Month/Year. 
+    // We will use 'selectedYear' for overall context.
+    
+    const yearlyCosts = costs.filter(c => {
+        const d = new Date(c.date);
+        return d.getFullYear() === selectedYear;
+    });
+
+    const totalCost = yearlyCosts.reduce((acc, c) => acc + c.amount, 0);
+    const paidCost = yearlyCosts.filter(c => c.status === 'Pago').reduce((acc, c) => acc + c.amount, 0);
+    const pendingCost = yearlyCosts.filter(c => c.status !== 'Pago').reduce((acc, c) => acc + c.amount, 0);
+
+    return { totalCost, paidCost, pendingCost, yearlyCosts };
+  };
+
+  const getCostByCategory = (yearlyCosts: CostItem[]) => {
+      const counts: Record<string, number> = {};
+      yearlyCosts.forEach(c => {
+          const cat = c.category || 'Outros';
+          counts[cat] = (counts[cat] || 0) + c.amount;
+      });
+      return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  };
+
+  const getCostByMonth = (yearlyCosts: CostItem[]) => {
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const data = Array(12).fill(0).map((_, i) => ({ name: monthNames[i], value: 0 }));
+      
+      yearlyCosts.forEach(c => {
+          const d = new Date(c.date);
+          if(!isNaN(d.getTime())) {
+              data[d.getMonth()].value += c.amount;
+          }
+      });
+      
+      // Filter from Aug if 2024
+      const startMonth = selectedYear === 2024 ? 7 : 0;
+      return data.slice(startMonth);
+  };
+
+
+  // --- Dados de Pizza e Raças (Revenue) ---
   const getTopSizesData = () => {
       const yearApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear && a.status !== 'cancelado');
       const counts: Record<string, number> = { 'Pequeno': 0, 'Médio': 0, 'Grande': 0 };
-      
       yearApps.forEach(app => {
           const client = clients.find(c => c.id === app.clientId);
           const pet = client?.pets.find(p => p.id === app.petId);
-          // O objeto 'pet' aqui já foi atualizado pelo handleSyncAppointments com os dados da coluna F da planilha
-          if (pet?.size && counts[pet.size] !== undefined) {
-              counts[pet.size]++;
-          } else if (pet?.size) {
-             // Caso venha algo fora do padrão, tenta normalizar
+          if (pet?.size) {
              const s = pet.size;
              if(s.includes('Peq')) counts['Pequeno']++;
              if(s.includes('Méd') || s.includes('Med')) counts['Médio']++;
              if(s.includes('Gra')) counts['Grande']++;
           }
       });
-
-      return Object.entries(counts)
-        .map(([name, value]) => ({ name, value }))
-        .filter(i => i.value > 0);
+      return Object.entries(counts).map(([name, value]) => ({ name, value })).filter(i => i.value > 0);
   };
 
-  // --- Dados de Raças ---
   const getTopBreedsData = () => {
       const yearApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear && a.status !== 'cancelado');
       const counts: Record<string, number> = {};
-
       yearApps.forEach(app => {
           const client = clients.find(c => c.id === app.clientId);
           const pet = client?.pets.find(p => p.id === app.petId);
           const breed = pet?.breed || 'SRD';
           counts[breed] = (counts[breed] || 0) + 1;
       });
-
-      return Object.entries(counts)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a,b) => b.value - a.value)
-        .slice(0, 5);
+      return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 5);
   };
 
-  // --- Calculations for Cards ---
+
+  // --- Prep Render Vars ---
   const dailyApps = appointments.filter(a => a.date.startsWith(selectedDate));
   const dailyStats = calculateStats(dailyApps);
 
@@ -378,8 +407,13 @@ const Dashboard: React.FC<{
   const yearlyChartData = getYearlyChartData();
   const topSizesData = getTopSizesData();
   const topBreedsData = getTopBreedsData();
+  
+  // Cost Data Prep
+  const costStats = calculateCostStats();
+  const costByCategory = getCostByCategory(costStats.yearlyCosts);
+  const costByMonth = getCostByMonth(costStats.yearlyCosts);
 
-  const PIE_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981'];
+  const PIE_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e'];
 
   const StatCard = ({ title, value, icon: Icon, colorClass, subValue, footer }: any) => (
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition min-h-[120px]">
@@ -455,253 +489,372 @@ const Dashboard: React.FC<{
 
   return (
     <div className="space-y-4 animate-fade-in pb-10">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex">
-              <TabButton id="daily" label="Diário" icon={CalendarIcon} />
-              <TabButton id="weekly" label="Semanal" icon={BarChart2} />
-              <TabButton id="monthly" label="Mensal" icon={TrendingUp} />
-              <TabButton id="yearly" label="Anual" icon={PieChartIcon} />
-          </div>
+      
+      {/* Top Toggle Switch */}
+      <div className="flex bg-white rounded-xl shadow-sm border border-gray-200 p-1 mb-6">
+          <button 
+            onClick={() => setDashboardType('revenue')}
+            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${dashboardType === 'revenue' ? 'bg-brand-50 text-brand-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+          >
+              Faturamento
+          </button>
+          <button 
+            onClick={() => setDashboardType('costs')}
+            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${dashboardType === 'costs' ? 'bg-rose-50 text-rose-600 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+          >
+              Custo Mensal
+          </button>
       </div>
 
-      {/* SEÇÃO DIA */}
-      {activeTab === 'daily' && (
-      <section className="animate-fade-in">
-          <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
-              <h2 className="text-lg font-bold text-gray-800">Filtro de Data</h2>
-              <input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={e => setSelectedDate(e.target.value)}
-                  className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-brand-200 outline-none"
-              />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-100 text-blue-600" />
-              <StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" subValue="Normal e Tesoura" />
-              <StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-100 text-green-600" />
-              <StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-100 text-red-600" />
-          </div>
-      </section>
-      )}
+      {dashboardType === 'revenue' ? (
+        <>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="flex">
+                    <TabButton id="daily" label="Diário" icon={CalendarIcon} />
+                    <TabButton id="weekly" label="Semanal" icon={BarChart2} />
+                    <TabButton id="monthly" label="Mensal" icon={TrendingUp} />
+                    <TabButton id="yearly" label="Anual" icon={PieChartIcon} />
+                </div>
+            </div>
 
-      {/* SEÇÃO SEMANA */}
-      {activeTab === 'weekly' && (
-      <section className="animate-fade-in">
-           <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
-              <h2 className="text-lg font-bold text-gray-800">Semana de Referência</h2>
-              <span className="text-sm font-medium text-gray-500">{new Date(weekStart).toLocaleDateString('pt-BR')} - {new Date(weekEnd).toLocaleDateString('pt-BR')}</span>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard title="Pets da Semana" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-indigo-100 text-indigo-600" />
-              <StatCard title="Tosas da Semana" value={weeklyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" />
-              <StatCard title="Total Pago" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-100 text-emerald-600" />
-              <StatCard title="Pendente" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-rose-100 text-rose-600" />
-          </div>
+            {/* SEÇÃO DIA */}
+            {activeTab === 'daily' && (
+            <section className="animate-fade-in">
+                <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
+                    <h2 className="text-lg font-bold text-gray-800">Filtro de Data</h2>
+                    <input 
+                        type="date" 
+                        value={selectedDate} 
+                        onChange={e => setSelectedDate(e.target.value)}
+                        className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-brand-200 outline-none"
+                    />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-100 text-blue-600" />
+                    <StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" subValue="Normal e Tesoura" />
+                    <StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-100 text-green-600" />
+                    <StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-100 text-red-600" />
+                </div>
+            </section>
+            )}
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2">
-                  <TrendingUp size={16}/> Faturamento Diário (Terça - Sábado)
-              </h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={weeklyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} domain={['auto', 'auto']} />
-                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                        <Tooltip formatter={(value: number, name: string) => [name === 'faturamento' ? `R$ ${value.toFixed(2)}` : value, name === 'faturamento' ? 'Faturamento' : 'Pets']} />
-                        <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#c7d2fe" radius={[4, 4, 0, 0]} barSize={40}>
-                            <LabelList dataKey="petsCount" position="top" style={{fontSize: 10, fill: '#6366f1'}} />
-                        </Bar>
-                        {/* Weekly Color: Indigo */}
-                        <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#4f46e5" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
-                            <LabelList dataKey="faturamento" position="top" offset={10} style={{fontSize: 10, fill: '#4f46e5', fontWeight: 'bold'}} formatter={(val: number) => `R$${val}`}/>
-                        </Line>
-                    </ComposedChart>
-                </ResponsiveContainer>
+            {/* SEÇÃO SEMANA */}
+            {activeTab === 'weekly' && (
+            <section className="animate-fade-in">
+                <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
+                    <h2 className="text-lg font-bold text-gray-800">Semana de Referência</h2>
+                    <span className="text-sm font-medium text-gray-500">{new Date(weekStart).toLocaleDateString('pt-BR')} - {new Date(weekEnd).toLocaleDateString('pt-BR')}</span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <StatCard title="Pets da Semana" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-indigo-100 text-indigo-600" />
+                    <StatCard title="Tosas da Semana" value={weeklyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" />
+                    <StatCard title="Total Pago" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-100 text-emerald-600" />
+                    <StatCard title="Pendente" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-rose-100 text-rose-600" />
+                </div>
+
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2">
+                        <TrendingUp size={16}/> Faturamento Diário (Terça - Sábado)
+                    </h3>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={weeklyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} domain={['auto', 'auto']} />
+                                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                                <Tooltip formatter={(value: number, name: string) => [name === 'faturamento' ? `R$ ${value.toFixed(2)}` : value, name === 'faturamento' ? 'Faturamento' : 'Pets']} />
+                                <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#c7d2fe" radius={[4, 4, 0, 0]} barSize={40}>
+                                    <LabelList dataKey="petsCount" position="top" style={{fontSize: 10, fill: '#6366f1'}} />
+                                </Bar>
+                                {/* Weekly Color: Indigo */}
+                                <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#4f46e5" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
+                                    <LabelList dataKey="faturamento" position="top" offset={10} style={{fontSize: 10, fill: '#4f46e5', fontWeight: 'bold'}} formatter={(val: number) => `R$${val}`}/>
+                                </Line>
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+                    
+                    {/* Data Table */}
+                    <ChartDataTable data={weeklyChartData} />
+                </div>
+            </section>
+            )}
+
+            {/* SEÇÃO MÊS */}
+            {activeTab === 'monthly' && (
+            <section className="animate-fade-in">
+                <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
+                    <h2 className="text-lg font-bold text-gray-800">Seletor de Mês</h2>
+                    <input 
+                        type="month" 
+                        value={selectedMonth} 
+                        onChange={e => setSelectedMonth(e.target.value)}
+                        className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-purple-200 outline-none"
+                    />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <StatCard title="Total de Pets" value={monthlyStats.totalPets} icon={PawPrint} colorClass="bg-purple-100 text-purple-600" />
+                    <StatCard title="Total de Tosas" value={monthlyStats.totalTosas} icon={Scissors} colorClass="bg-pink-100 text-pink-600" subValue="Normal e Tesoura" />
+                    <StatCard title="Receita Paga" value={`R$ ${monthlyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-100 text-emerald-600" />
+                    <StatCard title="A Receber" value={`R$ ${monthlyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-red-100 text-red-600" />
+                </div>
+
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2">
+                        <TrendingUp size={16}/> Comparativo Semanal (Semana Ano)
+                    </h3>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={monthlyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} domain={['auto', 'auto']} />
+                                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                                <Tooltip 
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            return (
+                                                <div className="bg-white p-2 border shadow-sm rounded text-xs">
+                                                    <p className="font-bold">{data.fullName}</p>
+                                                    <p>Faturamento: R$ {data.faturamento.toFixed(2)}</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={40}>
+                                    <LabelList dataKey="petsCount" position="top" style={{fontSize: 10, fill: '#a855f7'}} />
+                                </Bar>
+                                {/* Monthly Color: Purple */}
+                                <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#9333ea" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
+                                    <LabelList dataKey="faturamento" position="top" offset={10} style={{fontSize: 10, fill: '#9333ea', fontWeight: 'bold'}} formatter={(val: number) => `R$${val}`}/>
+                                </Line>
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Data Table with Growth */}
+                    <ChartDataTable data={monthlyChartData} showGrowth />
+                </div>
+            </section>
+            )}
+
+            {/* SEÇÃO ANO */}
+            {activeTab === 'yearly' && (
+            <section className="animate-fade-in">
+                <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
+                    <h2 className="text-lg font-bold text-gray-800">Ano de Referência</h2>
+                    <select 
+                        value={selectedYear} 
+                        onChange={e => setSelectedYear(parseInt(e.target.value))}
+                        className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-emerald-200 outline-none"
+                    >
+                        {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <StatCard title="Total Pets" value={yearlyStats.totalPets} icon={PawPrint} colorClass="bg-sky-100 text-sky-600" />
+                    <StatCard title="Total Tosas" value={yearlyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" />
+                    <StatCard title="Faturamento Total" value={`R$ ${yearlyStats.grossRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-green-100 text-green-600" />
+                    <StatCard title="Pendência Total" value={`R$ ${yearlyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-100 text-red-600" />
+                </div>
+
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+                    <h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2">
+                        <TrendingUp size={16}/> Evolução Mensal (Início: Ago/24)
+                    </h3>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={yearlyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val/1000}k`} domain={['auto', 'auto']} />
+                                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                                
+                                <Tooltip 
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            return (
+                                                <div className="bg-white p-2 border shadow-sm rounded text-xs w-40">
+                                                    <p className="font-bold mb-1">{data.name}</p>
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span>Fat: R${data.faturamento.toFixed(0)}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+
+                                <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={30}>
+                                    <LabelList dataKey="petsCount" position="top" style={{fontSize: 10, fill: '#059669'}} />
+                                </Bar>
+                                {/* Yearly Color: Emerald */}
+                                <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#059669" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
+                                    <LabelList dataKey="faturamento" position="top" offset={10} style={{fontSize: 10, fill: '#059669', fontWeight: 'bold'}} formatter={(val: number) => `R$${val}`}/>
+                                </Line>
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Data Table with Growth */}
+                    <ChartDataTable data={yearlyChartData} showGrowth />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* TOP RAÇAS */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
+                        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
+                            <PawPrint size={16}/> Top 5 Raças Mais Atendidas
+                        </h3>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart layout="vertical" data={topBreedsData} margin={{top: 5, right: 30, left: 40, bottom: 5}}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="name" type="category" width={80} tick={{fontSize: 10, fontWeight: 'bold'}} />
+                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20}>
+                                    <LabelList dataKey="value" position="right" style={{fontSize: 12, fill: '#b45309', fontWeight: 'bold'}} />
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* PIE CHART PORTES */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
+                        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
+                            <PieChartIcon size={16}/> Distribuição por Porte
+                        </h3>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={topSizesData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    fill="#8884d8"
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {topSizesData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend verticalAlign="bottom" height={36}/>
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </section>
+            )}
+        </>
+      ) : (
+          /* --- VISÃO CUSTO MENSAL --- */
+          <section className="animate-fade-in">
+              <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
+                  <h2 className="text-lg font-bold text-gray-800">Custo Mensal - {selectedYear}</h2>
+                  <select 
+                      value={selectedYear} 
+                      onChange={e => setSelectedYear(parseInt(e.target.value))}
+                      className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-rose-200 outline-none"
+                  >
+                      {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
               </div>
-              
-              {/* Data Table */}
-              <ChartDataTable data={weeklyChartData} />
-          </div>
-      </section>
-      )}
 
-      {/* SEÇÃO MÊS */}
-      {activeTab === 'monthly' && (
-      <section className="animate-fade-in">
-          <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
-              <h2 className="text-lg font-bold text-gray-800">Seletor de Mês</h2>
-              <input 
-                  type="month" 
-                  value={selectedMonth} 
-                  onChange={e => setSelectedMonth(e.target.value)}
-                  className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-purple-200 outline-none"
-              />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard title="Total de Pets" value={monthlyStats.totalPets} icon={PawPrint} colorClass="bg-purple-100 text-purple-600" />
-              <StatCard title="Total de Tosas" value={monthlyStats.totalTosas} icon={Scissors} colorClass="bg-pink-100 text-pink-600" subValue="Normal e Tesoura" />
-              <StatCard title="Receita Paga" value={`R$ ${monthlyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-100 text-emerald-600" />
-              <StatCard title="A Receber" value={`R$ ${monthlyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-red-100 text-red-600" />
-          </div>
-
-           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2">
-                  <TrendingUp size={16}/> Comparativo Semanal (Semana Ano)
-              </h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={monthlyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
-                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} domain={['auto', 'auto']} />
-                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                        <Tooltip 
-                            content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                    const data = payload[0].payload;
-                                    return (
-                                        <div className="bg-white p-2 border shadow-sm rounded text-xs">
-                                            <p className="font-bold">{data.fullName}</p>
-                                            <p>Faturamento: R$ {data.faturamento.toFixed(2)}</p>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            }}
-                        />
-                        <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={40}>
-                            <LabelList dataKey="petsCount" position="top" style={{fontSize: 10, fill: '#a855f7'}} />
-                        </Bar>
-                        {/* Monthly Color: Purple */}
-                        <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#9333ea" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
-                            <LabelList dataKey="faturamento" position="top" offset={10} style={{fontSize: 10, fill: '#9333ea', fontWeight: 'bold'}} formatter={(val: number) => `R$${val}`}/>
-                        </Line>
-                    </ComposedChart>
-                </ResponsiveContainer>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  <StatCard title="Custo Total" value={`R$ ${costStats.totalCost.toFixed(2)}`} icon={ShoppingBag} colorClass="bg-rose-100 text-rose-600" />
+                  <StatCard title="Pago" value={`R$ ${costStats.paidCost.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-100 text-green-600" />
+                  <StatCard title="Pendente" value={`R$ ${costStats.pendingCost.toFixed(2)}`} icon={AlertCircle} colorClass="bg-orange-100 text-orange-600" />
               </div>
 
-              {/* Data Table with Growth */}
-              <ChartDataTable data={monthlyChartData} showGrowth />
-          </div>
-      </section>
-      )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Costs by Month Chart */}
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
+                      <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
+                          <BarChart2 size={16}/> Evolução Mensal de Custos
+                      </h3>
+                      <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={costByMonth}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis dataKey="name" tick={{fontSize: 10}} axisLine={false} tickLine={false} />
+                              <YAxis tickFormatter={(val) => `R$${val}`} tick={{fontSize: 10}} axisLine={false} tickLine={false} />
+                              <Tooltip formatter={(val: number) => `R$ ${val.toFixed(2)}`} />
+                              <Bar dataKey="value" fill="#f43f5e" radius={[4, 4, 0, 0]}>
+                                  <LabelList dataKey="value" position="top" style={{fontSize: 10, fill: '#e11d48'}} formatter={(val: number) => `R$${val.toFixed(0)}`} />
+                              </Bar>
+                          </BarChart>
+                      </ResponsiveContainer>
+                  </div>
 
-      {/* SEÇÃO ANO */}
-      {activeTab === 'yearly' && (
-      <section className="animate-fade-in">
-          <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200">
-              <h2 className="text-lg font-bold text-gray-800">Ano de Referência</h2>
-              <select 
-                  value={selectedYear} 
-                  onChange={e => setSelectedYear(parseInt(e.target.value))}
-                  className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 focus:ring-2 ring-emerald-200 outline-none"
-              >
-                  {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard title="Total Pets" value={yearlyStats.totalPets} icon={PawPrint} colorClass="bg-sky-100 text-sky-600" />
-              <StatCard title="Total Tosas" value={yearlyStats.totalTosas} icon={Scissors} colorClass="bg-orange-100 text-orange-600" />
-              <StatCard title="Faturamento Total" value={`R$ ${yearlyStats.grossRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-green-100 text-green-600" />
-              <StatCard title="Pendência Total" value={`R$ ${yearlyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-100 text-red-600" />
-          </div>
-
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
-              <h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2">
-                  <TrendingUp size={16}/> Evolução Mensal (Início: Ago/24)
-              </h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={yearlyChartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
-                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val/1000}k`} domain={['auto', 'auto']} />
-                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                        
-                        <Tooltip 
-                            content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                    const data = payload[0].payload;
-                                    return (
-                                        <div className="bg-white p-2 border shadow-sm rounded text-xs w-40">
-                                            <p className="font-bold mb-1">{data.name}</p>
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span>Fat: R${data.faturamento.toFixed(0)}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            }}
-                        />
-
-                        <Bar yAxisId="right" dataKey="petsCount" name="Pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={30}>
-                            <LabelList dataKey="petsCount" position="top" style={{fontSize: 10, fill: '#059669'}} />
-                        </Bar>
-                        {/* Yearly Color: Emerald */}
-                        <Line yAxisId="left" type="monotone" dataKey="faturamento" name="Faturamento" stroke="#059669" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
-                            <LabelList dataKey="faturamento" position="top" offset={10} style={{fontSize: 10, fill: '#059669', fontWeight: 'bold'}} formatter={(val: number) => `R$${val}`}/>
-                        </Line>
-                    </ComposedChart>
-                </ResponsiveContainer>
+                  {/* Costs by Category Pie */}
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
+                      <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
+                          <Tag size={16}/> Custos por Categoria
+                      </h3>
+                      <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                              <Pie
+                                  data={costByCategory}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={60}
+                                  outerRadius={80}
+                                  fill="#8884d8"
+                                  paddingAngle={5}
+                                  dataKey="value"
+                              >
+                                  {costByCategory.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                  ))}
+                              </Pie>
+                              <Tooltip formatter={(val: number) => `R$ ${val.toFixed(2)}`} />
+                              <Legend layout="vertical" verticalAlign="middle" align="right" />
+                          </PieChart>
+                      </ResponsiveContainer>
+                  </div>
               </div>
 
-              {/* Data Table with Growth */}
-              <ChartDataTable data={yearlyChartData} showGrowth />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* TOP RAÇAS */}
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
-                  <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
-                      <PawPrint size={16}/> Top 5 Raças Mais Atendidas
-                  </h3>
-                  <ResponsiveContainer width="100%" height="100%">
-                      <BarChart layout="vertical" data={topBreedsData} margin={{top: 5, right: 30, left: 40, bottom: 5}}>
-                          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                          <XAxis type="number" hide />
-                          <YAxis dataKey="name" type="category" width={80} tick={{fontSize: 10, fontWeight: 'bold'}} />
-                          <Tooltip cursor={{fill: 'transparent'}} />
-                          <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20}>
-                              <LabelList dataKey="value" position="right" style={{fontSize: 12, fill: '#b45309', fontWeight: 'bold'}} />
-                          </Bar>
-                      </BarChart>
-                  </ResponsiveContainer>
-              </div>
-
-              {/* PIE CHART PORTES */}
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80">
-                  <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
-                      <PieChartIcon size={16}/> Distribuição por Porte
-                  </h3>
-                  <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                          <Pie
-                              data={topSizesData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={60}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              paddingAngle={5}
-                              dataKey="value"
-                          >
-                              {topSizesData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+              {/* Data Table for Costs */}
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mt-6 overflow-hidden">
+                  <h3 className="text-sm font-bold text-gray-500 mb-4">Detalhamento de Custos</h3>
+                  <div className="overflow-x-auto max-h-80">
+                      <table className="min-w-full divide-y divide-gray-200 text-xs">
+                          <thead className="bg-gray-50 sticky top-0">
+                              <tr>
+                                  <th className="px-3 py-2 text-left text-gray-500">Data</th>
+                                  <th className="px-3 py-2 text-left text-gray-500">Categoria</th>
+                                  <th className="px-3 py-2 text-left text-gray-500">Status</th>
+                                  <th className="px-3 py-2 text-right text-gray-500">Valor</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {costStats.yearlyCosts.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(c => (
+                                  <tr key={c.id}>
+                                      <td className="px-3 py-2 whitespace-nowrap text-gray-700">{new Date(c.date).toLocaleDateString('pt-BR')}</td>
+                                      <td className="px-3 py-2 text-gray-700">{c.category}</td>
+                                      <td className="px-3 py-2">
+                                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${c.status === 'Pago' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                              {c.status || 'Pendente'}
+                                          </span>
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-bold text-gray-700">R$ {c.amount.toFixed(2)}</td>
+                                  </tr>
                               ))}
-                          </Pie>
-                          <Tooltip />
-                          <Legend verticalAlign="bottom" height={36}/>
-                      </PieChart>
-                  </ResponsiveContainer>
+                          </tbody>
+                      </table>
+                  </div>
               </div>
-          </div>
-      </section>
+          </section>
       )}
     </div>
   );
@@ -992,1045 +1145,407 @@ const PaymentManager: React.FC<{
     )
 };
 
-// 4. Client Manager (RESPONSIVE CARDS)
-const ClientManager: React.FC<{
-  clients: Client[];
-  onDeleteClient: (id: string) => void;
-  googleUser: GoogleUser | null;
-  accessToken: string | null;
-}> = ({ clients, onDeleteClient, googleUser, accessToken }) => {
-  const [showConfig, setShowConfig] = useState(false);
-  const [sheetId, setSheetId] = useState(localStorage.getItem('petgestor_sheet_id') || PREDEFINED_SHEET_ID);
-  const [formUrl, setFormUrl] = useState(localStorage.getItem('petgestor_form_url') || PREDEFINED_FORM_URL);
-  const [searchTerm, setSearchTerm] = useState('');
+// 4. Client Manager
+const ClientManager: React.FC<{ 
+    clients: Client[]; 
+    onDeleteClient: (id: string) => void;
+    googleUser: GoogleUser | null;
+    accessToken: string | null;
+}> = ({ clients, onDeleteClient }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    
+    const filteredClients = clients.filter(c => 
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.pets.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
 
-  const sortedClients = [...clients].sort((a, b) => {
-    if (a.createdAt && b.createdAt) {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); 
-    }
-    return a.name.localeCompare(b.name);
-  });
-
-  const filteredClients = sortedClients.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.phone.includes(searchTerm) ||
-    c.pets.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  const saveConfig = () => {
-    localStorage.setItem('petgestor_sheet_id', sheetId);
-    localStorage.setItem('petgestor_form_url', formUrl);
-    setShowConfig(false);
-  };
-
-  const ClientCard = ({ client }: { client: Client }) => (
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4">
-          <div className="flex justify-between items-start mb-2">
-              <div>
-                  <h3 className="font-bold text-gray-800 text-lg">{client.name}</h3>
-                  <div className="text-sm text-gray-500">{client.phone}</div>
-              </div>
-              <div className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-500">
-                  {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
-              </div>
-          </div>
-          <div className="text-xs text-gray-600 mb-3 flex items-start gap-1">
-              <MapPin size={12} className="mt-0.5" />
-              <span>{client.address} {client.complement ? ` - ${client.complement}` : ''}</span>
-          </div>
-          <div className="space-y-2">
-              {client.pets.map((pet, idx) => (
-                  <div key={idx} className="bg-brand-50 border border-brand-100 rounded-lg p-2 text-xs">
-                      <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-brand-800 flex items-center gap-1"><PawPrint size={10}/> {pet.name}</span>
-                          <span className="bg-white px-2 py-0.5 rounded-full text-brand-600 font-bold border border-brand-100">{pet.breed}</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-gray-600">
-                          <div><span className="font-bold">Porte:</span> {pet.size}</div>
-                          <div><span className="font-bold">Pelo:</span> {pet.coat}</div>
-                          {pet.age && <div><span className="font-bold">Idade:</span> {pet.age}</div>}
-                          {pet.gender && <div><span className="font-bold">Sexo:</span> {pet.gender}</div>}
-                      </div>
-                      {pet.notes && <div className="mt-1 pt-1 border-t border-brand-100 text-gray-500 italic">Obs: {pet.notes}</div>}
-                  </div>
-              ))}
-          </div>
-      </div>
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-            <h2 className="text-2xl font-bold text-gray-800">Clientes e Pets</h2>
-            <p className="text-sm text-gray-500">Ordenado por data de cadastro</p>
-        </div>
-        
-        <div className="flex gap-2 w-full md:w-auto flex-wrap">
-             {formUrl && (
-                <a href={formUrl} target="_blank" rel="noreferrer" className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition text-sm flex-1 md:flex-none justify-center">
-                  <ExternalLink size={16} /> Formulário
-                </a>
-             )}
-             <button onClick={() => setShowConfig(!showConfig)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-lg">
-                <Settings size={20} />
-             </button>
-        </div>
-      </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-        <input 
-            className="w-full pl-10 p-2.5 border rounded-lg focus:ring-2 ring-brand-200 outline-none"
-            placeholder="Buscar por nome do cliente, pet ou telefone..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {showConfig && (
-        <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200 shadow-sm animate-fade-in-down">
-          <h3 className="text-lg font-semibold mb-4 text-yellow-800 flex items-center gap-2">
-            <Settings size={18} /> Configurações do Sistema
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">ID da Planilha Google</label>
-                <input className="w-full border p-2 rounded focus:ring-2 ring-yellow-400 outline-none" value={sheetId} onChange={e => setSheetId(e.target.value)} />
-            </div>
-            <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Link do Formulário</label>
-                <input className="w-full border p-2 rounded focus:ring-2 ring-yellow-400 outline-none" value={formUrl} onChange={e => setFormUrl(e.target.value)} />
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 mt-4">
-            <button onClick={() => setShowConfig(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Fechar</button>
-            <button onClick={saveConfig} className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">Salvar</button>
-          </div>
-        </div>
-      )}
-
-      {clients.length === 0 && !showConfig ? (
-          <div className="text-center py-10 bg-white rounded-xl border border-dashed border-gray-300">
-              <p className="text-gray-500 mb-2">Nenhum cliente encontrado.</p>
-              <p className="text-sm text-gray-400">Os dados serão sincronizados automaticamente.</p>
-          </div>
-      ) : (
-        <>
-            {/* Mobile Cards */}
-            <div className="md:hidden">
-                {filteredClients.map(client => <ClientCard key={client.id} client={client} />)}
-            </div>
-
-            {/* Desktop Table */}
-            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cadastro</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato / Endereço</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pet(s)</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredClients.map(client => (
-                                <tr key={client.id} className="hover:bg-gray-50 transition">
-                                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                                        {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
-                                    </td>
-                                    <td className="px-6 py-4"><div className="text-sm font-bold text-gray-900">{client.name}</div></td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm text-gray-900">{client.phone}</div>
-                                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                            <MapPin size={10} /> {client.address}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="space-y-2">
-                                            {client.pets.map((pet, idx) => (
-                                                <div key={idx} className="bg-brand-50 rounded p-2 text-xs border border-brand-100">
-                                                    <div className="flex items-center justify-between font-bold text-brand-800">
-                                                        <span className="flex items-center gap-1"><PawPrint size={10} /> {pet.name}</span>
-                                                        <span>{pet.size}/{pet.coat}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+    return (
+        <div className="space-y-4 animate-fade-in h-full flex flex-col">
+             <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0">
+                <h2 className="text-2xl font-bold text-gray-800">Clientes & Pets</h2>
+                <div className="flex gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-64">
+                        <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+                        <input 
+                            placeholder="Buscar cliente ou pet..." 
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border rounded-xl focus:ring-2 ring-brand-200 outline-none shadow-sm"
+                        />
+                    </div>
+                    <a 
+                        href={PREDEFINED_FORM_URL} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold hover:bg-brand-700 transition shadow-sm whitespace-nowrap"
+                    >
+                        <Plus size={18} /> <span className="hidden md:inline">Novo</span>
+                    </a>
                 </div>
             </div>
-        </>
-      )}
-    </div>
-  );
+
+            <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredClients.map(client => (
+                        <div key={client.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition group">
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                        {client.name}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                                        <Phone size={12}/> {client.phone}
+                                    </p>
+                                </div>
+                                <div className="opacity-0 group-hover:opacity-100 transition">
+                                    <button onClick={() => { if(confirm('Excluir cliente?')) onDeleteClient(client.id); }} className="text-red-400 hover:text-red-600 p-1">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                {client.pets.map(pet => (
+                                    <div key={pet.id} className="bg-gray-50 p-2 rounded-lg flex items-center gap-3 text-sm border border-gray-100">
+                                        <div className="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                                            {pet.name[0]}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-700">{pet.name}</p>
+                                            <p className="text-[10px] text-gray-500">{pet.breed} • {pet.size}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // 5. Service Manager
 const ServiceManager: React.FC<{
-  services: Service[];
-  onAddService: (s: Service) => void;
-  onDeleteService: (id: string) => void;
-  onSyncServices: (s: Service[]) => void;
-  accessToken: string | null;
-  sheetId: string;
-}> = ({ services, onAddService, onDeleteService, onSyncServices, accessToken, sheetId }) => {
-    const [name, setName] = useState('');
-    const [price, setPrice] = useState('');
-    const [desc, setDesc] = useState('');
-    const [category, setCategory] = useState<'principal' | 'adicional'>('principal');
-    const [size, setSize] = useState('Todos');
-    const [coat, setCoat] = useState('Todos');
+    services: Service[];
+    onAddService: (s: Service) => void;
+    onDeleteService: (id: string) => void;
+    onSyncServices: (silent: boolean) => void;
+    accessToken: string | null;
+    sheetId: string;
+}> = ({ services, onSyncServices, sheetId }) => {
+    return (
+        <div className="space-y-4 animate-fade-in h-full flex flex-col">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex-shrink-0">
+                <div>
+                    <h2 className="text-xl font-bold text-gray-800">Serviços</h2>
+                    <p className="text-xs text-gray-500 hidden sm:block">Gerenciado via Google Sheets</p>
+                </div>
+                <div className="flex gap-2">
+                    <a 
+                        href={`https://docs.google.com/spreadsheets/d/${sheetId}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg flex items-center gap-2 font-medium transition text-sm"
+                    >
+                        <ExternalLink size={16} /> <span className="hidden md:inline">Planilha</span>
+                    </a>
+                    <button 
+                        onClick={() => onSyncServices(false)} 
+                        className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:bg-brand-700 transition shadow-sm text-sm"
+                    >
+                        <Sparkles size={16} /> Sincronizar
+                    </button>
+                </div>
+            </div>
 
-    // Context Menu State
-    const [contextMenu, setContextMenu] = useState<{x: number, y: number, id: string} | null>(null);
+            <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {services.map(service => (
+                        <div key={service.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                            <div>
+                                <div className="flex justify-between items-start mb-2">
+                                    <h3 className="font-bold text-gray-800">{service.name}</h3>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${service.category === 'principal' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                        {service.category}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 mb-2 line-clamp-2">{service.description}</p>
+                                <div className="flex flex-wrap gap-1 mb-3">
+                                    <span className="text-[10px] bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-100">Porte: {service.targetSize}</span>
+                                    <span className="text-[10px] bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-100">Pelo: {service.targetCoat}</span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-3 border-t border-gray-50 mt-2">
+                                <span className="text-lg font-bold text-brand-600">R$ {service.price.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// 6. Schedule Manager
+const ScheduleManager: React.FC<{
+    appointments: Appointment[];
+    clients: Client[];
+    services: Service[];
+    onAdd: (app: Appointment, client: Client, pet: Pet, services: Service[]) => void;
+    onUpdateStatus: (id: string, status: Appointment['status']) => void;
+    onDelete: (id: string) => void;
+    googleUser: GoogleUser | null;
+}> = ({ appointments, clients, services, onAdd, onUpdateStatus, onDelete }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
     
-    // Edit Modal State
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editService, setEditService] = useState<Service | null>(null);
-    const [isSavingEdit, setIsSavingEdit] = useState(false);
+    // Form State
+    const [selectedClient, setSelectedClient] = useState<string>('');
+    const [selectedPet, setSelectedPet] = useState<string>('');
+    const [selectedService, setSelectedService] = useState<string>('');
+    const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]);
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [time, setTime] = useState('');
+    const [notes, setNotes] = useState('');
 
-    const handleAdd = () => {
-        if(name && price) {
-            onAddService({ 
-                id: Date.now().toString(), 
-                name, 
-                price: parseFloat(price), 
-                description: desc, 
-                durationMin: 60,
-                category,
-                targetSize: size,
-                targetCoat: coat
-            });
-            setName(''); setPrice(''); setDesc('');
-        }
-    }
+    const resetForm = () => {
+        setSelectedClient(''); setSelectedPet(''); setSelectedService('');
+        setSelectedAddServices([]); setTime(''); setNotes('');
+        setIsModalOpen(false);
+    };
 
-    const handleDeleteSheetService = async (serviceId: string) => {
-        if (!serviceId.includes('sheet_svc_')) {
-            alert("Este serviço foi criado manualmente, não está na planilha.");
-            onDeleteService(serviceId);
-            return;
-        }
+    const handleSave = () => {
+        if (!selectedClient || !selectedPet || !selectedService || !date || !time) return;
 
-        if(!window.confirm("Isso apagará o conteúdo da linha na Planilha Google. Confirmar?")) return;
+        const client = clients.find(c => c.id === selectedClient);
+        const pet = client?.pets.find(p => p.id === selectedPet);
+        const mainSvc = services.find(s => s.id === selectedService);
+        const addSvcs = selectedAddServices.map(id => services.find(s => s.id === id)).filter(s => s) as Service[];
 
-        try {
-            // Extract index from ID format: sheet_svc_{index}_{timestamp}
-            const parts = serviceId.split('_');
-            const index = parseInt(parts[2]);
-            const rowNumber = index + 2; // Data starts at row 2 (index 0)
-
-            const range = `Serviço!A${rowNumber}:E${rowNumber}`;
-            
-            await googleService.clearSheetValues(accessToken!, sheetId, range);
-            onDeleteService(serviceId);
-            alert("Serviço excluído da planilha com sucesso.");
-        } catch (e) {
-            console.error(e);
-            alert("Erro ao excluir da planilha. Verifique permissões.");
+        if (client && pet && mainSvc) {
+            const newApp: Appointment = {
+                id: `local_${Date.now()}`,
+                clientId: client.id,
+                petId: pet.id,
+                serviceId: mainSvc.id,
+                additionalServiceIds: selectedAddServices,
+                date: `${date}T${time}:00`,
+                status: 'agendado',
+                notes: notes
+            };
+            onAdd(newApp, client, pet, [mainSvc, ...addSvcs]);
+            resetForm();
         }
     };
 
-    const handleOpenEdit = (service: Service) => {
-        setEditService({...service});
-        setIsEditModalOpen(true);
-        setContextMenu(null);
-    }
+    const filteredClients = clients.filter(c => c.pets.length > 0).sort((a,b) => a.name.localeCompare(b.name));
+    const client = clients.find(c => c.id === selectedClient);
+    const pets = client?.pets || [];
 
-    const handleSaveEdit = async () => {
-        if (!editService) return;
-
-        if (!editService.id.includes('sheet_svc_')) {
-            alert("A edição de serviços manuais não salva na planilha, apenas localmente.");
-            // Update local
-            const newServices = services.map(s => s.id === editService.id ? editService : s);
-            onSyncServices(newServices);
-            setIsEditModalOpen(false);
-            return;
-        }
-
-        try {
-            setIsSavingEdit(true);
-            const parts = editService.id.split('_');
-            const index = parseInt(parts[2]);
-            const rowNumber = index + 2;
-            const range = `Serviço!A${rowNumber}:E${rowNumber}`;
-
-            const rowData = [
-                editService.name,
-                editService.category,
-                editService.targetSize,
-                editService.targetCoat,
-                editService.price.toString().replace('.', ',') // Convert back to BR format for sheets
-            ];
-
-            await googleService.updateSheetValues(accessToken!, sheetId, range, rowData);
-            
-            // Update local state to reflect changes immediately
-            const newServices = services.map(s => s.id === editService.id ? editService : s);
-            onSyncServices(newServices);
-            
-            alert("Serviço atualizado na planilha!");
-            setIsEditModalOpen(false);
-        } catch (e) {
-            console.error(e);
-            alert("Erro ao atualizar planilha.");
-        } finally {
-            setIsSavingEdit(false);
-        }
-    }
-
-    // Group services for display
-    const groupedServices = services.reduce((acc, curr) => {
-        const key = curr.category === 'principal' ? 'Principais' : 'Adicionais';
-        if(!acc[key]) acc[key] = [];
-        acc[key].push(curr);
-        return acc;
-    }, {} as Record<string, Service[]>);
+    // Filter Logic
+    const now = new Date();
+    const sortedApps = [...appointments].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const upcoming = sortedApps.filter(a => new Date(a.date) >= now && a.status !== 'cancelado');
+    const past = sortedApps.filter(a => new Date(a.date) < now || a.status === 'cancelado').reverse().slice(0, 20);
 
     return (
-        <div className="space-y-6">
-             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h2 className="text-2xl font-bold text-gray-800">Catálogo de Serviços</h2>
-                {/* Sync Button Removed - Auto Sync */}
-             </div>
+        <div className="space-y-6 animate-fade-in relative h-full flex flex-col">
+            <div className="flex justify-between items-center flex-shrink-0">
+                <h2 className="text-2xl font-bold text-gray-800">Agenda</h2>
+                <button 
+                    onClick={() => setIsModalOpen(true)}
+                    className="bg-brand-600 text-white px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-brand-700 transition flex items-center gap-2 text-sm"
+                >
+                    <Plus size={18} /> Novo
+                </button>
+            </div>
 
-             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hidden md:block">
-                <h3 className="text-sm font-bold text-gray-500 uppercase mb-4">Adicionar Novo Serviço Manualmente</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <div className="md:col-span-2">
-                        <label className="text-xs font-semibold text-gray-500">Nome do Serviço</label>
-                        <input className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Banho Premium" />
-                    </div>
-                    <div>
-                         <label className="text-xs font-semibold text-gray-500">Categoria</label>
-                         <select className="w-full border p-2 rounded mt-1 bg-white" value={category} onChange={e => setCategory(e.target.value as any)}>
-                             <option value="principal">Principal</option>
-                             <option value="adicional">Adicional</option>
-                         </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-semibold text-gray-500">Valor (R$)</label>
-                        <input type="number" className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" />
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                     <div>
-                         <label className="text-xs font-semibold text-gray-500">Porte Alvo</label>
-                         <select className="w-full border p-2 rounded mt-1 bg-white" value={size} onChange={e => setSize(e.target.value)}>
-                             <option value="Todos">Todos</option>
-                             <option value="Pequeno">Pequeno</option>
-                             <option value="Médio">Médio</option>
-                             <option value="Grande">Grande</option>
-                         </select>
-                     </div>
-                     <div>
-                         <label className="text-xs font-semibold text-gray-500">Pelagem Alvo</label>
-                         <select className="w-full border p-2 rounded mt-1 bg-white" value={coat} onChange={e => setCoat(e.target.value)}>
-                             <option value="Todos">Todos</option>
-                             <option value="Curto">Curto</option>
-                             <option value="Longo">Longo</option>
-                         </select>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-xs font-semibold text-gray-500">Descrição</label>
-                        <input className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Detalhes" />
-                     </div>
-                     <button onClick={handleAdd} className="bg-brand-600 text-white px-6 py-2 rounded hover:bg-brand-700 h-[42px] font-bold">Adicionar</button>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-20">
-                {Object.entries(groupedServices).map(([cat, svcs]) => (
-                    <div key={cat} className="space-y-3">
-                        <h3 className="font-bold text-lg text-gray-700 border-b pb-2">{cat}</h3>
-                        {svcs.sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(s => {
-                            const displayPrice = (s.price === null || s.price === undefined || isNaN(s.price)) ? 0 : s.price;
-                            const sizeLabel = (s.targetSize || 'Todos').substring(0,3);
-                            const coatLabel = (s.targetCoat || 'Todos').substring(0,3);
-                            
-                            return (
-                                <div 
-                                    key={s.id} 
-                                    className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm flex justify-between items-center group relative cursor-pointer hover:border-brand-300 transition"
-                                    onContextMenu={(e) => {
-                                        e.preventDefault();
-                                        setContextMenu({ x: e.pageX, y: e.pageY, id: s.id });
-                                    }}
-                                >
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <h4 className="font-bold text-gray-800">{s.name}</h4>
-                                            <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">{sizeLabel}/{coatLabel}</span>
-                                        </div>
-                                        <p className="text-xs text-gray-500">{s.description}</p>
+            <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0 space-y-4">
+                {/* Upcoming List */}
+                <div className="space-y-2">
+                    <h3 className="text-sm font-bold text-brand-700 uppercase tracking-wider flex items-center gap-2 sticky top-0 bg-gray-50 py-2 z-10">
+                        <CalendarIcon size={14}/> Próximos
+                    </h3>
+                    {upcoming.length === 0 && <div className="text-gray-400 italic text-sm p-4 bg-white rounded-lg border border-dashed">Nenhum agendamento futuro.</div>}
+                    {upcoming.map(app => {
+                        const c = clients.find(cl => cl.id === app.clientId);
+                        const p = c?.pets.find(pt => pt.id === app.petId);
+                        const s = services.find(srv => srv.id === app.serviceId);
+                        return (
+                            <div key={app.id} className="bg-white p-3 rounded-xl border-l-4 border-brand-500 shadow-sm flex justify-between items-center gap-3">
+                                <div>
+                                    <div className="flex items-center gap-2 text-brand-700 font-bold text-xs mb-0.5">
+                                        <Clock size={12}/>
+                                        {new Date(app.date).toLocaleDateString('pt-BR')} • {new Date(app.date).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className={`text-sm font-bold px-2 py-1 rounded-full ${displayPrice === 0 ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}`}>
-                                            {displayPrice === 0 ? 'Grátis' : `R$ ${displayPrice.toFixed(2)}`}
-                                        </span>
-                                        <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setContextMenu({ x: e.pageX, y: e.pageY, id: s.id });
-                                            }}
-                                            className="text-gray-400 p-2 hover:bg-gray-100 rounded-full"
-                                        >
-                                            <MoreVertical size={16} />
-                                        </button>
-                                    </div>
+                                    <h4 className="font-bold text-gray-800 text-sm">{p?.name} <span className="text-gray-500 font-normal">({c?.name})</span></h4>
+                                    <p className="text-xs text-gray-500 mt-0.5">{s?.name}</p>
                                 </div>
-                            )
-                        })}
-                    </div>
-                ))}
-             </div>
+                                <div className="flex items-center gap-1">
+                                    <button onClick={() => onUpdateStatus(app.id, 'concluido')} className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition" title="Concluir">
+                                        <Check size={18} />
+                                    </button>
+                                    <button onClick={() => { if(confirm('Cancelar este agendamento?')) onDelete(app.id); }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition" title="Excluir">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
 
-             {/* Context Menu */}
-             {contextMenu && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)}></div>
-                    <div 
-                        className="fixed z-50 bg-white shadow-xl border rounded-lg overflow-hidden py-1 w-48 animate-fade-in"
-                        style={{ top: contextMenu.y, left: contextMenu.x }}
-                    >
-                        <button 
-                            className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            onClick={() => handleOpenEdit(services.find(s => s.id === contextMenu.id)!)}
-                        >
-                            <Edit2 size={16} /> Editar Serviço
-                        </button>
-                        <button 
-                            className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 font-medium"
-                            onClick={() => {
-                                handleDeleteSheetService(contextMenu.id);
-                                setContextMenu(null);
-                            }}
-                        >
-                            <Trash2 size={16} /> Excluir da Planilha
-                        </button>
-                    </div>
-                </>
-            )}
+                 {/* Past List */}
+                 <div className="space-y-2 mt-6">
+                    <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2 sticky top-0 bg-gray-50 py-2 z-10">
+                        <Clock size={14}/> Histórico Recente
+                    </h3>
+                    {past.map(app => {
+                        const c = clients.find(cl => cl.id === app.clientId);
+                        const p = c?.pets.find(pt => pt.id === app.petId);
+                        return (
+                            <div key={app.id} className="bg-gray-100 p-3 rounded-lg border border-gray-200 flex justify-between items-center opacity-75">
+                                <div>
+                                    <div className="text-gray-500 font-medium text-xs">
+                                        {new Date(app.date).toLocaleDateString('pt-BR')}
+                                    </div>
+                                    <h4 className="font-bold text-gray-600 text-sm">{p?.name}</h4>
+                                </div>
+                                <div className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${app.status === 'cancelado' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                    {app.status}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
 
-            {/* Edit Modal */}
-            {isEditModalOpen && editService && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl animate-fade-in-down">
-                        <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Editar Serviço</h3>
+            {/* Modal for New Appointment */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                            <h3 className="font-bold text-lg text-gray-800">Novo Agendamento</h3>
+                            <button onClick={resetForm}><X size={24} className="text-gray-400 hover:text-gray-600"/></button>
+                        </div>
                         
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Nome</label>
-                                <input className="w-full border p-2 rounded" value={editService.name} onChange={e => setEditService({...editService, name: e.target.value})} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="p-6 overflow-y-auto custom-scrollbar">
+                            <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Preço (R$)</label>
-                                    <input type="number" className="w-full border p-2 rounded" value={editService.price} onChange={e => setEditService({...editService, price: parseFloat(e.target.value)})} />
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente</label>
+                                    <select 
+                                        value={selectedClient} 
+                                        onChange={e => { setSelectedClient(e.target.value); setSelectedPet(''); }} 
+                                        className="w-full border p-3 rounded-xl bg-white outline-none focus:ring-2 ring-brand-200 text-sm"
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {filteredClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
                                 </div>
-                                <div>
-                                     <label className="block text-xs font-bold text-gray-500 mb-1">Categoria</label>
-                                     <select className="w-full border p-2 rounded bg-white" value={editService.category} onChange={e => setEditService({...editService, category: e.target.value as any})}>
-                                         <option value="principal">Principal</option>
-                                         <option value="adicional">Adicional</option>
-                                     </select>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                     <label className="block text-xs font-bold text-gray-500 mb-1">Porte</label>
-                                     <select className="w-full border p-2 rounded bg-white" value={editService.targetSize || 'Todos'} onChange={e => setEditService({...editService, targetSize: e.target.value})}>
-                                         <option value="Todos">Todos</option>
-                                         <option value="Pequeno">Pequeno</option>
-                                         <option value="Médio">Médio</option>
-                                         <option value="Grande">Grande</option>
-                                     </select>
-                                </div>
-                                <div>
-                                     <label className="block text-xs font-bold text-gray-500 mb-1">Pelagem</label>
-                                     <select className="w-full border p-2 rounded bg-white" value={editService.targetCoat || 'Todos'} onChange={e => setEditService({...editService, targetCoat: e.target.value})}>
-                                         <option value="Todos">Todos</option>
-                                         <option value="Curto">Curto</option>
-                                         <option value="Longo">Longo</option>
-                                     </select>
-                                </div>
+
+                                {selectedClient && (
+                                    <div className="animate-fade-in">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Pet</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {pets.map(p => (
+                                                <button 
+                                                    key={p.id}
+                                                    onClick={() => setSelectedPet(p.id)}
+                                                    className={`p-3 rounded-xl border text-left transition ${selectedPet === p.id ? 'bg-brand-50 border-brand-500 ring-1 ring-brand-500' : 'hover:bg-gray-50 border-gray-200'}`}
+                                                >
+                                                    <div className="font-bold text-gray-800 text-sm">{p.name}</div>
+                                                    <div className="text-xs text-gray-500">{p.breed}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedPet && (
+                                    <div className="animate-fade-in space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Serviço Principal</label>
+                                            <select 
+                                                value={selectedService} 
+                                                onChange={e => setSelectedService(e.target.value)} 
+                                                className="w-full border p-3 rounded-xl bg-white outline-none focus:ring-2 ring-brand-200 text-sm"
+                                            >
+                                                <option value="">Selecione...</option>
+                                                {services.filter(s => s.category === 'principal').map(s => (
+                                                    <option key={s.id} value={s.id}>{s.name} - R$ {s.price}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Adicionais</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {services.filter(s => s.category === 'adicional').map(s => {
+                                                    const isSelected = selectedAddServices.includes(s.id);
+                                                    return (
+                                                        <button 
+                                                            key={s.id}
+                                                            onClick={() => {
+                                                                if(isSelected) setSelectedAddServices(prev => prev.filter(id => id !== s.id));
+                                                                else if(selectedAddServices.length < 3) setSelectedAddServices(prev => [...prev, s.id]);
+                                                            }}
+                                                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${isSelected ? 'bg-purple-100 border-purple-500 text-purple-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                        >
+                                                            {s.name}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Data</label>
+                                                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full border p-3 rounded-xl bg-white outline-none focus:ring-2 ring-brand-200 text-sm font-medium" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hora</label>
+                                                <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full border p-3 rounded-xl bg-white outline-none focus:ring-2 ring-brand-200 text-sm font-medium" />
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Observações</label>
+                                            <textarea 
+                                                value={notes} 
+                                                onChange={e => setNotes(e.target.value)} 
+                                                className="w-full border p-3 rounded-xl bg-white outline-none focus:ring-2 ring-brand-200 text-sm"
+                                                rows={2}
+                                                placeholder="Notas internas..."
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
-                            <button onClick={handleSaveEdit} disabled={isSavingEdit} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 font-bold disabled:opacity-50">
-                                {isSavingEdit ? 'Salvando...' : 'Salvar Alterações'}
+                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                            <button onClick={resetForm} className="px-4 py-2 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition text-sm">Cancelar</button>
+                            <button 
+                                onClick={handleSave} 
+                                disabled={!selectedClient || !selectedPet || !selectedService || !date || !time}
+                                className="px-6 py-2 bg-brand-600 text-white font-bold rounded-lg shadow-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm"
+                            >
+                                Confirmar
                             </button>
                         </div>
                     </div>
                 </div>
             )}
         </div>
-    )
-}
-
-// 6. Schedule Manager (CALENDAR VIEW REWRITE)
-type CalendarViewType = 'month' | 'week' | 'day';
-
-const ScheduleManager: React.FC<{
-  appointments: Appointment[];
-  clients: Client[];
-  services: Service[];
-  onAdd: (a: Appointment, client: Client, pet: Pet, services: Service[]) => void;
-  onUpdateStatus: (id: string, status: Appointment['status']) => void;
-  onDelete: (id: string) => void;
-  googleUser: GoogleUser | null;
-}> = ({ appointments, clients, services, onAdd, onUpdateStatus, onDelete, googleUser }) => {
-    const [view, setView] = useState<CalendarViewType>('week');
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [showModal, setShowModal] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    
-    // States for Details and Context Menu
-    const [selectedApp, setSelectedApp] = useState<Appointment | null>(null);
-    const [contextMenu, setContextMenu] = useState<{x: number, y: number, id: string} | null>(null);
-
-    // Form State
-    const [selDate, setSelDate] = useState('');
-    const [selTime, setSelTime] = useState('09:00');
-    const [selClient, setSelClient] = useState('');
-    const [selPet, setSelPet] = useState('');
-    const [selService, setSelService] = useState('');
-    const [selAdd1, setSelAdd1] = useState('');
-    const [selAdd2, setSelAdd2] = useState('');
-    const [selAdd3, setSelAdd3] = useState('');
-    const [searchClientModal, setSearchClientModal] = useState('');
-
-    // --- Helpers ---
-    const getStartOfWeek = (d: Date) => {
-        const date = new Date(d);
-        const day = date.getDay(); // 0 (Sun) to 6 (Sat)
-        const diff = date.getDate() - day;
-        return new Date(date.setDate(diff));
-    };
-
-    const addDays = (d: Date, days: number) => {
-        const date = new Date(d);
-        date.setDate(date.getDate() + days);
-        return date;
-    };
-
-    const navigate = (direction: 'prev' | 'next') => {
-        const newDate = new Date(currentDate);
-        if (view === 'month') newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
-        else if (view === 'week') newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
-        else newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
-        setCurrentDate(newDate);
-    };
-
-    const getAppointmentStyle = (app: Appointment) => {
-        const mainSvc = services.find(s => s.id === app.serviceId);
-        const addSvcs = (app.additionalServiceIds || []).map(id => services.find(s => s.id === id)).filter(Boolean);
-        
-        // Verifica todos os nomes de serviços envolvidos
-        const allServiceNames = [mainSvc?.name || '', ...addSvcs.map(s => s?.name || '')].join(' ').toLowerCase();
-
-        // Regra de prioridade: Se tiver QUALQUER Tosa (Normal, Tesoura, Higiênica), fica Laranja
-        if (allServiceNames.includes('tosa')) return 'bg-orange-100 text-orange-800 border-orange-200 border-l-4 border-l-orange-500';
-        
-        // Regra: Pacotes ficam Roxos
-        if (mainSvc?.name.toLowerCase().includes('pacote')) return 'bg-purple-100 text-purple-800 border-purple-200 border-l-4 border-l-purple-500';
-        
-        // Regra: Banhos ficam Azuis
-        if (mainSvc?.name.toLowerCase().includes('banho')) return 'bg-blue-100 text-blue-800 border-blue-200 border-l-4 border-l-blue-500';
-        
-        // Padrão
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-
-    const filteredAppointments = appointments.filter(app => {
-        if (!searchTerm) return true;
-        const client = clients.find(c => c.id === app.clientId);
-        const pet = client?.pets.find(p => p.id === app.petId);
-        return (client?.name.toLowerCase().includes(searchTerm.toLowerCase()) || pet?.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    });
-
-    const openNewModal = (dateStr?: string, timeStr?: string) => {
-        setSelDate(dateStr || new Date().toISOString().split('T')[0]);
-        setSelTime(timeStr || '09:00');
-        setSelClient(''); setSelPet(''); setSelService(''); setSelAdd1(''); setSelAdd2(''); setSelAdd3(''); setSearchClientModal('');
-        setShowModal(true);
-    };
-
-    const handleCreate = () => {
-        if(selClient && selPet && selService && selDate) {
-            const client = clients.find(c => c.id === selClient)!;
-            const pet = client.pets.find(p => p.id === selPet)!;
-            
-            const mainService = services.find(s => s.id === selService)!;
-            const addServices = [selAdd1, selAdd2, selAdd3]
-                .filter(id => id)
-                .map(id => services.find(s => s.id === id)!);
-
-            onAdd({
-                id: Date.now().toString(),
-                clientId: selClient,
-                petId: selPet,
-                serviceId: selService,
-                additionalServiceIds: [selAdd1, selAdd2, selAdd3].filter(id => id),
-                date: `${selDate}T${selTime}`,
-                status: 'agendado'
-            }, client, pet, [mainService, ...addServices]);
-
-            setShowModal(false);
-        }
-    };
-
-    const filteredClientsForModal = clients.filter(c => c.name.toLowerCase().includes(searchClientModal.toLowerCase()) || c.phone.includes(searchClientModal));
-    
-    // Filter Services based on Selected Pet
-    const selectedPetObj = clients.find(c => c.id === selClient)?.pets.find(p => p.id === selPet);
-    
-    const availableMainServices = services.filter(s => {
-        if(s.category !== 'principal') return false;
-        if(!selectedPetObj) return true; // Show all if no pet selected
-        
-        // Relaxed matching logic (Case Insensitive)
-        const sSize = (s.targetSize || 'Todos').toLowerCase();
-        const sCoat = (s.targetCoat || 'Todos').toLowerCase();
-        const pSize = (selectedPetObj.size || '').toLowerCase();
-        const pCoat = (selectedPetObj.coat || '').toLowerCase();
-
-        // If pet data is incomplete, show options so user isn't blocked
-        if (!pSize && !pCoat) return true;
-
-        const sizeMatch = sSize === 'todos' || !pSize || sSize === pSize;
-        const coatMatch = sCoat === 'todos' || !pCoat || sCoat === pCoat;
-
-        return sizeMatch && coatMatch;
-    });
-
-    const availableAddServices = services.filter(s => {
-        if(s.category !== 'adicional') return false;
-        if(!selectedPetObj) return true;
-
-        const sSize = (s.targetSize || 'Todos').toLowerCase();
-        const sCoat = (s.targetCoat || 'Todos').toLowerCase();
-        const pSize = (selectedPetObj.size || '').toLowerCase();
-        const pCoat = (selectedPetObj.coat || '').toLowerCase();
-
-        if (!pSize && !pCoat) return true;
-
-        const sizeMatch = sSize === 'todos' || !pSize || sSize === pSize;
-        const coatMatch = sCoat === 'todos' || !pCoat || sCoat === pCoat;
-        return sizeMatch && coatMatch;
-    });
-
-    // --- Renderers ---
-
-    const renderHeader = () => (
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
-            <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold text-gray-800">
-                    {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                </h2>
-                <div className="flex bg-gray-100 rounded-lg p-1">
-                    <button onClick={() => navigate('prev')} className="p-1 hover:bg-white rounded shadow-sm"><ChevronLeft size={20}/></button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-3 text-sm font-bold">Hoje</button>
-                    <button onClick={() => navigate('next')} className="p-1 hover:bg-white rounded shadow-sm"><ChevronRight size={20}/></button>
-                </div>
-            </div>
-            
-            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-                 <div className="bg-gray-100 p-1 rounded-lg flex shrink-0">
-                    {(['month', 'week', 'day'] as const).map(v => (
-                        <button 
-                            key={v}
-                            onClick={() => setView(v)}
-                            className={`px-3 py-1 text-sm rounded-md capitalize ${view === v ? 'bg-white shadow text-brand-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                            {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
-                        </button>
-                    ))}
-                 </div>
-                 {/* Refresh Button Removed */}
-                 <button onClick={() => openNewModal()} className="bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 flex items-center gap-2 font-bold shrink-0">
-                    <Plus size={18} /> Novo
-                 </button>
-            </div>
-        </div>
     );
-
-    const renderMonth = () => {
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const startDay = firstDay.getDay(); // 0-6
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        
-        const days = [];
-        // Empty slots
-        for(let i=0; i<startDay; i++) days.push(<div key={`empty-${i}`} className="bg-gray-50 min-h-[100px] border-b border-r hidden md:block"></div>);
-        
-        // Days
-        for(let d=1; d<=daysInMonth; d++) {
-            const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const isToday = new Date().toISOString().split('T')[0] === dateStr;
-            const daysApps = filteredAppointments.filter(a => a.date.startsWith(dateStr));
-
-            days.push(
-                <div key={d} className={`min-h-[80px] md:min-h-[100px] border-b border-r p-1 md:p-2 hover:bg-gray-50 transition cursor-pointer ${isToday ? 'bg-blue-50/50' : ''}`} onClick={() => { setCurrentDate(new Date(year, month, d)); setView('day'); }}>
-                    <div className={`text-sm font-bold mb-1 ${isToday ? 'text-brand-600' : 'text-gray-700'}`}>{d}</div>
-                    <div className="space-y-1">
-                        {daysApps.slice(0, 3).map(app => {
-                            const client = clients.find(c => c.id === app.clientId);
-                            const pet = client?.pets.find(p => p.id === app.petId);
-                            const time = app.date.split('T')[1].substring(0, 5);
-                            return (
-                                <div 
-                                    key={app.id} 
-                                    className={`text-[9px] md:text-[10px] p-1 rounded truncate border cursor-pointer ${getAppointmentStyle(app)}`}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedApp(app);
-                                    }}
-                                >
-                                    <span className="font-bold hidden md:inline">{time}</span> {pet?.name}
-                                </div>
-                            )
-                        })}
-                        {daysApps.length > 3 && <div className="text-[9px] text-gray-500 font-bold">+{daysApps.length - 3}</div>}
-                    </div>
-                </div>
-            );
-        }
-
-        return (
-            <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-                <div className="grid grid-cols-7 border-b bg-gray-50">
-                    {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => (
-                        <div key={d} className="p-2 text-center text-xs font-bold text-gray-500 uppercase">{d}</div>
-                    ))}
-                </div>
-                <div className="grid grid-cols-7">
-                    {days}
-                </div>
-            </div>
-        );
-    };
-
-    const renderWeekOrDay = () => {
-        const start = view === 'week' ? getStartOfWeek(currentDate) : currentDate;
-        const daysToShow = view === 'week' ? 7 : 1;
-        // On mobile, force "Day" view effectively if "Week" is selected but screen is small? 
-        // Or just let it scroll horizontally. Let's let it scroll.
-        const hours = Array.from({length: 12}, (_, i) => i + 8); // 08:00 to 19:00
-
-        const daysHeader = [];
-        for(let i=0; i<daysToShow; i++) {
-            const d = addDays(start, i);
-            const isToday = new Date().toISOString().split('T')[0] === d.toISOString().split('T')[0];
-            daysHeader.push(
-                <div key={i} className={`min-w-[100px] flex-1 text-center p-2 border-r border-b font-bold ${isToday ? 'bg-brand-50 text-brand-700' : 'bg-white'}`}>
-                    <div className="text-xs uppercase text-gray-500">{d.toLocaleDateString('pt-BR', { weekday: 'short' })}</div>
-                    <div className="text-lg">{d.getDate()}</div>
-                </div>
-            );
-        }
-
-        const grid = hours.map(h => {
-            const timeLabel = `${String(h).padStart(2, '0')}:00`;
-            return (
-                <div key={h} className="flex min-h-[80px]">
-                    <div className="w-12 md:w-16 flex-shrink-0 text-xs text-gray-400 text-right pr-2 pt-2 border-r border-b -mt-2.5 bg-white relative z-10 sticky left-0">{timeLabel}</div>
-                    {Array.from({length: daysToShow}).map((_, i) => {
-                        const d = addDays(start, i);
-                        const dateStr = d.toISOString().split('T')[0];
-                        
-                        // Find appointments for this hour slot
-                        const slotApps = filteredAppointments.filter(app => {
-                            const appDate = app.date.split('T')[0];
-                            const appHour = parseInt(app.date.split('T')[1].split(':')[0]);
-                            return appDate === dateStr && appHour === h;
-                        });
-
-                        return (
-                            <div 
-                                key={`${dateStr}-${h}`} 
-                                className="min-w-[100px] flex-1 border-r border-b p-1 relative hover:bg-gray-50 transition group"
-                                onClick={() => {
-                                    if(slotApps.length === 0) openNewModal(dateStr, String(h).padStart(2, '0') + ':00');
-                                }}
-                            >
-                                {slotApps.map(app => {
-                                    const client = clients.find(c => c.id === app.clientId);
-                                    const pet = client?.pets.find(p => p.id === app.petId);
-                                    const service = services.find(s => s.id === app.serviceId);
-                                    const addSvc1 = app.additionalServiceIds?.[0] ? services.find(s => s.id === app.additionalServiceIds[0]) : null;
-                                    
-                                    return (
-                                        <div 
-                                            key={app.id} 
-                                            className={`relative z-10 mb-1 p-1 md:p-2 rounded text-xs border shadow-sm cursor-pointer ${getAppointmentStyle(app)}`}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedApp(app);
-                                            }}
-                                            onContextMenu={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                setContextMenu({ x: e.pageX, y: e.pageY, id: app.id });
-                                            }}
-                                        >
-                                            <div className="font-bold text-[10px] uppercase truncate">{pet?.name}</div>
-                                            <div className="truncate text-[10px] font-medium hidden md:block">{client?.name}</div>
-                                            <div className="mt-1 pt-1 border-t border-black/10 text-[9px] leading-tight opacity-90 hidden md:block">
-                                                {service?.name}
-                                                {addSvc1 && <div className="font-bold text-[9px]">+ {addSvc1.name}</div>}
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        );
-                    })}
-                </div>
-            )
-        });
-
-        return (
-            <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden flex flex-col h-full">
-                <div className="flex pl-12 md:pl-16 bg-gray-50 border-b overflow-x-auto">
-                    {daysHeader}
-                </div>
-                <div className="flex-1 overflow-auto">
-                    {grid}
-                </div>
-            </div>
-        );
-    };
-
-    return (
-        <div className="h-full flex flex-col gap-4">
-            {renderHeader()}
-
-            <div className="relative mb-2">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                <input 
-                    className="w-full pl-10 p-2 border rounded-lg focus:ring-2 ring-brand-200 outline-none bg-white shadow-sm"
-                    placeholder="Filtrar agenda por nome..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                />
-            </div>
-
-            <div className="flex-1 overflow-hidden">
-                {view === 'month' ? renderMonth() : renderWeekOrDay()}
-            </div>
-
-            {/* Context Menu for Delete */}
-            {contextMenu && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)}></div>
-                    <div 
-                        className="fixed z-50 bg-white shadow-xl border rounded-lg overflow-hidden py-1 w-48 animate-fade-in"
-                        style={{ top: contextMenu.y, left: contextMenu.x }}
-                    >
-                        <button 
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 font-medium"
-                            onClick={() => {
-                                if(window.confirm("Excluir agendamento? Esta ação não pode ser desfeita.")) {
-                                    onDelete(contextMenu.id);
-                                }
-                                setContextMenu(null);
-                            }}
-                        >
-                            <Trash2 size={16} /> Excluir Agendamento
-                        </button>
-                    </div>
-                </>
-            )}
-
-            {/* Detail Modal */}
-            {selectedApp && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-fade-in-down overflow-hidden">
-                        <div className="bg-brand-50 p-6 border-b border-brand-100 flex justify-between items-start">
-                             <div>
-                                {(() => {
-                                    const client = clients.find(c => c.id === selectedApp.clientId);
-                                    const pet = client?.pets.find(p => p.id === selectedApp.petId);
-                                    return (
-                                        <>
-                                            <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                                                <PawPrint className="text-brand-600"/> {pet?.name}
-                                            </h3>
-                                            <p className="text-gray-500 font-medium">{client?.name}</p>
-                                        </>
-                                    )
-                                })()}
-                             </div>
-                             <button onClick={() => setSelectedApp(null)} className="bg-white p-1 rounded-full text-gray-400 hover:text-gray-600 shadow-sm"><X size={20}/></button>
-                        </div>
-                        
-                        <div className="p-6 space-y-6">
-                            {(() => {
-                                const client = clients.find(c => c.id === selectedApp.clientId);
-                                const pet = client?.pets.find(p => p.id === selectedApp.petId);
-                                const mainService = services.find(s => s.id === selectedApp.serviceId);
-                                
-                                return (
-                                    <>
-                                        {/* Contact Info */}
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-3 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                                <Phone size={18} className="text-brand-500" />
-                                                <span className="font-mono">{client?.phone}</span>
-                                            </div>
-                                            <div className="flex items-start gap-3 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                                <MapPin size={18} className="text-brand-500 mt-0.5" />
-                                                <span>{client?.address} {client?.complement ? `- ${client.complement}` : ''}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Services */}
-                                        <div>
-                                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1"><Sparkles size={12}/> Serviços Contratados</h4>
-                                            <div className="flex flex-wrap gap-2">
-                                                {mainService && (
-                                                    <span className="px-3 py-1.5 rounded-lg text-sm font-bold border bg-blue-50 text-blue-800 border-blue-200">
-                                                        {mainService.name}
-                                                    </span>
-                                                )}
-                                                {selectedApp.additionalServiceIds?.map(id => {
-                                                    const s = services.find(sv => sv.id === id);
-                                                    if(!s) return null;
-                                                    return (
-                                                        <span key={id} className="px-3 py-1.5 rounded-lg text-sm font-medium border bg-gray-100 text-gray-600 border-gray-200">
-                                                            + {s.name}
-                                                        </span>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-
-                                        {/* Notes */}
-                                        {selectedApp.notes && (
-                                            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-                                                <h4 className="text-xs font-bold text-yellow-800 uppercase mb-1 flex items-center gap-1"><FileText size={12}/> Observações</h4>
-                                                <p className="text-sm text-yellow-900 italic">"{selectedApp.notes}"</p>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Time */}
-                                        <div className="pt-4 border-t flex justify-between items-center text-sm text-gray-500">
-                                            <span className="flex items-center gap-1">
-                                                <Clock size={16}/> {new Date(selectedApp.date).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
-                                            </span>
-                                            <span className="font-bold text-brand-600">
-                                                {new Date(selectedApp.date).toLocaleDateString('pt-BR')}
-                                            </span>
-                                        </div>
-                                    </>
-                                )
-                            })()}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal Novo Agendamento */}
-            {showModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl animate-fade-in-down max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4 border-b pb-2">
-                            <h3 className="text-lg font-bold text-gray-800">Novo Agendamento</h3>
-                            <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-sm font-medium text-gray-700">Data</label><input type="date" value={selDate} onChange={e => setSelDate(e.target.value)} className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none" /></div>
-                                <div><label className="block text-sm font-medium text-gray-700">Horário</label><input type="time" value={selTime} onChange={e => setSelTime(e.target.value)} className="w-full border p-2 rounded mt-1 focus:ring-2 ring-brand-200 outline-none" /></div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Cliente</label>
-                                {!selClient ? (
-                                    <div className="mt-1 relative">
-                                        <Search className="absolute left-3 top-3 text-gray-400" size={16} />
-                                        <input className="w-full pl-9 p-2 border rounded focus:ring-2 ring-brand-200 outline-none" placeholder="Buscar cliente..." value={searchClientModal} onChange={e => setSearchClientModal(e.target.value)} autoFocus />
-                                        {searchClientModal.length > 0 && (
-                                            <div className="absolute top-full left-0 right-0 bg-white border shadow-lg rounded mt-1 max-h-40 overflow-y-auto z-10">
-                                                {filteredClientsForModal.map(c => (
-                                                    <button key={c.id} onClick={() => { setSelClient(c.id); setSelPet(''); setSearchClientModal(''); }} className="w-full text-left p-2 hover:bg-brand-50 text-sm border-b last:border-0"><div className="font-bold">{c.name}</div><div className="text-xs text-gray-500">{c.phone}</div></button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-between p-3 bg-brand-50 border border-brand-200 rounded mt-1">
-                                        <span className="font-bold text-brand-800 text-sm">{clients.find(c => c.id === selClient)?.name}</span>
-                                        <button onClick={() => { setSelClient(''); setSelPet(''); }} className="text-red-500 hover:text-red-700 text-xs font-bold">Trocar</button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {selClient && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Pet</label>
-                                    <select value={selPet} onChange={e => setSelPet(e.target.value)} className="w-full border p-2 rounded mt-1">
-                                        <option value="">Selecione...</option>
-                                        {clients.find(c => c.id === selClient)?.pets.map(p => <option key={p.id} value={p.id}>{p.name} - {p.size}/{p.coat}</option>)}
-                                    </select>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Serviço Principal</label>
-                                <select value={selService} onChange={e => setSelService(e.target.value)} className="w-full border p-2 rounded mt-1 bg-blue-50" disabled={!selPet}>
-                                    <option value="">Selecione...</option>
-                                    {availableMainServices.map(s => <option key={s.id} value={s.id}>{s.name} - R$ {s.price}</option>)}
-                                </select>
-                                {selPet && availableMainServices.length === 0 && <p className="text-xs text-red-500 mt-1">Nenhum serviço encontrado para este porte/pelagem.</p>}
-                            </div>
-
-                            <div className="border-t pt-2">
-                                <p className="text-xs font-bold text-gray-500 mb-2">Serviços Adicionais (Opcional)</p>
-                                <select value={selAdd1} onChange={e => setSelAdd1(e.target.value)} className="w-full border p-2 rounded mb-2 text-sm" disabled={!selPet}>
-                                    <option value="">Adicional 1...</option>
-                                    {availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}
-                                </select>
-                                <select value={selAdd2} onChange={e => setSelAdd2(e.target.value)} className="w-full border p-2 rounded mb-2 text-sm" disabled={!selPet}>
-                                    <option value="">Adicional 2...</option>
-                                    {availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}
-                                </select>
-                                <select value={selAdd3} onChange={e => setSelAdd3(e.target.value)} className="w-full border p-2 rounded text-sm" disabled={!selPet}>
-                                    <option value="">Adicional 3...</option>
-                                    {availableAddServices.map(s => <option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>)}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                            <button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
-                            <button onClick={handleCreate} disabled={!selClient || !selPet || !selService} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">Confirmar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
+};
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [costs, setCosts] = useState<CostItem[]>([]);
   const [isConfigured, setIsConfigured] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
@@ -2078,12 +1593,14 @@ const App: React.FC = () => {
       if (!SHEET_ID) return;
       setIsGlobalLoading(true);
       try {
-          // 1. Sync Services First (needed for appointment pricing)
+          // 1. Sync Services First
           await handleSyncServices(token, true);
-          // 2. Sync Clients (needed for linking appointments)
+          // 2. Sync Clients
           await handleSyncClients(token, true);
           // 3. Sync Appointments
           await handleSyncAppointments(token, true);
+          // 4. Sync Costs
+          await handleSyncCosts(token, true);
       } catch (e) {
           console.error("Auto Sync Failed", e);
       } finally {
@@ -2139,6 +1656,54 @@ const App: React.FC = () => {
       localStorage.removeItem('petgestor_client_id');
       setIsConfigured(false);
       setGoogleUser(null);
+  };
+
+  const handleSyncCosts = async (token: string, silent = false) => {
+      const tokenToUse = token;
+      if (!tokenToUse || !SHEET_ID) return;
+
+      try {
+          // A:F (Mes, Semana, Data, Tipo, Custo, Status)
+          const rows = await googleService.getSheetValues(tokenToUse, SHEET_ID, 'Custo Mensal!A:F');
+          if(!rows || rows.length < 2) return;
+
+          const loadedCosts: CostItem[] = [];
+          
+          rows.slice(1).forEach((row: string[], idx: number) => {
+              const dateStr = row[2]; // DD/MM/YYYY
+              const typeStr = row[3];
+              const costStr = row[4];
+              const statusStr = row[5];
+              
+              if(!dateStr || !costStr) return;
+              
+              let isoDate = new Date().toISOString();
+              try {
+                  const [day, month, year] = dateStr.split('/');
+                  if(day && month && year) isoDate = `${year}-${month}-${day}T00:00:00`;
+              } catch(e){}
+              
+              let amount = 0;
+              const cleanCost = costStr.replace(/[^\d,.-]/g, '').trim();
+              amount = parseFloat(cleanCost.includes(',') ? cleanCost.replace(/\./g, '').replace(',', '.') : cleanCost);
+              if(isNaN(amount)) amount = 0;
+
+              loadedCosts.push({
+                  id: `cost_${idx}`,
+                  month: row[0],
+                  week: row[1],
+                  date: isoDate,
+                  category: typeStr,
+                  amount: amount,
+                  status: statusStr && statusStr.toLowerCase() === 'pago' ? 'Pago' : ''
+              });
+          });
+
+          setCosts(loadedCosts);
+          if(!silent) alert("Custos atualizados.");
+      } catch (e) {
+          console.error(e);
+      }
   };
 
   const handleSyncClients = async (token: string, silent = false) => {
@@ -2544,11 +2109,11 @@ const App: React.FC = () => {
             <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[60] flex flex-col items-center justify-center">
                 <Loader2 className="w-12 h-12 text-brand-600 animate-spin mb-4" />
                 <h3 className="text-xl font-bold text-gray-800">Sincronizando dados...</h3>
-                <p className="text-gray-500">Buscando Clientes, Serviços e Agendamentos atualizados.</p>
+                <p className="text-gray-500">Buscando Clientes, Serviços, Agendamentos e Custos.</p>
             </div>
         )}
 
-        {currentView === 'dashboard' && <Dashboard appointments={appointments} services={services} clients={clients} />}
+        {currentView === 'dashboard' && <Dashboard appointments={appointments} services={services} clients={clients} costs={costs} />}
         {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services} onUpdateAppointment={handleUpdateApp} accessToken={accessToken} sheetId={SHEET_ID} />}
         {currentView === 'clients' && <ClientManager clients={clients} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
         {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => handleSyncServices(accessToken!, false)} accessToken={accessToken} sheetId={SHEET_ID} />}
