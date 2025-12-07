@@ -28,15 +28,14 @@ const NavItem = ({
   return (
     <button
       onClick={() => onClick(view)}
-      className={`group flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${
+      className={`flex items-center space-x-3 w-full p-3 rounded-lg transition-colors ${
         isActive 
-          ? 'bg-brand-50 text-brand-700 shadow-sm ring-1 ring-brand-100 font-semibold' 
-          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+          ? 'bg-brand-600 text-white shadow-md' 
+          : 'text-gray-600 hover:bg-brand-50 hover:text-brand-600'
       }`}
     >
-      <Icon size={20} className={`transition-colors ${isActive ? 'text-brand-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-      <span className="text-sm">{label}</span>
-      {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-500" />}
+      <Icon size={20} />
+      <span className="font-medium">{label}</span>
     </button>
   );
 };
@@ -45,6 +44,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const touchStart = useRef<number | null>(null);
   const touchEnd = useRef<number | null>(null);
+
+  // --- SWIPE LOGIC (Only for Closing) ---
   const minSwipeDistance = 50;
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -60,124 +61,113 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
     if (!touchStart.current || !touchEnd.current) return;
     const distance = touchStart.current - touchEnd.current;
     const isLeftSwipe = distance > minSwipeDistance;
-    if (isLeftSwipe && isSidebarOpen) setIsSidebarOpen(false);
+    
+    // Only allow closing via swipe (Left Swipe), never opening
+    if (isLeftSwipe && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
   }
 
   return (
     <div 
-      className="flex h-screen bg-gray-50 overflow-hidden relative font-sans"
-      onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+      className="flex h-screen bg-gray-50 overflow-hidden relative"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
-            className="fixed inset-0 bg-gray-900/20 z-40 md:hidden backdrop-blur-sm transition-opacity duration-300"
+            className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
             onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar (Desktop: Static | Mobile: Drawer) */}
       <aside className={`
         fixed md:static inset-y-0 left-0 z-50
-        w-72 bg-white border-r border-gray-100 h-full shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] md:shadow-none
+        w-64 bg-white border-r border-gray-200 h-full shadow-2xl md:shadow-none
         transform transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="p-6 flex items-center justify-between h-[88px]">
-            <div className="flex items-center space-x-3">
-                <img 
-                    src="/logo.png" 
-                    alt="Logo" 
-                    className="w-10 h-10 object-contain drop-shadow-sm" 
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                    }}
-                />
-                <div className="hidden w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/30 text-lg">P</div>
-                <div>
-                    <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-none">PomPomPet</h1>
-                    <p className="text-[10px] font-medium text-brand-600 uppercase tracking-widest mt-1">Banho & Tosa</p>
-                </div>
+        <div className="p-6 flex items-center justify-between border-b border-gray-100 h-[72px]">
+            <div className="flex items-center space-x-2">
+                <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" onError={(e) => {
+                    // Fallback if image fails
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                }}/>
+                <div className="hidden w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">P</div>
+                <h1 className="text-xl font-bold text-gray-800">PomPomPet</h1>
             </div>
-            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 p-1">
+            {/* Close button inside sidebar on mobile */}
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-500">
                 <ChevronLeft size={24} />
             </button>
         </div>
         
-        <nav className="flex-1 px-4 py-2 space-y-6 overflow-y-auto custom-scrollbar">
-          <div>
-             <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Operacional</p>
-             <div className="space-y-1">
-                 <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-                 <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-             </div>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {/* Operacional Group */}
+          <div className="pb-2">
+             <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Operacional</p>
+             <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+             <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
           </div>
 
-          <div>
-            <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Gerencial</p>
-            <div className="space-y-1">
-                <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-                <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-            </div>
+          {/* Gerencial Group */}
+          <div className="border-t border-gray-100 pt-2 pb-2">
+            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Gerencial</p>
+            <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+            <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
           </div>
 
-          <div>
-             <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Cadastros</p>
-             <div className="space-y-1">
-                 <NavItem view="clients" current={currentView} icon={Users} label="Clientes & Pets" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-                 <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-             </div>
+          {/* Cadastros e Serviços Group */}
+          <div className="border-t border-gray-100 pt-2">
+             <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Cadastros e Serviços</p>
+             <NavItem view="clients" current={currentView} icon={Users} label="Clientes & Pets" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+             <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
           </div>
         </nav>
         
-        <div className="p-4 border-t border-gray-50 bg-gray-50/30">
+        {/* Google Auth Section */}
+        <div className="p-4 border-t border-gray-100 bg-gray-50/50">
             {googleUser ? (
-                <div className="bg-white border border-gray-100 p-3 rounded-xl shadow-sm group hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-3 mb-3">
-                        {googleUser.picture ? 
-                            <img src={googleUser.picture} alt="Profile" className="w-9 h-9 rounded-full ring-2 ring-white shadow-sm" /> :
-                            <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold">{googleUser.name[0]}</div>
-                        }
+                <div className="bg-white border border-gray-200 p-3 rounded-lg shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        {googleUser.picture && <img src={googleUser.picture} alt="Profile" className="w-8 h-8 rounded-full ring-2 ring-white" />}
                         <div className="overflow-hidden">
-                            <p className="text-sm font-bold text-gray-800 truncate">{googleUser.name}</p>
-                            <div className="flex items-center gap-1.5">
-                                <span className="relative flex h-2 w-2">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                </span>
-                                <p className="text-[10px] text-gray-500 font-medium">Online</p>
-                            </div>
+                            <p className="text-xs font-bold text-gray-800 truncate">{googleUser.name}</p>
+                            <p className="text-[10px] text-green-600 flex items-center gap-1 font-medium">● Conectado</p>
                         </div>
                     </div>
-                    <button onClick={onLogout} className="w-full text-xs flex items-center justify-center gap-2 text-gray-600 hover:text-red-600 hover:bg-red-50 p-2.5 rounded-lg transition-colors font-semibold">
-                        <LogOut size={14} /> Desconectar
+                    <button onClick={onLogout} className="w-full text-xs flex items-center justify-center gap-1 text-red-500 hover:bg-red-50 p-2 rounded transition font-medium border border-transparent hover:border-red-100">
+                        <LogOut size={12} /> Sair
                     </button>
                 </div>
             ) : (
-                <button onClick={onLogin} className="w-full bg-white border border-gray-200 hover:border-brand-300 hover:text-brand-700 text-gray-600 p-3 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all shadow-sm hover:shadow">
+                <button onClick={onLogin} className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 p-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition shadow-sm">
                     <LogIn size={16} /> Conectar Google
                 </button>
             )}
         </div>
       </aside>
 
-      {/* Floating Toggle Button (Mobile) */}
+      {/* Floating Toggle Button (Mobile Only) - ARROW ONLY */}
       <button 
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className={`
             md:hidden fixed bottom-6 left-4 z-50 
-            w-12 h-12 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex items-center justify-center 
+            w-12 h-12 rounded-full shadow-lg flex items-center justify-center 
             transition-all duration-300 border border-white/20
-            ${isSidebarOpen ? 'bg-white text-gray-800' : 'bg-brand-600 text-white hover:bg-brand-700'}
+            ${isSidebarOpen ? 'bg-white text-gray-800' : 'bg-brand-600 text-white'}
         `}
       >
         {isSidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
       </button>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden w-full bg-gray-50/50">
-        <div className="flex-1 overflow-auto p-4 md:p-8 pb-24 md:pb-8 custom-scrollbar">
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden w-full bg-gray-50">
+        <div className="flex-1 overflow-auto p-3 md:p-8 pb-24 md:pb-8">
             {children}
         </div>
       </main>
