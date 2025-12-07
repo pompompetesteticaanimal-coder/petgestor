@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { Layout } from './components/Layout';
@@ -10,7 +9,7 @@ import {
   Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
   RefreshCw, ExternalLink, Settings, PawPrint, LogIn, ShieldAlert, Lock, Copy,
   ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
-  Edit2, MoreVertical, Wallet
+  Edit2, MoreVertical, Wallet, Filter, CreditCard
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -195,7 +194,7 @@ const Dashboard: React.FC<{
   );
 };
 
-// 3.5 Payment Manager
+// 3.5 Payment Manager (RESPONSIVE CARDS)
 const PaymentManager: React.FC<{
     appointments: Appointment[];
     clients: Client[];
@@ -241,7 +240,7 @@ const PaymentManager: React.FC<{
                 const index = parseInt(parts[1]);
                 const rowNumber = index + 2;
                 
-                // Columns R (17) and S (18)
+                // Columns R (17) and S (18) in the Sheet "Agendamento"
                 const range = `Agendamento!R${rowNumber}:S${rowNumber}`;
                 const values = [finalAmount.toString().replace('.', ','), method];
                 
@@ -258,79 +257,149 @@ const PaymentManager: React.FC<{
         setIsSaving(false);
     };
 
+    const PaymentRow = ({ app, isMobile }: {app: Appointment, isMobile: boolean}) => {
+        const client = clients.find(c => c.id === app.clientId);
+        const pet = client?.pets.find(p => p.id === app.petId);
+        const mainSvc = services.find(s => s.id === app.serviceId);
+        const expected = calculateExpected(app);
+        const isPaid = !!app.paidAmount;
+
+        const isEditing = editingId === app.id;
+
+        // Content
+        if(isEditing) {
+            return (
+                <div className={`bg-brand-50 border border-brand-200 p-4 ${isMobile ? 'rounded-lg mb-4' : ''}`}>
+                    <div className="flex flex-col gap-3">
+                         <div className="flex justify-between items-center">
+                             <span className="font-bold text-gray-800">{pet?.name} <span className="text-gray-500 font-normal">({client?.name})</span></span>
+                             {isMobile && <span className="text-xs text-gray-500">Editando...</span>}
+                         </div>
+                         <div className="grid grid-cols-2 gap-2">
+                             <div>
+                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Valor R$</label>
+                                 <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full border p-2 rounded bg-white" />
+                             </div>
+                             <div>
+                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Método</label>
+                                 <select value={method} onChange={e => setMethod(e.target.value)} className="w-full border p-2 rounded bg-white">
+                                     <option value="Credito">Crédito</option>
+                                     <option value="Debito">Débito</option>
+                                     <option value="Pix">Pix</option>
+                                     <option value="Dinheiro">Dinheiro</option>
+                                 </select>
+                             </div>
+                         </div>
+                         <div className="flex gap-2 mt-2">
+                             <button onClick={() => handleSave(app)} disabled={isSaving} className="flex-1 bg-green-600 text-white p-2 rounded text-sm font-bold">
+                                 {isSaving ? 'Salvando...' : 'Confirmar'}
+                             </button>
+                             <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-200 text-gray-700 p-2 rounded text-sm">Cancelar</button>
+                         </div>
+                    </div>
+                </div>
+            )
+        }
+
+        return (
+            <div className={`p-4 ${isMobile ? 'bg-white rounded-lg shadow-sm border border-gray-100 mb-4' : ''}`}>
+                <div className="flex justify-between items-start mb-2">
+                    <div>
+                        <div className="text-lg font-bold text-gray-800">{pet?.name}</div>
+                        <div className="text-sm text-gray-500">{client?.name}</div>
+                        <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                            <Clock size={12}/> {new Date(app.date).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-lg font-bold text-brand-700">R$ {expected.toFixed(2)}</div>
+                        {isPaid ? (
+                            <div className="inline-block bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                {app.paymentMethod}
+                            </div>
+                        ) : (
+                            <div className="inline-block bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                Pendente
+                            </div>
+                        )}
+                    </div>
+                </div>
+                
+                <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded mb-3">
+                     <span className="font-bold">{mainSvc?.name}</span>
+                     {app.additionalServiceIds?.length ? ` + ${app.additionalServiceIds.map(id => services.find(s=>s.id===id)?.name).join(', ')}` : ''}
+                </div>
+
+                <button onClick={() => handleStartEdit(app)} className="w-full bg-brand-50 hover:bg-brand-100 text-brand-700 p-2 rounded flex items-center justify-center gap-2 font-bold text-sm transition">
+                    <DollarSign size={16}/> {isPaid ? 'Editar Pagamento' : 'Receber Agora'}
+                </button>
+            </div>
+        )
+    };
+
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h2 className="text-2xl font-bold text-gray-800">Financeiro & Pagamentos</h2>
                 <input 
                     type="date" 
                     value={selectedDate} 
                     onChange={e => setSelectedDate(e.target.value)}
-                    className="border p-2 rounded-lg"
+                    className="w-full md:w-auto border p-2 rounded-lg bg-white shadow-sm font-medium"
                 />
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            {/* Mobile View (Cards) */}
+            <div className="md:hidden">
+                {filteredApps.map(app => (
+                    <PaymentRow key={app.id} app={app} isMobile={true} />
+                ))}
+                {filteredApps.length === 0 && (
+                    <div className="text-center p-8 text-gray-400 bg-white rounded-xl border border-dashed">Nenhum agendamento para hoje.</div>
+                )}
+            </div>
+
+            {/* Desktop View (Table) */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hora/Cliente</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serviços</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor Total</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status Pagamento</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ação</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                         {filteredApps.map(app => {
-                            const client = clients.find(c => c.id === app.clientId);
-                            const pet = client?.pets.find(p => p.id === app.petId);
-                            const mainSvc = services.find(s => s.id === app.serviceId);
-                            const expected = calculateExpected(app);
-                            const isPaid = !!app.paidAmount;
-
                             if (editingId === app.id) {
                                 return (
                                     <tr key={app.id} className="bg-brand-50">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold">{pet?.name}</div>
-                                            <div className="text-xs text-gray-500">{client?.name}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-xs text-gray-500">Editando...</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center">
-                                                <span className="text-gray-500 mr-1">R$</span>
-                                                <input 
-                                                    type="number" 
-                                                    value={amount} 
-                                                    onChange={e => setAmount(e.target.value)} 
-                                                    className="w-24 border p-1 rounded"
-                                                />
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <select 
-                                                value={method} 
-                                                onChange={e => setMethod(e.target.value)}
-                                                className="w-32 border p-1 rounded bg-white"
-                                            >
-                                                <option value="Credito">Crédito</option>
-                                                <option value="Debito">Débito</option>
-                                                <option value="Pix">Pix</option>
-                                                <option value="Dinheiro">Dinheiro</option>
-                                            </select>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex gap-2">
-                                                <button onClick={() => handleSave(app)} disabled={isSaving} className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700">
-                                                    {isSaving ? '...' : 'Salvar'}
-                                                </button>
-                                                <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-gray-700 text-xs">Cancelar</button>
+                                        <td colSpan={5} className="p-0">
+                                            <div className="flex items-center gap-4 p-4">
+                                                <div className="font-bold text-gray-800">{clients.find(c=>c.id===app.clientId)?.pets.find(p=>p.id===app.petId)?.name}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <span>R$</span>
+                                                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="border p-1 rounded w-24" />
+                                                </div>
+                                                <select value={method} onChange={e => setMethod(e.target.value)} className="border p-1 rounded w-32 bg-white">
+                                                    <option value="Credito">Crédito</option>
+                                                    <option value="Debito">Débito</option>
+                                                    <option value="Pix">Pix</option>
+                                                    <option value="Dinheiro">Dinheiro</option>
+                                                </select>
+                                                <button onClick={() => handleSave(app)} disabled={isSaving} className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold">Salvar</button>
+                                                <button onClick={() => setEditingId(null)} className="text-gray-500 px-2 text-sm">Cancelar</button>
                                             </div>
                                         </td>
                                     </tr>
                                 )
                             }
+                            const client = clients.find(c => c.id === app.clientId);
+                            const pet = client?.pets.find(p => p.id === app.petId);
+                            const mainSvc = services.find(s => s.id === app.serviceId);
+                            const expected = calculateExpected(app);
 
                             return (
                                 <tr key={app.id}>
@@ -342,13 +411,11 @@ const PaymentManager: React.FC<{
                                         <div>{mainSvc?.name}</div>
                                         {app.additionalServiceIds?.map(id => services.find(s=>s.id===id)?.name).join(', ')}
                                     </td>
-                                    <td className="px-6 py-4 text-sm font-bold text-gray-800">
-                                        R$ {expected.toFixed(2)}
-                                    </td>
+                                    <td className="px-6 py-4 text-sm font-bold text-gray-800">R$ {expected.toFixed(2)}</td>
                                     <td className="px-6 py-4">
-                                        {isPaid ? (
+                                        {app.paidAmount ? (
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                Pago: R$ {app.paidAmount?.toFixed(2)} ({app.paymentMethod})
+                                                Pago ({app.paymentMethod})
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -357,16 +424,13 @@ const PaymentManager: React.FC<{
                                         )}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <button onClick={() => handleStartEdit(app)} className="text-brand-600 hover:text-brand-800 font-medium text-xs flex items-center gap-1">
-                                            <DollarSign size={14}/> Receber
+                                        <button onClick={() => handleStartEdit(app)} className="text-brand-600 font-medium text-xs hover:underline">
+                                            Receber
                                         </button>
                                     </td>
                                 </tr>
                             );
                         })}
-                        {filteredApps.length === 0 && (
-                             <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-500">Nenhum agendamento para esta data.</td></tr>
-                        )}
                     </tbody>
                 </table>
             </div>
@@ -374,7 +438,7 @@ const PaymentManager: React.FC<{
     )
 };
 
-// 4. Client Manager
+// 4. Client Manager (RESPONSIVE CARDS)
 const ClientManager: React.FC<{
   clients: Client[];
   onSyncClients: (newClients: Client[]) => void;
@@ -498,6 +562,41 @@ const ClientManager: React.FC<{
     }
   };
 
+  const ClientCard = ({ client }: { client: Client }) => (
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4">
+          <div className="flex justify-between items-start mb-2">
+              <div>
+                  <h3 className="font-bold text-gray-800 text-lg">{client.name}</h3>
+                  <div className="text-sm text-gray-500">{client.phone}</div>
+              </div>
+              <div className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-500">
+                  {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
+              </div>
+          </div>
+          <div className="text-xs text-gray-600 mb-3 flex items-start gap-1">
+              <MapPin size={12} className="mt-0.5" />
+              <span>{client.address} {client.complement ? ` - ${client.complement}` : ''}</span>
+          </div>
+          <div className="space-y-2">
+              {client.pets.map((pet, idx) => (
+                  <div key={idx} className="bg-brand-50 border border-brand-100 rounded-lg p-2 text-xs">
+                      <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-brand-800 flex items-center gap-1"><PawPrint size={10}/> {pet.name}</span>
+                          <span className="bg-white px-2 py-0.5 rounded-full text-brand-600 font-bold border border-brand-100">{pet.breed}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-gray-600">
+                          <div><span className="font-bold">Porte:</span> {pet.size}</div>
+                          <div><span className="font-bold">Pelo:</span> {pet.coat}</div>
+                          {pet.age && <div><span className="font-bold">Idade:</span> {pet.age}</div>}
+                          {pet.gender && <div><span className="font-bold">Sexo:</span> {pet.gender}</div>}
+                      </div>
+                      {pet.notes && <div className="mt-1 pt-1 border-t border-brand-100 text-gray-500 italic">Obs: {pet.notes}</div>}
+                  </div>
+              ))}
+          </div>
+      </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -560,48 +659,56 @@ const ClientManager: React.FC<{
               <p className="text-sm text-gray-400">Clique em "Sincronizar" para carregar.</p>
           </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cadastro</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato / Endereço</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pet(s)</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredClients.map(client => (
-                            <tr key={client.id} className="hover:bg-gray-50 transition">
-                                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                                    {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
-                                </td>
-                                <td className="px-6 py-4"><div className="text-sm font-bold text-gray-900">{client.name}</div></td>
-                                <td className="px-6 py-4">
-                                    <div className="text-sm text-gray-900">{client.phone}</div>
-                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                        <MapPin size={10} /> {client.address}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="space-y-2">
-                                        {client.pets.map((pet, idx) => (
-                                            <div key={idx} className="bg-brand-50 rounded p-2 text-xs border border-brand-100">
-                                                <div className="flex items-center justify-between font-bold text-brand-800">
-                                                    <span className="flex items-center gap-1"><PawPrint size={10} /> {pet.name}</span>
-                                                    <span>{pet.size}/{pet.coat}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+        <>
+            {/* Mobile Cards */}
+            <div className="md:hidden">
+                {filteredClients.map(client => <ClientCard key={client.id} client={client} />)}
             </div>
-        </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cadastro</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato / Endereço</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pet(s)</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredClients.map(client => (
+                                <tr key={client.id} className="hover:bg-gray-50 transition">
+                                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                                        {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
+                                    </td>
+                                    <td className="px-6 py-4"><div className="text-sm font-bold text-gray-900">{client.name}</div></td>
+                                    <td className="px-6 py-4">
+                                        <div className="text-sm text-gray-900">{client.phone}</div>
+                                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                            <MapPin size={10} /> {client.address}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="space-y-2">
+                                            {client.pets.map((pet, idx) => (
+                                                <div key={idx} className="bg-brand-50 rounded p-2 text-xs border border-brand-100">
+                                                    <div className="flex items-center justify-between font-bold text-brand-800">
+                                                        <span className="flex items-center gap-1"><PawPrint size={10} /> {pet.name}</span>
+                                                        <span>{pet.size}/{pet.coat}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </>
       )}
     </div>
   );
@@ -797,7 +904,7 @@ const ServiceManager: React.FC<{
 
     return (
         <div className="space-y-6">
-             <div className="flex justify-between items-center">
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h2 className="text-2xl font-bold text-gray-800">Catálogo de Serviços</h2>
                 <button 
                     onClick={handleSync} 
@@ -809,7 +916,7 @@ const ServiceManager: React.FC<{
                 </button>
              </div>
 
-             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hidden md:block">
                 <h3 className="text-sm font-bold text-gray-500 uppercase mb-4">Adicionar Novo Serviço Manualmente</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div className="md:col-span-2">
@@ -1154,8 +1261,8 @@ const ScheduleManager: React.FC<{
                 </div>
             </div>
             
-            <div className="flex gap-2">
-                 <div className="bg-gray-100 p-1 rounded-lg flex">
+            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                 <div className="bg-gray-100 p-1 rounded-lg flex shrink-0">
                     {(['month', 'week', 'day'] as const).map(v => (
                         <button 
                             key={v}
@@ -1166,10 +1273,10 @@ const ScheduleManager: React.FC<{
                         </button>
                     ))}
                  </div>
-                 <button onClick={onSync} disabled={isSyncing} className="bg-white border border-brand-200 text-brand-600 p-2 rounded-lg hover:bg-brand-50 disabled:opacity-50">
+                 <button onClick={onSync} disabled={isSyncing} className="bg-white border border-brand-200 text-brand-600 p-2 rounded-lg hover:bg-brand-50 disabled:opacity-50 shrink-0">
                      <RefreshCw size={20} className={isSyncing ? "animate-spin" : ""} />
                  </button>
-                 <button onClick={() => openNewModal()} className="bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 flex items-center gap-2 font-bold">
+                 <button onClick={() => openNewModal()} className="bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 flex items-center gap-2 font-bold shrink-0">
                     <Plus size={18} /> Novo
                  </button>
             </div>
@@ -1185,7 +1292,7 @@ const ScheduleManager: React.FC<{
         
         const days = [];
         // Empty slots
-        for(let i=0; i<startDay; i++) days.push(<div key={`empty-${i}`} className="bg-gray-50 min-h-[100px] border-b border-r"></div>);
+        for(let i=0; i<startDay; i++) days.push(<div key={`empty-${i}`} className="bg-gray-50 min-h-[100px] border-b border-r hidden md:block"></div>);
         
         // Days
         for(let d=1; d<=daysInMonth; d++) {
@@ -1194,35 +1301,27 @@ const ScheduleManager: React.FC<{
             const daysApps = filteredAppointments.filter(a => a.date.startsWith(dateStr));
 
             days.push(
-                <div key={d} className={`min-h-[100px] border-b border-r p-2 hover:bg-gray-50 transition cursor-pointer ${isToday ? 'bg-blue-50/50' : ''}`} onClick={() => { setCurrentDate(new Date(year, month, d)); setView('day'); }}>
+                <div key={d} className={`min-h-[80px] md:min-h-[100px] border-b border-r p-1 md:p-2 hover:bg-gray-50 transition cursor-pointer ${isToday ? 'bg-blue-50/50' : ''}`} onClick={() => { setCurrentDate(new Date(year, month, d)); setView('day'); }}>
                     <div className={`text-sm font-bold mb-1 ${isToday ? 'text-brand-600' : 'text-gray-700'}`}>{d}</div>
                     <div className="space-y-1">
                         {daysApps.slice(0, 3).map(app => {
                             const client = clients.find(c => c.id === app.clientId);
                             const pet = client?.pets.find(p => p.id === app.petId);
-                            const service = services.find(s => s.id === app.serviceId);
-                            const addSvc1 = app.additionalServiceIds?.[0] ? services.find(s => s.id === app.additionalServiceIds[0]) : null;
                             const time = app.date.split('T')[1].substring(0, 5);
                             return (
                                 <div 
                                     key={app.id} 
-                                    className={`text-[10px] p-1 rounded truncate border cursor-pointer ${getAppointmentStyle(app)}`}
+                                    className={`text-[9px] md:text-[10px] p-1 rounded truncate border cursor-pointer ${getAppointmentStyle(app)}`}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setSelectedApp(app);
                                     }}
-                                    onContextMenu={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setContextMenu({ x: e.pageX, y: e.pageY, id: app.id });
-                                    }}
                                 >
-                                    <span className="font-bold">{time}</span> {pet?.name}
-                                    {addSvc1 && <span className="block opacity-75">+ {addSvc1.name}</span>}
+                                    <span className="font-bold hidden md:inline">{time}</span> {pet?.name}
                                 </div>
                             )
                         })}
-                        {daysApps.length > 3 && <div className="text-[10px] text-gray-500 font-bold">+{daysApps.length - 3} mais</div>}
+                        {daysApps.length > 3 && <div className="text-[9px] text-gray-500 font-bold">+{daysApps.length - 3}</div>}
                     </div>
                 </div>
             );
@@ -1231,7 +1330,7 @@ const ScheduleManager: React.FC<{
         return (
             <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
                 <div className="grid grid-cols-7 border-b bg-gray-50">
-                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
+                    {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => (
                         <div key={d} className="p-2 text-center text-xs font-bold text-gray-500 uppercase">{d}</div>
                     ))}
                 </div>
@@ -1245,6 +1344,8 @@ const ScheduleManager: React.FC<{
     const renderWeekOrDay = () => {
         const start = view === 'week' ? getStartOfWeek(currentDate) : currentDate;
         const daysToShow = view === 'week' ? 7 : 1;
+        // On mobile, force "Day" view effectively if "Week" is selected but screen is small? 
+        // Or just let it scroll horizontally. Let's let it scroll.
         const hours = Array.from({length: 12}, (_, i) => i + 8); // 08:00 to 19:00
 
         const daysHeader = [];
@@ -1252,7 +1353,7 @@ const ScheduleManager: React.FC<{
             const d = addDays(start, i);
             const isToday = new Date().toISOString().split('T')[0] === d.toISOString().split('T')[0];
             daysHeader.push(
-                <div key={i} className={`flex-1 text-center p-2 border-r border-b font-bold ${isToday ? 'bg-brand-50 text-brand-700' : 'bg-white'}`}>
+                <div key={i} className={`min-w-[100px] flex-1 text-center p-2 border-r border-b font-bold ${isToday ? 'bg-brand-50 text-brand-700' : 'bg-white'}`}>
                     <div className="text-xs uppercase text-gray-500">{d.toLocaleDateString('pt-BR', { weekday: 'short' })}</div>
                     <div className="text-lg">{d.getDate()}</div>
                 </div>
@@ -1263,7 +1364,7 @@ const ScheduleManager: React.FC<{
             const timeLabel = `${String(h).padStart(2, '0')}:00`;
             return (
                 <div key={h} className="flex min-h-[80px]">
-                    <div className="w-16 flex-shrink-0 text-xs text-gray-400 text-right pr-2 pt-2 border-r border-b -mt-2.5 bg-white relative z-10">{timeLabel}</div>
+                    <div className="w-12 md:w-16 flex-shrink-0 text-xs text-gray-400 text-right pr-2 pt-2 border-r border-b -mt-2.5 bg-white relative z-10 sticky left-0">{timeLabel}</div>
                     {Array.from({length: daysToShow}).map((_, i) => {
                         const d = addDays(start, i);
                         const dateStr = d.toISOString().split('T')[0];
@@ -1278,17 +1379,11 @@ const ScheduleManager: React.FC<{
                         return (
                             <div 
                                 key={`${dateStr}-${h}`} 
-                                className="flex-1 border-r border-b p-1 relative hover:bg-gray-50 transition group"
+                                className="min-w-[100px] flex-1 border-r border-b p-1 relative hover:bg-gray-50 transition group"
                                 onClick={() => {
-                                    // Only open if clicking empty space
                                     if(slotApps.length === 0) openNewModal(dateStr, String(h).padStart(2, '0') + ':00');
                                 }}
                             >
-                                {/* Invisible "add" button on hover */}
-                                <button className="hidden group-hover:flex absolute inset-0 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-0">
-                                    <Plus className="text-gray-300" />
-                                </button>
-
                                 {slotApps.map(app => {
                                     const client = clients.find(c => c.id === app.clientId);
                                     const pet = client?.pets.find(p => p.id === app.petId);
@@ -1298,7 +1393,7 @@ const ScheduleManager: React.FC<{
                                     return (
                                         <div 
                                             key={app.id} 
-                                            className={`relative z-10 mb-1 p-2 rounded text-xs border shadow-sm cursor-pointer ${getAppointmentStyle(app)}`}
+                                            className={`relative z-10 mb-1 p-1 md:p-2 rounded text-xs border shadow-sm cursor-pointer ${getAppointmentStyle(app)}`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedApp(app);
@@ -1309,9 +1404,9 @@ const ScheduleManager: React.FC<{
                                                 setContextMenu({ x: e.pageX, y: e.pageY, id: app.id });
                                             }}
                                         >
-                                            <div className="font-bold text-[10px] uppercase">{pet?.name}</div>
-                                            <div className="truncate text-[10px] font-medium">{client?.name}</div>
-                                            <div className="mt-1 pt-1 border-t border-black/10 text-[9px] leading-tight opacity-90">
+                                            <div className="font-bold text-[10px] uppercase truncate">{pet?.name}</div>
+                                            <div className="truncate text-[10px] font-medium hidden md:block">{client?.name}</div>
+                                            <div className="mt-1 pt-1 border-t border-black/10 text-[9px] leading-tight opacity-90 hidden md:block">
                                                 {service?.name}
                                                 {addSvc1 && <div className="font-bold text-[9px]">+ {addSvc1.name}</div>}
                                             </div>
@@ -1327,10 +1422,10 @@ const ScheduleManager: React.FC<{
 
         return (
             <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden flex flex-col h-full">
-                <div className="flex pl-16 bg-gray-50 border-b">
+                <div className="flex pl-12 md:pl-16 bg-gray-50 border-b overflow-x-auto">
                     {daysHeader}
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-auto">
                     {grid}
                 </div>
             </div>
@@ -1351,7 +1446,7 @@ const ScheduleManager: React.FC<{
                 />
             </div>
 
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-hidden">
                 {view === 'month' ? renderMonth() : renderWeekOrDay()}
             </div>
 
