@@ -1294,7 +1294,19 @@ const ScheduleManager: React.FC<{
                                 <div className="space-y-3">
                                     <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full border p-2 rounded-xl bg-white text-sm"><option value="">Serviço Principal...</option>{getApplicableServices('principal').map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}</select>
                                     <div className="flex flex-wrap gap-2">
-                                        <select className="flex-1 border p-2 rounded-xl bg-white text-sm" onChange={(e) => { const val = e.target.value; if(val && !selectedAddServices.includes(val)) setSelectedAddServices(prev => [...prev, val]); e.target.value = ''; }}><option value="">Adicionar Extra...</option>{getApplicableServices('adicional').map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}</select>
+                                        <select 
+                                            className="flex-1 border p-2 rounded-xl bg-white text-sm" 
+                                            onChange={(e) => { const val = e.target.value; if(val && !selectedAddServices.includes(val)) setSelectedAddServices(prev => [...prev, val]); e.target.value = ''; }}
+                                        >
+                                            <option value="">Serviço Adicional...</option>
+                                            {getApplicableServices('adicional')
+                                                // Filtrar duplicatas pelo nome para limpar a lista
+                                                .filter((service, index, self) => 
+                                                    index === self.findIndex((t) => t.name === service.name)
+                                                )
+                                                .map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)
+                                            }
+                                        </select>
                                     </div>
                                     <div className="flex flex-wrap gap-1">{selectedAddServices.map(id => <span key={id} onClick={() => setSelectedAddServices(p => p.filter(x => x !== id))} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-bold cursor-pointer">{services.find(s=>s.id===id)?.name} ×</span>)}</div>
                                     <div className="grid grid-cols-2 gap-3"><input type="date" value={date} onChange={e => setDate(e.target.value)} className="border p-2 rounded-xl text-sm" /><select value={time} onChange={e => setTime(e.target.value)} className="border p-2 rounded-xl text-sm">{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
