@@ -1314,7 +1314,7 @@ const ScheduleManager: React.FC<{
             {/* NEW APPOINTMENT MODAL */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] md:min-h-[600px]">
+                    <div className="bg-white rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] md:min-h-[600px]">
                         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                             <h3 className="font-bold text-lg text-gray-800">{editingAppId ? 'Editar Agendamento' : 'Novo Agendamento'}</h3>
                             <button onClick={resetForm}><X size={24} className="text-gray-400 hover:text-gray-600"/></button>
@@ -1470,7 +1470,7 @@ const App: React.FC = () => {
           if(!rows || rows.length < 2) return;
           const loadedCosts: CostItem[] = [];
           rows.slice(1).forEach((row: string[], idx: number) => {
-              const dateStr = row[2]; const typeStr = row[3]; const costStr = row[4]; const statusStr = row[5];
+              const dateStr = row[2]; const typeStr = row[3]; const costStr = row[4]; const statusStr = row[5] ? row[5].trim() : '';
               if(!dateStr || !costStr) return;
               let isoDate = new Date().toISOString();
               try { const [day, month, year] = dateStr.split('/'); if(day && month && year) isoDate = `${year}-${month}-${day}T00:00:00`; } catch(e){}
@@ -1478,7 +1478,7 @@ const App: React.FC = () => {
               const cleanCost = costStr.replace(/[^\d,.-]/g, '').trim();
               amount = parseFloat(cleanCost.includes(',') ? cleanCost.replace(/\./g, '').replace(',', '.') : cleanCost);
               if(isNaN(amount)) amount = 0;
-              loadedCosts.push({ id: `cost_${idx}`, month: row[0], week: row[1], date: isoDate, category: typeStr, amount: amount, status: statusStr && statusStr.toLowerCase() === 'pago' ? 'Pago' : '' });
+              loadedCosts.push({ id: `cost_${idx}`, month: row[0], week: row[1], date: isoDate, category: typeStr, amount: amount, status: statusStr.toLowerCase() === 'pago' ? 'Pago' : '' });
           });
           setCosts(loadedCosts);
           if(!silent) alert("Custos atualizados.");
