@@ -812,29 +812,70 @@ const App: React.FC = () => {
               return;
           }
 
-          // Simple strategy: Rebuild appointments based on sheet to ensure sync
-          // Note: This matches clients by name/phone which is tricky, so we do best effort matching
           const loadedApps: Appointment[] = [];
+          const newTempClients: Client[] = [];
+          const existingClientIds = new Set(clients.map(c => c.id));
           
           rows.slice(1).forEach((row: string[], idx: number) => {
+              // COLUMNS:
+              // 0: Pet, 1: Client, 2: Phone, 3: Address, 4: Breed, 5: Size, 6: Coat
+              // 7: Service, 8: Add1, 9: Add2, 10: Add3, 11: Date, 12: Time, 13: Obs, 14: Duration
+
               const petName = row[0];
               const clientName = row[1];
+              const clientPhone = row[2] || '';
+              const clientAddr = row[3] || '';
+              const petBreed = row[4];
               const datePart = row[11]; // DD/MM/YYYY
               const timePart = row[12]; // HH:MM
               const serviceName = row[7];
               
               if(!clientName || !datePart) return;
 
-              // Find Client & Pet
-              const client = clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
-              const pet = client?.pets.find(p => p.name.toLowerCase() === petName.toLowerCase());
-              const service = services.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || services[0];
-
+              // Parse Date
               let isoDate = new Date().toISOString();
               try {
                   const [day, month, year] = datePart.split('/');
-                  isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`;
+                  if(day && month && year) {
+                     isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`;
+                  }
               } catch(e) {}
+
+              // Find or Create Client
+              // Priority: Match by ID (Phone) -> Match by Name -> Create Temp
+              const cleanPhone = clientPhone.replace(/\D/g, '') || `temp_${idx}`;
+              let client = clients.find(c => c.id === cleanPhone) || clients.find(c => c.name.toLowerCase() === clientName.toLowerCase()) || newTempClients.find(c => c.id === cleanPhone);
+
+              if (!client) {
+                  // Create Temp Client if not found to ensure appointment shows up
+                  client = {
+                      id: cleanPhone,
+                      name: clientName,
+                      phone: clientPhone,
+                      address: clientAddr,
+                      pets: []
+                  };
+                  newTempClients.push(client);
+              }
+
+              // Find or Create Pet
+              let pet = client.pets.find(p => p.name.toLowerCase() === petName?.toLowerCase());
+              if (!pet && petName) {
+                  pet = {
+                    id: `${client.id}_p_${idx}`,
+                    name: petName,
+                    breed: petBreed || 'SRD',
+                    age: '',
+                    gender: '',
+                    size: row[5] || '',
+                    coat: row[6] || '',
+                    notes: row[13] || ''
+                  };
+                  client.pets.push(pet);
+              }
+
+              // Find Service
+              const service = services.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || services[0];
 
               if(client && pet) {
                   loadedApps.push({
@@ -842,23 +883,32 @@ const App: React.FC = () => {
                       clientId: client.id,
                       petId: pet.id,
                       serviceId: service?.id || 'unknown',
-                      additionalServiceIds: [], // Hard to map names back to IDs if names changed, keeping simple
+                      additionalServiceIds: [], 
                       date: isoDate,
-                      status: 'agendado', // Default
-                      notes: row[13]
+                      status: 'agendado', 
+                      notes: row[13],
+                      durationTotal: parseInt(row[14] || '0')
                   });
               }
           });
           
+          if (newTempClients.length > 0) {
+              const updatedClients = [...clients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))];
+              setClients(updatedClients);
+              db.saveClients(updatedClients);
+          }
+          
           if(loadedApps.length > 0) {
               setAppointments(loadedApps);
               db.saveAppointments(loadedApps);
-              alert(`${loadedApps.length} agendamentos carregados da planilha!`);
+              alert(`${loadedApps.length} agendamentos carregados!`);
+          } else {
+              alert('Nenhum agendamento válido encontrado.');
           }
 
       } catch (error) {
           console.error(error);
-          alert('Erro ao sincronizar agendamentos.');
+          alert('Erro ao sincronizar agendamentos. Verifique se a data está em DD/MM/AAAA.');
       } finally {
           setIsSyncing(false);
       }
@@ -875,6 +925,11 @@ const App: React.FC = () => {
         const mainService = appServices[0];
         let totalDuration = mainService.durationMin;
         const description = appServices.map(s => s.name).join(' + ');
+        
+        // Sum durations
+        if(appServices.length > 1) {
+             appServices.slice(1).forEach(s => totalDuration += (s.durationMin || 0));
+        }
 
         await googleService.createEvent(accessToken, {
             summary: `Banho/Tosa: ${pet.name} - ${client.name}`,
@@ -884,27 +939,26 @@ const App: React.FC = () => {
         });
 
         // 3. Save to Google Sheets (Append Row)
-        // Order: Pet, Client, Phone, Address, Breed, Size, Coat, Svc, Add1, Add2, Add3, Date, Time, Obs, Duration
         const dateObj = new Date(app.date);
-        const dateStr = dateObj.toLocaleDateString('pt-BR');
-        const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        const dateStr = dateObj.toLocaleDateString('pt-BR'); // DD/MM/YYYY
+        const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}); // HH:MM
         
         const rowData = [
-            pet.name,
-            client.name,
-            client.phone,
-            `${client.address} ${client.complement || ''}`,
-            pet.breed,
-            pet.size,
-            pet.coat,
-            appServices[0]?.name || '', // Main Service
-            appServices[1]?.name || '', // Add 1
-            appServices[2]?.name || '', // Add 2
-            appServices[3]?.name || '', // Add 3
-            dateStr,
-            timeStr,
-            pet.notes,
-            totalDuration
+            pet.name,                                     // Col A: Pet
+            client.name,                                  // Col B: Cliente
+            client.phone,                                 // Col C: Telefone
+            `${client.address} ${client.complement || ''}`.trim(), // Col D: Endereco
+            pet.breed,                                    // Col E: Raca
+            pet.size,                                     // Col F: Porte
+            pet.coat,                                     // Col G: Pelagem
+            appServices[0]?.name || '',                   // Col H: Servico Principal
+            appServices[1]?.name || '',                   // Col I: Adicional 1
+            appServices[2]?.name || '',                   // Col J: Adicional 2
+            appServices[3]?.name || '',                   // Col K: Adicional 3
+            dateStr,                                      // Col L: Data
+            timeStr,                                      // Col M: Hora
+            pet.notes,                                    // Col N: Obs
+            totalDuration                                 // Col O: Duracao
         ];
 
         try {
