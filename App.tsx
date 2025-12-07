@@ -11,7 +11,7 @@ import {
   ExternalLink, Settings, PawPrint, LogIn, ShieldAlert, Lock, Copy,
   ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
   Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
-  Scissors, TrendingUp, AlertOctagon
+  Scissors, TrendingUp, AlertOctagon, BarChart2
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
@@ -181,6 +181,26 @@ const Dashboard: React.FC<{
       return { totalPets, totalTosas, paidRevenue, pendingRevenue };
   };
 
+  // --- Helper Semana ---
+  const getStartEndOfWeek = (dateStr: string) => {
+      const date = new Date(dateStr);
+      // Ajustar fuso horário para garantir dia correto
+      const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+      const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
+      
+      const day = adjustedDate.getDay(); // 0 (Dom) - 6 (Sab)
+      const diff = adjustedDate.getDate() - day; // Ajusta para o domingo
+      
+      const start = new Date(adjustedDate.setDate(diff));
+      start.setHours(0,0,0,0);
+      
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23,59,59,999);
+      
+      return { start, end };
+  };
+
   // --- Dados para Gráficos ---
 
   // Gráfico Semanal (baseado na data selecionada)
@@ -214,7 +234,6 @@ const Dashboard: React.FC<{
   // Gráfico Mensal (Semanas do Mês)
   const getMonthlyChartData = () => {
       const [year, month] = selectedMonth.split('-').map(Number);
-      const daysInMonth = new Date(year, month, 0).getDate();
       
       // Agrupar por semana (1 a 5)
       const weeksData = [
@@ -242,15 +261,23 @@ const Dashboard: React.FC<{
   // --- Filtros ---
   const dailyApps = appointments.filter(a => a.date.startsWith(selectedDate));
   const monthlyApps = appointments.filter(a => a.date.startsWith(selectedMonth));
+  
+  // Weekly Apps
+  const { start: weekStart, end: weekEnd } = getStartEndOfWeek(selectedDate);
+  const weeklyApps = appointments.filter(a => {
+      const d = new Date(a.date);
+      return d >= weekStart && d <= weekEnd;
+  });
 
   const dailyStats = calculateStats(dailyApps);
+  const weeklyStats = calculateStats(weeklyApps);
   const monthlyStats = calculateStats(monthlyApps);
   
   const weeklyChartData = getWeeklyChartData();
   const monthlyChartData = getMonthlyChartData();
 
   const StatCard = ({ title, value, icon: Icon, colorClass, subValue }: any) => (
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition">
           <div>
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">{title}</p>
               <h3 className="text-2xl font-bold text-gray-800 mt-1">{value}</h3>
@@ -294,31 +321,69 @@ const Dashboard: React.FC<{
                   subValue="Normal e Tesoura"
               />
               <StatCard 
-                  title="Faturamento Pago" 
+                  title="Receita Paga" 
                   value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} 
                   icon={CheckCircle} 
                   colorClass="bg-green-100 text-green-600" 
-                  subValue="Com baixa na planilha"
               />
               <StatCard 
-                  title="Faturamento Pendente" 
+                  title="Receita Pendente" 
                   value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} 
                   icon={AlertCircle} 
                   colorClass="bg-red-100 text-red-600" 
-                  subValue="Sem forma de pagamento"
               />
           </div>
+      </section>
+
+      <div className="border-t border-gray-200"></div>
+
+      {/* SEÇÃO SEMANA (NOVA) */}
+      <section>
+          <div className="flex items-center gap-2 mb-4">
+              <BarChart2 className="text-indigo-600" />
+              <h2 className="text-xl font-bold text-gray-800">Visão Semanal</h2>
+              <span className="text-xs text-gray-400 font-normal ml-2">
+                ({weekStart.toLocaleDateString('pt-BR')} até {weekEnd.toLocaleDateString('pt-BR')})
+              </span>
+          </div>
           
-          {/* GRÁFICO DIÁRIO (SEMANAL) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard 
+                  title="Pets da Semana" 
+                  value={weeklyStats.totalPets} 
+                  icon={PawPrint} 
+                  colorClass="bg-indigo-100 text-indigo-600" 
+              />
+              <StatCard 
+                  title="Tosas da Semana" 
+                  value={weeklyStats.totalTosas} 
+                  icon={Scissors} 
+                  colorClass="bg-orange-100 text-orange-600" 
+              />
+              <StatCard 
+                  title="Total Pago (Sem)" 
+                  value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} 
+                  icon={Wallet} 
+                  colorClass="bg-emerald-100 text-emerald-600" 
+              />
+              <StatCard 
+                  title="Pendente (Sem)" 
+                  value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} 
+                  icon={AlertOctagon} 
+                  colorClass="bg-rose-100 text-rose-600" 
+              />
+          </div>
+
+          {/* GRÁFICO DIÁRIO DA SEMANA */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-64">
-              <h3 className="text-sm font-bold text-gray-500 mb-4">Faturamento da Semana (Total)</h3>
+              <h3 className="text-sm font-bold text-gray-500 mb-4">Evolução do Faturamento na Semana</h3>
               <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={weeklyChartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
                       <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `R$${val}`} />
                       <Tooltip formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Faturamento']} />
-                      <Line type="monotone" dataKey="faturamento" stroke="#0ea5e9" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                      <Line type="monotone" dataKey="faturamento" stroke="#4f46e5" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
                   </LineChart>
               </ResponsiveContainer>
           </div>
