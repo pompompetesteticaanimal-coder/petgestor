@@ -9,7 +9,8 @@ import {
   Plus, Trash2, Check, X, 
   Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
   RefreshCw, ExternalLink, Settings, PawPrint, LogIn, ShieldAlert, Lock, Copy,
-  ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText
+  ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
+  Edit2, MoreVertical
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -443,6 +444,13 @@ const ServiceManager: React.FC<{
     const [coat, setCoat] = useState('Todos');
     const [isSyncing, setIsSyncing] = useState(false);
 
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{x: number, y: number, id: string} | null>(null);
+    
+    // Edit Modal State
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editService, setEditService] = useState<Service | null>(null);
+
     const handleAdd = () => {
         if(name && price) {
             onAddService({ 
@@ -524,6 +532,81 @@ const ServiceManager: React.FC<{
         }
     };
 
+    const handleDeleteSheetService = async (serviceId: string) => {
+        if (!serviceId.includes('sheet_svc_')) {
+            alert("Este serviço foi criado manualmente, não está na planilha.");
+            onDeleteService(serviceId);
+            return;
+        }
+
+        if(!window.confirm("Isso apagará o conteúdo da linha na Planilha Google. Confirmar?")) return;
+
+        try {
+            // Extract index from ID format: sheet_svc_{index}_{timestamp}
+            const parts = serviceId.split('_');
+            const index = parseInt(parts[2]);
+            const rowNumber = index + 2; // Data starts at row 2 (index 0)
+
+            const range = `Serviço!A${rowNumber}:E${rowNumber}`;
+            
+            await googleService.clearSheetValues(accessToken!, sheetId, range);
+            onDeleteService(serviceId);
+            alert("Serviço excluído da planilha com sucesso.");
+        } catch (e) {
+            console.error(e);
+            alert("Erro ao excluir da planilha. Verifique permissões.");
+        }
+    };
+
+    const handleOpenEdit = (service: Service) => {
+        setEditService({...service});
+        setIsEditModalOpen(true);
+        setContextMenu(null);
+    }
+
+    const handleSaveEdit = async () => {
+        if (!editService) return;
+
+        if (!editService.id.includes('sheet_svc_')) {
+            alert("A edição de serviços manuais não salva na planilha, apenas localmente.");
+            // Update local
+            const newServices = services.map(s => s.id === editService.id ? editService : s);
+            onSyncServices(newServices);
+            setIsEditModalOpen(false);
+            return;
+        }
+
+        try {
+            setIsSyncing(true);
+            const parts = editService.id.split('_');
+            const index = parseInt(parts[2]);
+            const rowNumber = index + 2;
+            const range = `Serviço!A${rowNumber}:E${rowNumber}`;
+
+            const rowData = [
+                editService.name,
+                editService.category,
+                editService.targetSize,
+                editService.targetCoat,
+                editService.price.toString().replace('.', ',') // Convert back to BR format for sheets
+            ];
+
+            await googleService.updateSheetValues(accessToken!, sheetId, range, rowData);
+            
+            // Update local state to reflect changes immediately
+            const newServices = services.map(s => s.id === editService.id ? editService : s);
+            onSyncServices(newServices);
+            
+            alert("Serviço atualizado na planilha!");
+            setIsEditModalOpen(false);
+        } catch (e) {
+            console.error(e);
+            alert("Erro ao atualizar planilha.");
+        } finally {
+            setIsSyncing(false);
+        }
+    }
+
     // Group services for display
     const groupedServices = services.reduce((acc, curr) => {
         const key = curr.category === 'principal' ? 'Principais' : 'Adicionais';
@@ -591,18 +674,24 @@ const ServiceManager: React.FC<{
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-20">
                 {Object.entries(groupedServices).map(([cat, svcs]) => (
                     <div key={cat} className="space-y-3">
                         <h3 className="font-bold text-lg text-gray-700 border-b pb-2">{cat}</h3>
                         {svcs.sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(s => {
-                            // PROTEÇÃO CONTRA DADOS CORROMPIDOS (Evita Tela Branca)
                             const displayPrice = (s.price === null || s.price === undefined || isNaN(s.price)) ? 0 : s.price;
                             const sizeLabel = (s.targetSize || 'Todos').substring(0,3);
                             const coatLabel = (s.targetCoat || 'Todos').substring(0,3);
                             
                             return (
-                                <div key={s.id} className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm flex justify-between items-center group">
+                                <div 
+                                    key={s.id} 
+                                    className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm flex justify-between items-center group relative cursor-pointer hover:border-brand-300 transition"
+                                    onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        setContextMenu({ x: e.pageX, y: e.pageY, id: s.id });
+                                    }}
+                                >
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h4 className="font-bold text-gray-800">{s.name}</h4>
@@ -614,7 +703,15 @@ const ServiceManager: React.FC<{
                                         <span className={`text-sm font-bold px-2 py-1 rounded-full ${displayPrice === 0 ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}`}>
                                             {displayPrice === 0 ? 'Grátis' : `R$ ${displayPrice.toFixed(2)}`}
                                         </span>
-                                        <button onClick={() => onDeleteService(s.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 p-1 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setContextMenu({ x: e.pageX, y: e.pageY, id: s.id });
+                                            }}
+                                            className="text-gray-400 p-2 hover:bg-gray-100 rounded-full"
+                                        >
+                                            <MoreVertical size={16} />
+                                        </button>
                                     </div>
                                 </div>
                             )
@@ -622,6 +719,88 @@ const ServiceManager: React.FC<{
                     </div>
                 ))}
              </div>
+
+             {/* Context Menu */}
+             {contextMenu && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)}></div>
+                    <div 
+                        className="fixed z-50 bg-white shadow-xl border rounded-lg overflow-hidden py-1 w-48 animate-fade-in"
+                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                    >
+                        <button 
+                            className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            onClick={() => handleOpenEdit(services.find(s => s.id === contextMenu.id)!)}
+                        >
+                            <Edit2 size={16} /> Editar Serviço
+                        </button>
+                        <button 
+                            className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 font-medium"
+                            onClick={() => {
+                                handleDeleteSheetService(contextMenu.id);
+                                setContextMenu(null);
+                            }}
+                        >
+                            <Trash2 size={16} /> Excluir da Planilha
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {/* Edit Modal */}
+            {isEditModalOpen && editService && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl animate-fade-in-down">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Editar Serviço</h3>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Nome</label>
+                                <input className="w-full border p-2 rounded" value={editService.name} onChange={e => setEditService({...editService, name: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Preço (R$)</label>
+                                    <input type="number" className="w-full border p-2 rounded" value={editService.price} onChange={e => setEditService({...editService, price: parseFloat(e.target.value)})} />
+                                </div>
+                                <div>
+                                     <label className="block text-xs font-bold text-gray-500 mb-1">Categoria</label>
+                                     <select className="w-full border p-2 rounded bg-white" value={editService.category} onChange={e => setEditService({...editService, category: e.target.value as any})}>
+                                         <option value="principal">Principal</option>
+                                         <option value="adicional">Adicional</option>
+                                     </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                     <label className="block text-xs font-bold text-gray-500 mb-1">Porte</label>
+                                     <select className="w-full border p-2 rounded bg-white" value={editService.targetSize || 'Todos'} onChange={e => setEditService({...editService, targetSize: e.target.value})}>
+                                         <option value="Todos">Todos</option>
+                                         <option value="Pequeno">Pequeno</option>
+                                         <option value="Médio">Médio</option>
+                                         <option value="Grande">Grande</option>
+                                     </select>
+                                </div>
+                                <div>
+                                     <label className="block text-xs font-bold text-gray-500 mb-1">Pelagem</label>
+                                     <select className="w-full border p-2 rounded bg-white" value={editService.targetCoat || 'Todos'} onChange={e => setEditService({...editService, targetCoat: e.target.value})}>
+                                         <option value="Todos">Todos</option>
+                                         <option value="Curto">Curto</option>
+                                         <option value="Longo">Longo</option>
+                                     </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
+                            <button onClick={handleSaveEdit} disabled={isSyncing} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 font-bold disabled:opacity-50">
+                                {isSyncing ? 'Salvando...' : 'Salvar Alterações'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

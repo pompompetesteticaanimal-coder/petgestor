@@ -145,5 +145,40 @@ export const googleService = {
       console.error('Error appending sheet data', error);
       throw error;
     }
+  },
+
+  updateSheetValues: async (accessToken: string, spreadsheetId: string, range: string, values: any[]) => {
+    try {
+      const body = {
+        values: [values]
+      };
+      const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?valueInputOption=USER_ENTERED`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating sheet data', error);
+      throw error;
+    }
+  },
+
+  clearSheetValues: async (accessToken: string, spreadsheetId: string, range: string) => {
+    try {
+      const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:clear`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error clearing sheet data', error);
+      throw error;
+    }
   }
 };
