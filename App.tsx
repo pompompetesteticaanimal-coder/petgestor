@@ -4,7 +4,7 @@ import { HashRouter } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { db } from './services/db';
 import { googleService, DEFAULT_CLIENT_ID } from './services/googleCalendar';
-import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem } from './types';
+import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem, AppSettings } from './types';
 import { 
   Plus, Trash2, Check, X, 
   Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
@@ -407,7 +407,28 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
     const onTouchStart = (e: React.TouchEvent) => { touchEnd.current = null; touchStart.current = e.targetTouches[0].clientX; }; const onTouchMove = (e: React.TouchEvent) => { touchEnd.current = e.targetTouches[0].clientX; }; const onTouchEnd = () => { if (!touchStart.current || !touchEnd.current) return; const distance = touchStart.current - touchEnd.current; if (distance > minSwipeDistance) navigateDate(1); if (distance < -minSwipeDistance) navigateDate(-1); };
     const calculateExpected = (app: Appointment) => { const main = services.find(s => s.id === app.serviceId); let total = main?.price || 0; app.additionalServiceIds?.forEach(id => { const s = services.find(srv => srv.id === id); if(s) total += s.price; }); return total; };
     const handleStartEdit = (app: Appointment) => { setEditingId(app.id); const expected = calculateExpected(app); setAmount(app.paidAmount ? app.paidAmount.toString() : expected.toString()); setMethod(app.paymentMethod || 'Credito'); setContextMenu(null); };
-    const handleSave = async (app: Appointment) => { setIsSaving(true); const finalAmount = parseFloat(amount); const updatedApp = { ...app, paidAmount: finalAmount, paymentMethod: method as any }; if (app.id.startsWith('sheet_') && accessToken && sheetId) { try { const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1; const range = `Agendamento!R${rowNumber}:S${rowNumber}`; const values = [finalAmount.toString().replace('.', ','), method]; await googleService.updateSheetValues(accessToken, sheetId, range, values); } catch (e) { console.error("Failed", e); alert("Erro ao salvar na planilha."); } } onUpdateAppointment(updatedApp); setEditingId(null); setIsSaving(false); };
+    
+    // CORREÇÃO AQUI: Mudança para Q e R
+    const handleSave = async (app: Appointment) => { 
+        setIsSaving(true); 
+        const finalAmount = parseFloat(amount); 
+        const updatedApp = { ...app, paidAmount: finalAmount, paymentMethod: method as any }; 
+        if (app.id.startsWith('sheet_') && accessToken && sheetId) { 
+            try { 
+                const parts = app.id.split('_'); 
+                const index = parseInt(parts[1]); 
+                const rowNumber = index + 5; // Mantém offset 5
+                // Coluna Q (Valor) e R (Pagamento)
+                const range = `Agendamento!Q${rowNumber}:R${rowNumber}`; 
+                const values = [finalAmount.toString().replace('.', ','), method]; 
+                await googleService.updateSheetValues(accessToken, sheetId, range, values); 
+            } catch (e) { 
+                console.error("Failed", e); alert("Erro ao salvar na planilha."); 
+            } 
+        } 
+        onUpdateAppointment(updatedApp); setEditingId(null); setIsSaving(false); 
+    };
+    
     const PaymentRow = ({ app, statusColor }: {app: Appointment, statusColor: string}) => { const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(s => s.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x=>x) as Service[] || []; const expected = calculateExpected(app); const isPaid = !!app.paidAmount && !!app.paymentMethod; const isEditing = editingId === app.id; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase(); let serviceBorderColor = 'border-sky-400'; if (allServiceNames.includes('tesoura')) serviceBorderColor = 'border-pink-500'; else if (allServiceNames.includes('tosa normal')) serviceBorderColor = 'border-orange-500'; else if (allServiceNames.includes('higi')) serviceBorderColor = 'border-yellow-500'; else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) serviceBorderColor = 'border-purple-500'; else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) serviceBorderColor = 'border-indigo-500';
         if(isEditing) { return ( <div className="bg-brand-50 border border-brand-200 p-4 rounded-lg mb-4 shadow-sm animate-fade-in"><div className="flex flex-col gap-3"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{pet?.name}</span><span className="text-xs text-gray-500">Editando...</span></div><div className="grid grid-cols-2 gap-2"><div><label className="text-[10px] font-bold text-gray-500 uppercase">Valor R$</label><input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full border p-2 rounded bg-white" /></div><div><label className="text-[10px] font-bold text-gray-500 uppercase">Método</label><select value={method} onChange={e => setMethod(e.target.value)} className="w-full border p-2 rounded bg-white"><option value="Credito">Crédito</option><option value="Debito">Débito</option><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option></select></div></div><div className="flex gap-2 mt-2"><button onClick={() => handleSave(app)} disabled={isSaving} className="flex-1 bg-green-600 text-white p-2 rounded text-sm font-bold">{isSaving ? '...' : 'OK'}</button><button onClick={() => setEditingId(null)} className="flex-1 bg-gray-200 text-gray-700 p-2 rounded text-sm">Cancel</button></div></div></div> ) }
         return ( <div className={`p-3 rounded-lg shadow-sm border border-gray-100 mb-2 border-l-[6px] ${serviceBorderColor} ${statusColor} min-w-0`} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, app }); }}> <div className="flex justify-between items-start mb-2"> <div className="min-w-0 flex-1 pr-2"> <div className="text-base font-bold text-gray-800 truncate">{pet?.name}</div> <div className="text-xs text-gray-500 truncate">{client?.name}</div> <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-1"> <Clock size={10}/> {new Date(app.date).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} </div> </div> <div className="text-right flex-shrink-0"> <div className="text-base font-bold text-brand-700">R$ {expected.toFixed(2)}</div> {isPaid ? ( <div className="inline-block bg-green-100 text-green-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase"> {app.paymentMethod} </div> ) : ( <div className="inline-block bg-red-100 text-red-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase"> Pendente </div> )} </div> </div> <div className="flex flex-wrap gap-1 mb-2"> {mainSvc && <span className="text-[9px] bg-white border border-gray-200 px-1.5 py-0.5 rounded text-gray-600">{mainSvc.name}</span>} {addSvcs.map((s, idx) => ( <span key={idx} className="text-[9px] bg-white border border-gray-200 px-1.5 py-0.5 rounded text-gray-600">{s.name}</span> ))} </div> <button onClick={() => handleStartEdit(app)} className="w-full bg-white/50 hover:bg-white text-gray-700 p-2 rounded flex items-center justify-center gap-2 font-bold text-xs transition border border-gray-200"> <DollarSign size={14}/> {isPaid ? 'Editar Pagamento' : 'Receber Valor'} </button> </div> )
@@ -444,27 +465,33 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const filteredClients = clientSearch.length > 0 ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch) || c.pets.some(p => p.name.toLowerCase().includes(clientSearch.toLowerCase()))).slice(0, 5) : []; const selectedClientData = clients.find(c => c.id === selectedClient); const pets = selectedClientData?.pets || []; const selectedPetData = pets.find(p => p.id === selectedPet);
     const getApplicableServices = (category: 'principal' | 'adicional') => { if (!selectedPetData) return []; return services.filter(s => { const matchesCategory = s.category === category; const matchesSize = s.targetSize === 'Todos' || !s.targetSize || (selectedPetData.size && s.targetSize.toLowerCase().includes(selectedPetData.size.toLowerCase())); const matchesCoat = s.targetCoat === 'Todos' || !s.targetCoat || (selectedPetData.coat && s.targetCoat.toLowerCase().includes(selectedPetData.coat.toLowerCase())); return matchesCategory && matchesSize && matchesCoat; }); };
     const navigate = (direction: 'prev' | 'next') => { const newDate = new Date(currentDate); if (viewMode === 'day') newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1)); if (viewMode === 'week') newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7)); if (viewMode === 'month') newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1)); setCurrentDate(newDate); };
-    const timeOptions = []; for (let h = 9; h <= 18; h++) { ['00', '15', '30', '45'].forEach(m => { if(h === 18 && m !== '00') return; timeOptions.push(`${String(h).padStart(2, '0')}:${m}`); }); }
+    const timeOptions = []; for (let h = 9; h <= 18; h++) { ['00', '10', '20', '30', '40', '50'].forEach(m => { if(h === 18 && m !== '00') return; timeOptions.push(`${String(h).padStart(2, '0')}:${m}`); }); }
     
-    // --- SMART OVERLAP LOGIC ---
+    // --- SMART OVERLAP LOGIC (Stacking) ---
     const getLayout = (dayApps: Appointment[]) => {
         const sorted = [...dayApps].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         const columns: Appointment[][] = [];
         sorted.forEach(app => {
-            let placed = false;
-            for (const col of columns) {
-                const lastInCol = col[col.length - 1];
-                const lastEnd = new Date(lastInCol.date).getTime() + (lastInCol.durationTotal || 60) * 60000;
-                const currentStart = new Date(app.date).getTime();
-                if (currentStart >= lastEnd) {
-                    col.push(app);
-                    placed = true;
-                    break;
-                }
+            // Find existing columns where this app conflicts
+            const conflictingCols = columns.filter(col => {
+                return col.some(existingApp => {
+                    const existingStart = new Date(existingApp.date).getTime();
+                    const existingEnd = existingStart + (existingApp.durationTotal || 60) * 60000;
+                    const currentStart = new Date(app.date).getTime();
+                    const currentEnd = currentStart + (app.durationTotal || 60) * 60000;
+                    return (currentStart < existingEnd && currentEnd > existingStart);
+                });
+            });
+
+            if (conflictingCols.length > 0) {
+                 // Stack on top of the first conflict column found (visually stacking)
+                 // Just push to the same visual group essentially
+                 conflictingCols[0].push(app);
+            } else {
+                 columns.push([app]);
             }
-            if (!placed) columns.push([app]);
         });
-        return columns; // Returns array of columns, each containing non-overlapping apps
+        return columns; 
     };
 
     const AppointmentCard = ({ app, style, onClick, onContext }: any) => {
@@ -472,13 +499,14 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div
                 style={style}
-                className={`absolute rounded-lg p-1.5 border shadow-sm ${colorClass} text-xs cursor-pointer hover:brightness-95 hover:z-50 transition-all overflow-hidden flex flex-col leading-tight`}
+                className={`absolute rounded-lg p-1.5 border shadow-sm ${colorClass} text-xs cursor-pointer hover:brightness-95 hover:z-50 transition-all overflow-hidden flex flex-col leading-tight group`}
                 onClick={(e) => { e.stopPropagation(); onClick(app); }}
                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}
             >
                 <div className="font-bold truncate">{client?.name}</div>
                 <div className="truncate opacity-90">{pet?.name}</div>
                  <div className="mt-0.5 flex flex-wrap gap-0.5 opacity-80"> {mainSvc && <span>{mainSvc.name}</span>} {addSvcs.length > 0 && <span>+ {addSvcs.length}</span>} </div>
+                 <div className="absolute right-1 bottom-1 bg-white/50 px-1 rounded text-[8px] font-mono">{app.durationTotal || 60}m</div>
             </div>
         );
     };
@@ -490,9 +518,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         
         return (
             <div className="relative h-[1200px] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex">
-                <div className="w-12 bg-gray-50 border-r border-gray-200 flex-shrink-0">
+                <div className="w-12 bg-gray-50 border-r border-gray-200 flex-shrink-0 sticky left-0 z-10">
                     {Array.from({length: 10}, (_, i) => i + 9).map(h => (
-                        <div key={h} className="h-[120px] border-b border-gray-200 text-[10px] text-gray-400 font-bold p-1 text-right relative">
+                        <div key={h} className="h-[120px] border-b border-gray-200 text-[10px] text-gray-400 font-bold p-1 text-right relative bg-gray-50">
                             <span className="-top-2 relative">{h}:00</span>
                         </div>
                     ))}
@@ -501,13 +529,14 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                      {/* 10 min grid lines */}
                      {Array.from({length: 60}, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{top: i * 20}} />)}
                     
-                    {columns.map((col, colIdx) => (
-                        col.map(app => {
+                    {columns.map((col) => (
+                        col.map((app, idx) => {
                             const d = new Date(app.date);
                             const startMin = (d.getHours() - 9) * 60 + d.getMinutes();
                             const duration = app.durationTotal || 60;
-                            const width = 100 / columns.length;
-                            const left = width * colIdx;
+                            // Stacking Logic: Slight indentation
+                            const left = idx * 10; 
+                            const width = `calc(100% - ${left}px)`;
                             
                             return (
                                 <AppointmentCard 
@@ -516,8 +545,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                     style={{
                                         top: `${startMin * 2}px`,
                                         height: `${duration * 2}px`,
-                                        left: `${left}%`,
-                                        width: `${width}%`
+                                        left: `${left}px`,
+                                        width: width,
+                                        zIndex: idx + 1
                                     }}
                                     onClick={setDetailsApp}
                                     onContext={(e: any, id: string) => setContextMenu({x: e.clientX, y: e.clientY, appId: id})}
@@ -551,9 +581,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 </div>
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto relative flex">
-                     <div className="w-10 bg-gray-50 border-r border-gray-200 flex-shrink-0">
+                     <div className="w-10 bg-gray-50 border-r border-gray-200 flex-shrink-0 sticky left-0 z-10">
                         {Array.from({length: 10}, (_, i) => i + 9).map(h => (
-                            <div key={h} className="h-[120px] border-b border-gray-200 text-[9px] text-gray-400 font-bold p-1 text-right relative">
+                            <div key={h} className="h-[120px] border-b border-gray-200 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50">
                                 <span className="-top-2 relative">{h}:00</span>
                             </div>
                         ))}
@@ -566,19 +596,20 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
                          return (
                              <div key={dIdx} className="flex-1 border-r border-gray-100 relative min-w-[60px]">
-                                  {Array.from({length: 10}, (_, i) => i + 9).map(h => <div key={h} className="h-[120px] border-b border-gray-50" />)}
+                                  {Array.from({length: 60}, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{top: i * 20}} />)}
                                   
-                                  {columns.map((col, colIdx) => (
-                                    col.map(app => {
+                                  {columns.map((col) => (
+                                    col.map((app, idx) => {
                                         const ad = new Date(app.date);
                                         const startMin = (ad.getHours() - 9) * 60 + ad.getMinutes();
                                         const duration = app.durationTotal || 60;
-                                        const width = 100 / columns.length;
-                                        const left = width * colIdx;
+                                        const left = idx * 5; 
+                                        const width = `calc(100% - ${left}px)`;
+
                                         return (
                                             <AppointmentCard 
                                                 key={app.id} app={app} 
-                                                style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: `${left}%`, width: `${width}%` }}
+                                                style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: `${left}px`, width: width, zIndex: idx+1 }}
                                                 onClick={setDetailsApp}
                                                 onContext={(e: any, id: string) => setContextMenu({x: e.clientX, y: e.clientY, appId: id})}
                                             />
@@ -802,7 +833,9 @@ const App: React.FC = () => {
               if (idx < 4) return;
               
               const petName = row[0]; const clientName = row[1]; const clientPhone = row[2] || ''; const clientAddr = row[3] || ''; const petBreed = row[4]; const datePart = row[11]; const timePart = row[12]; const serviceName = row[7];
-              const paidAmountStr = row[17]; const paymentMethod = row[18];
+              // CORREÇÃO AQUI: Índice 16 para Valor, 17 para Pagamento
+              const paidAmountStr = row[16]; 
+              const paymentMethod = row[17];
               if(!clientName || !datePart) return;
               let isoDate = new Date().toISOString();
               try { const [day, month, year] = datePart.split('/'); if(day && month && year) isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`; } catch(e){}
@@ -837,8 +870,8 @@ const App: React.FC = () => {
         const googleResponse = await googleService.createEvent(accessToken, { summary: `Banho/Tosa: ${pet.name} - ${client.name}`, description: `Serviços: ${description}\nObs: ${pet.notes}`, startTime: app.date, durationMin: totalDuration });
         if (googleResponse && googleResponse.id) { googleEventId = googleResponse.id; }
         const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-        // Columns A-S mapping (Index 0-18)
-        // A:Pet, B:Client, C:Phone, D:Addr, E:Breed, F:Size, G:Coat, H:MainSvc, I:Add1, J:Add2, K:Add3, L:Date, M:Time, N:Obs, O:Dur, P:Status, Q:sdd, R:Val, S:Pay
+        
+        // CORREÇÃO AQUI: Array termina em R (índice 17), Q (Valor) e R (Pagamento)
         const rowData = [ 
             pet.name, 
             client.name, 
@@ -856,13 +889,14 @@ const App: React.FC = () => {
             app.notes || '', 
             totalDuration,
             'Agendado', // Col P (Status)
-            '', // Col Q (sdd)
-            '', // Col R (Valor - initially empty)
-            ''  // Col S (Payment - initially empty)
+            '', // Col Q (Valor)
+            ''  // Col R (Payment)
         ];
         try { await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:S', rowData); alert('Agendamento salvo no Calendar e na Planilha!'); } catch (e) { alert('Erro ao salvar na planilha (verifique permissões). Salvo apenas localmente e no Calendar.'); }
     }
     const newApp = { ...app, googleEventId, durationTotal: totalDuration }; const updated = [...appointments, newApp]; setAppointments(updated); db.saveAppointments(updated);
+    // Force sync to get Sheet ID
+    setTimeout(() => performFullSync(accessToken!), 1000);
   }
 
   const handleEditAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
@@ -880,13 +914,15 @@ const App: React.FC = () => {
          await googleService.updateEvent(accessToken, googleEventId, { summary: `Banho/Tosa: ${pet.name} - ${client.name}`, description: `Serviços: ${description}\nObs: ${pet.notes}`, startTime: app.date, durationMin: totalDuration });
     }
     if (accessToken && app.id.startsWith('sheet_')) {
-        const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1; 
-        const range = `Agendamento!A${rowNumber}:S${rowNumber}`; const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        const parts = app.id.split('_'); const index = parseInt(parts[1]); 
+        const rowNumber = index + 5; // Offset 5
+        const range = `Agendamento!A${rowNumber}:R${rowNumber}`; 
+        const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
         
-        // Preserve existing payment data if available
         const currentPaidAmount = app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '';
         const currentPaymentMethod = app.paymentMethod || '';
 
+        // CORREÇÃO AQUI: Mapeamento Q e R
         const rowData = [ 
             pet.name, 
             client.name, 
@@ -904,13 +940,14 @@ const App: React.FC = () => {
             app.notes || '', 
             totalDuration,
             'Agendado', // Col P
-            '', // Col Q
-            currentPaidAmount, // Col R (Preserve)
-            currentPaymentMethod // Col S (Preserve)
+            currentPaidAmount, // Col Q
+            currentPaymentMethod // Col R
         ];
         try { await googleService.updateSheetValues(accessToken, SHEET_ID, range, rowData); } catch(e) { console.error("Update sheet failed", e); }
     }
     const updated = appointments.map(a => a.id === app.id ? { ...app, durationTotal: totalDuration } : a); setAppointments(updated); db.saveAppointments(updated); alert('Agendamento atualizado!');
+    // Force sync
+    setTimeout(() => performFullSync(accessToken!), 1000);
   }
 
   const handleUpdateAppStatus = (id: string, status: Appointment['status']) => { const updated = appointments.map(a => a.id === id ? { ...a, status } : a); setAppointments(updated); db.saveAppointments(updated); }
@@ -925,7 +962,7 @@ const App: React.FC = () => {
          if (appToDelete.id.startsWith('sheet_')) {
              try {
                  const idx = parseInt(appToDelete.id.split('_')[1]);
-                 const row = idx + 1;
+                 const row = idx + 5; // Offset 5
                  await googleService.clearSheetValues(accessToken, SHEET_ID, `Agendamento!A${row}:S${row}`);
              } catch (e) { console.error("Failed to clear row from Sheet", e); }
          }
