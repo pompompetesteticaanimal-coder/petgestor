@@ -70,4 +70,4 @@ export interface AppSettings {
   sidebarOrder: string[];
 }
 
-export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services';
+export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu';
