@@ -63,4 +63,11 @@ export interface GoogleUser {
   picture: string;
 }
 
+export interface AppSettings {
+  appName: string;
+  logoUrl: string;
+  theme: string;
+  sidebarOrder: string[];
+}
+
 export type ViewState = 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services';
