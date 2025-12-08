@@ -12,7 +12,7 @@ import {
   ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
   Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
   Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon,
-  ShoppingBag, Tag, User, Key, Unlock, Home, Activity, Menu
+  ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
@@ -23,7 +23,8 @@ import {
 const PREDEFINED_SHEET_ID = '1qbb0RoKxFfrdyTCyHd5rJRbLNBPcOEk4Y_ctyy-ujLw';
 const PREDEFINED_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfnUDOsMjn6iho8msiRw9ulfIEghwB1kEU_mrzz4PcSW97V-A/viewform';
 
-// --- SUB-COMPONENTS START ---
+// --- SUB-COMPONENTS ---
+
 const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => {
     const [clientId, setClientId] = useState(DEFAULT_CLIENT_ID);
     return (
@@ -71,7 +72,6 @@ const PinGuard: React.FC<{ isUnlocked: boolean; onUnlock: (pin: string) => boole
 };
 
 const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: AppSettings; onSave: (s: AppSettings) => void }> = ({ isOpen, onClose, settings, onSave }) => {
-    // ... [Settings Modal Logic - Same as before] ...
     const [localSettings, setLocalSettings] = useState(settings);
     const [activeTab, setActiveTab] = useState<'general'|'theme'|'menu'>('general');
     if(!isOpen) return null;
@@ -131,7 +131,6 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: 
 }
 
 const CustomXAxisTick = ({ x, y, payload, data }: any) => {
-    // ... [Same implementation]
     const item = data && data[payload.index];
     if (!item) return <g />;
     return (
@@ -152,7 +151,6 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-    // ... [Stats Calculation Logic - Same as before] ...
     const getISOWeek = (date: Date) => {
         const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
         const dayNum = d.getUTCDay() || 7;
@@ -189,7 +187,6 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         return { totalPets, totalTosas, paidRevenue, pendingRevenue, grossRevenue, averageTicket };
     };
 
-    // ... [Get Chart Data Functions - Same as before] ...
     const getWeeklyChartData = () => {
         const [y, m, d] = selectedDate.split('-').map(Number);
         const date = new Date(y, m - 1, d);
@@ -301,7 +298,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             )}
             {activeTab === 'weekly' && (
                 <section>
-                    {/* ... (Weekly View Same as Before) ... */}
+                    {/* ... (Weekly View) ... */}
                     <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200 gap-2"><h2 className="text-lg font-bold text-gray-800">Semana</h2></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Pets da Semana" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-indigo-500" /><StatCard title="Total Faturamento" value={`R$ ${weeklyStats.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-teal-500" /><StatCard title="Total Pago" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-500" /><StatCard title="Pendente" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-rose-500" /></div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-96"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2"><TrendingUp size={16}/> Faturamento Diário</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={weeklyChartData} margin={{ top: 20, right: 0, bottom: 40, left: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" interval={0} tick={<CustomXAxisTick data={weeklyChartData} />} height={60} axisLine={false} tickLine={false} /><YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 10}} tickFormatter={(val) => `R$${val}`} domain={['auto', 'auto']} /><YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} /><Bar yAxisId="right" dataKey="petsCount" fill="#c7d2fe" radius={[4, 4, 0, 0]} barSize={40} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#4f46e5" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} /></ComposedChart></ResponsiveContainer></div>
@@ -309,7 +306,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             )}
             {activeTab === 'monthly' && (
                 <section>
-                    {/* ... (Monthly View Same as Before) ... */}
+                    {/* ... (Monthly View) ... */}
                     <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800">Mês</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none" /></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Total de Pets" value={monthlyStats.totalPets} icon={PawPrint} colorClass="bg-purple-500" /><StatCard title="Ticket Médio" value={`R$ ${monthlyStats.averageTicket.toFixed(2)}`} icon={DollarSign} colorClass="bg-teal-500" /><StatCard title="Receita Paga" value={`R$ ${monthlyStats.paidRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-emerald-500" /><StatCard title="A Receber" value={`R$ ${monthlyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-red-500" /></div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-96"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2"><TrendingUp size={16}/> Comparativo Semanal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 20, right: 0, bottom: 40, left: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" interval={0} tick={<CustomXAxisTick data={monthlyChartData} />} height={60} axisLine={false} tickLine={false} /><YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 10}} tickFormatter={(val) => `R$${val}`} domain={['auto', 'auto']} /><YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} /><Bar yAxisId="right" dataKey="petsCount" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={40} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} /></ComposedChart></ResponsiveContainer></div>
@@ -317,7 +314,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             )}
              {activeTab === 'yearly' && (
                 <section>
-                    {/* ... (Yearly View Same as Before) ... */}
+                    {/* ... (Yearly View) ... */}
                     <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800">Ano</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none">{[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Total Pets" value={yearlyStats.totalPets} icon={PawPrint} colorClass="bg-sky-500" /><StatCard title="Ticket Médio" value={`R$ ${yearlyStats.averageTicket.toFixed(2)}`} icon={DollarSign} colorClass="bg-teal-500" /><StatCard title="Faturamento Total" value={`R$ ${yearlyStats.grossRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-green-500" /><StatCard title="Pendência Total" value={`R$ ${yearlyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" /></div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2"><TrendingUp size={16}/> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 20, right: 0, bottom: 40, left: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" interval={0} tick={<CustomXAxisTick data={yearlyChartData} />} height={60} axisLine={false} tickLine={false} /><YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 10}} tickFormatter={(val) => `R$${val/1000}k`} domain={['auto', 'auto']} /><YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10}} /><Bar yAxisId="right" dataKey="petsCount" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={30} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} /></ComposedChart></ResponsiveContainer></div>
@@ -327,9 +324,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     );
 };
 
-// ... [CostsView, PaymentManager, ClientManager, ServiceManager, ScheduleManager - Same as before] ...
 const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
-    // ... [Costs View Logic] ...
     const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('yearly');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -352,12 +347,7 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     );
 };
 
-// ... PaymentManager, ClientManager, ServiceManager, ScheduleManager ...
-// [The full implementation of these components should be included here as in previous steps]
-// Due to output size limits, I'm ensuring the key navigational change is highlighted below in App component and MenuView.
-
 const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; accessToken: string | null; sheetId: string; }> = ({ appointments, clients, services, onUpdateAppointment, accessToken, sheetId }) => {
-    // ... [Original Payment Manager Logic] ...
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
     const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid'>('toReceive'); const [contextMenu, setContextMenu] = useState<{x: number, y: number, app: Appointment} | null>(null); const touchStart = useRef<number | null>(null); const touchEnd = useRef<number | null>(null); const minSwipeDistance = 50; const todayStr = getLocalISODate();
     const getAppLocalDateStr = (dateStr: string) => { const d = new Date(dateStr); return getLocalISODate(d); };
@@ -400,7 +390,6 @@ const ClientManager: React.FC<{ clients: Client[]; onDeleteClient: (id: string) 
 };
 
 const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service) => void; onDeleteService: (id: string) => void; onSyncServices: (silent: boolean) => void; accessToken: string | null; sheetId: string; }> = ({ services, onAddService, onDeleteService, onSyncServices, sheetId, accessToken }) => {
-    // ... [Service Manager logic same as before] ...
     const [isModalOpen, setIsModalOpen] = useState(false); const [editingService, setEditingService] = useState<Service | null>(null); const [formData, setFormData] = useState({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' }); const [contextMenu, setContextMenu] = useState<{x: number, y: number, service: Service} | null>(null);
     const resetForm = () => { setFormData({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' }); setEditingService(null); setIsModalOpen(false); };
     const handleEditStart = (s: Service) => { setEditingService(s); setFormData({ name: s.name, price: s.price.toString(), category: s.category, size: s.targetSize || 'Todos', coat: s.targetCoat || 'Todos' }); setIsModalOpen(true); setContextMenu(null); };
@@ -410,7 +399,6 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
 };
 
 const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; googleUser: GoogleUser | null; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete }) => {
-    // ... [Schedule Manager logic - same as before] ...
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day'); const [currentDate, setCurrentDate] = useState(new Date()); const [isModalOpen, setIsModalOpen] = useState(false); const [detailsApp, setDetailsApp] = useState<Appointment | null>(null); const [contextMenu, setContextMenu] = useState<{x: number, y: number, appId: string} | null>(null); const [editingAppId, setEditingAppId] = useState<string | null>(null);
     const [clientSearch, setClientSearch] = useState(''); const [selectedClient, setSelectedClient] = useState(''); const [selectedPet, setSelectedPet] = useState(''); const [selectedService, setSelectedService] = useState(''); const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]); const [date, setDate] = useState(new Date().toISOString().split('T')[0]); const [time, setTime] = useState('09:00'); const [notes, setNotes] = useState(''); const [manualDuration, setManualDuration] = useState('0');
     const resetForm = () => { setClientSearch(''); setSelectedClient(''); setSelectedPet(''); setSelectedService(''); setSelectedAddServices([]); setTime('09:00'); setNotes(''); setManualDuration('0'); setEditingAppId(null); setIsModalOpen(false); };
@@ -481,7 +469,6 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         )
     }
 
-    // ... [Month View and Render logic same as before] ...
     const renderMonthView = () => {
         const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const firstDay = new Date(year, month, 1); const startDay = firstDay.getDay(); const daysInMonth = new Date(year, month + 1, 0).getDate(); const slots = []; for(let i=0; i<startDay; i++) slots.push(null); for(let i=1; i<=daysInMonth; i++) slots.push(new Date(year, month, i));
         return ( <div className="h-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col"> <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200"> {['D','S','T','Q','Q','S','S'].map(d => <div key={d} className="py-2 text-center text-xs font-bold text-gray-500">{d}</div>)} </div> <div className="flex-1 grid grid-cols-7 auto-rows-fr"> {slots.map((date, idx) => { if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/30 border-b border-r border-gray-100" />; const dateStr = date.toISOString().split('T')[0]; const isToday = dateStr === new Date().toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado').sort((a,b) => a.date.localeCompare(b.date)); return ( <div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col ${isToday ? 'bg-blue-50/30' : ''}`} onClick={() => { setDate(dateStr); setViewMode('day'); }}> <span className={`text-[10px] font-bold mb-1 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-brand-600 text-white' : 'text-gray-500'}`}>{date.getDate()}</span> <div className="flex-1 overflow-hidden space-y-1"> {dayApps.slice(0, 3).map(app => ( <div key={app.id} className="text-[8px] bg-sky-100 text-sky-800 rounded px-1 truncate font-medium"> {clients.find(c=>c.id===app.clientId)?.pets.find(p=>p.id===app.petId)?.name} </div> ))} {dayApps.length > 3 && <div className="text-[8px] text-gray-400 pl-1">+ {dayApps.length - 3} mais</div>} </div> </div> ) })} </div> </div> )
@@ -619,32 +606,86 @@ const App: React.FC = () => {
   const handleAddAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
     // ... [Add Appointment Logic same as before] ...
     let googleEventId = ''; let totalDuration = manualDuration > 0 ? manualDuration : appServices[0].durationMin + (appServices.length > 1 ? appServices.slice(1).reduce((acc,s)=>acc+(s.durationMin||0),0) : 0);
-    if (accessToken) { const description = appServices.map(s => s.name).join(' + '); const googleResponse = await googleService.createEvent(accessToken, { summary: `Banho/Tosa: ${pet.name} - ${client.name}`, description: `Serviços: ${description}\nObs: ${pet.notes}`, startTime: app.date, durationMin: totalDuration }); if (googleResponse && googleResponse.id) { googleEventId = googleResponse.id; } const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}); const rowData = [ pet.name, client.name, client.phone, `${client.address} ${client.complement || ''}`.trim(), pet.breed, pet.size, pet.coat, appServices[0]?.name || '', appServices[1]?.name || '', appServices[2]?.name || '', appServices[3]?.name || '', dateStr, timeStr, app.notes || '', totalDuration, 'Agendado', '', '', '', googleEventId ]; try { await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData); alert('Agendamento salvo!'); } catch (e) { alert('Erro ao salvar na planilha.'); } }
-    const newApp = { ...app, googleEventId, durationTotal: totalDuration }; const updated = [...appointments, newApp]; setAppointments(updated); db.saveAppointments(updated); setTimeout(() => performFullSync(accessToken!), 1000);
-  }
+    if (accessToken) { const description = appServices.map(s => s.name).join(' + '); const googleResponse = await googleService.createEvent(accessToken, { summary: `Banho/Tosa: ${pet.name}`, description: `${description}\nCliente: ${client.name}\nTel: ${client.phone}\nObs: ${app.notes}`, startTime: app.date, durationMin: totalDuration }); if (googleResponse) googleEventId = googleResponse.id; }
+    const newApp = { ...app, googleEventId, durationTotal: totalDuration };
+    const updatedApps = [...appointments, newApp];
+    setAppointments(updatedApps);
+    db.saveAppointments(updatedApps);
+    if (accessToken && SHEET_ID) {
+        try {
+            const d = new Date(app.date); const dateStr = d.toLocaleDateString('pt-BR'); const timeStr = d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+            const mainSvc = appServices[0];
+            const rowData = [
+                pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
+                appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
+                dateStr, timeStr, app.notes || '', totalDuration.toString(), 'Agendado', '', '', '', googleEventId
+            ];
+            await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData);
+            // Silent Sync to update IDs
+            handleSyncAppointments(accessToken, true);
+        } catch (e) { console.error(e); alert("Salvo no app, mas erro na planilha."); }
+    }
+  };
+
   const handleEditAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
-    // ... [Edit Appointment Logic same as before] ...
-    let googleEventId = app.googleEventId; let totalDuration = manualDuration > 0 ? manualDuration : appServices.reduce((acc,s)=>acc+(s.durationMin||0),0);
-    if (accessToken && googleEventId) { const description = appServices.map(s => s.name).join(' + '); await googleService.updateEvent(accessToken, googleEventId, { summary: `Banho/Tosa: ${pet.name} - ${client.name}`, description: `Serviços: ${description}\nObs: ${pet.notes}`, startTime: app.date, durationMin: totalDuration }); }
-    if (accessToken && app.id.startsWith('sheet_')) { const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1; const range = `Agendamento!A${rowNumber}:T${rowNumber}`; const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}); const currentPaidAmount = app.paidAmount ? app.paidAmount.toString().replace('.', ',') : ''; const currentPaymentMethod = app.paymentMethod || ''; const rowData = [ pet.name, client.name, client.phone, `${client.address} ${client.complement || ''}`.trim(), pet.breed, pet.size, pet.coat, appServices[0]?.name || '', appServices[1]?.name || '', appServices[2]?.name || '', appServices[3]?.name || '', dateStr, timeStr, app.notes || '', totalDuration, 'Agendado', currentPaidAmount, currentPaymentMethod, '', app.googleEventId || '' ]; try { await googleService.updateSheetValues(accessToken, SHEET_ID, range, rowData); } catch(e) { console.error("Update sheet failed", e); } }
-    const updated = appointments.map(a => a.id === app.id ? { ...app, durationTotal: totalDuration } : a); setAppointments(updated); db.saveAppointments(updated); alert('Atualizado!'); setTimeout(() => performFullSync(accessToken!), 1000);
-  }
-  const handleUpdateAppStatus = (id: string, status: Appointment['status']) => { const updated = appointments.map(a => a.id === id ? { ...a, status } : a); setAppointments(updated); db.saveAppointments(updated); }
-  const handleDeleteApp = async (id: string) => {
-     // ... [Delete Logic same as before] ...
-     const appToDelete = appointments.find(a => a.id === id); if (appToDelete && accessToken) { if (appToDelete.googleEventId) { try { await googleService.deleteEvent(accessToken, appToDelete.googleEventId); } catch (e) { console.error("Failed to delete from Google Calendar", e); } } if (appToDelete.id.startsWith('sheet_')) { try { const idx = parseInt(appToDelete.id.split('_')[1]); const row = idx + 1; await googleService.clearSheetValues(accessToken, SHEET_ID, `Agendamento!A${row}:T${row}`); } catch (e) { console.error("Failed to clear row", e); } } } const updated = appointments.filter(a => a.id !== id); setAppointments(updated); db.saveAppointments(updated);
+      let googleEventId = app.googleEventId; const totalDuration = manualDuration > 0 ? manualDuration : appServices[0].durationMin + (appServices.length > 1 ? appServices.slice(1).reduce((acc,s)=>acc+(s.durationMin||0),0) : 0);
+      const updatedApp = { ...app, durationTotal: totalDuration };
+      if (accessToken && googleEventId) { 
+          const description = appServices.map(s => s.name).join(' + '); 
+          await googleService.updateEvent(accessToken, googleEventId, { summary: `Banho/Tosa: ${pet.name}`, description: `${description}\nCliente: ${client.name}\nTel: ${client.phone}\nObs: ${app.notes}`, startTime: app.date, durationMin: totalDuration }); 
+      }
+      const updatedList = appointments.map(a => a.id === app.id ? updatedApp : a);
+      setAppointments(updatedList); db.saveAppointments(updatedList);
+      if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
+          try {
+              const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1; // Correct row calculation
+              const d = new Date(app.date); const dateStr = d.toLocaleDateString('pt-BR'); const timeStr = d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+              const mainSvc = appServices[0];
+              const rowData = [
+                  pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
+                  appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
+                  dateStr, timeStr, app.notes || '', totalDuration.toString(), 'Agendado', '', app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '', app.paymentMethod || '', googleEventId
+              ];
+              await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`, rowData);
+          } catch(e) { console.error(e); alert("Erro ao atualizar planilha."); }
+      }
+  };
+
+  const handleDeleteAppointment = async (id: string) => {
+      if(!confirm("Tem certeza que deseja excluir?")) return;
+      const app = appointments.find(a => a.id === id);
+      if (app && app.googleEventId && accessToken) { await googleService.deleteEvent(accessToken, app.googleEventId); }
+      const updated = appointments.filter(a => a.id !== id);
+      setAppointments(updated); db.saveAppointments(updated);
+      if (id.startsWith('sheet_') && accessToken && SHEET_ID) {
+           try {
+               const parts = id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1;
+               await googleService.clearSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`);
+           } catch(e) { console.error(e); }
+      }
+  };
+  
+  const handleUpdateStatus = (id: string, status: Appointment['status']) => {
+      const updated = appointments.map(a => a.id === id ? { ...a, status } : a);
+      setAppointments(updated);
+      db.saveAppointments(updated);
   }
 
+  // --- PIN LOGIC Handlers ---
+  const handlePinUnlock = (input: string) => { if(input === pin) { setIsPinUnlocked(true); return true; } return false; };
   const handleSetPin = (newPin: string) => { localStorage.setItem('petgestor_pin', newPin); setPin(newPin); setIsPinUnlocked(true); };
-  const handleUnlockPin = (inputPin: string) => { if (inputPin === pin) { setIsPinUnlocked(true); return true; } return false; };
-  const handleResetPin = () => { if (window.confirm("Redefinir senha via Google?")) { if(googleUser) { localStorage.removeItem('petgestor_pin'); setPin(''); setIsPinUnlocked(false); alert("Senha removida."); } else { alert("Faça login primeiro."); } } };
-  const handleSaveSettings = (newSettings: AppSettings) => { setSettings(newSettings); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings)); };
-
-  const isRestrictedView = currentView === 'revenue' || currentView === 'costs';
-  const showPinModal = isRestrictedView && !isPinUnlocked;
 
   if (!isConfigured) return <SetupScreen onSave={handleSaveConfig} />;
-  if (!googleUser) return <LoginScreen onLogin={() => googleService.login()} onReset={handleResetConfig} settings={settings} googleLoaded={googleLoaded} />;
+  
+  if (!googleUser) return <LoginScreen onLogin={googleService.login} onReset={handleResetConfig} settings={settings} googleLoaded={googleLoaded} />;
+
+  if (isGlobalLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-brand-50"><Loader2 size={48} className="text-brand-600 animate-spin mb-4" /><p className="text-brand-700 font-bold animate-pulse">Sincronizando dados...</p></div>;
+
+  // Views that require PIN
+  const secureViews: ViewState[] = ['revenue', 'costs'];
+  if (secureViews.includes(currentView) && !isPinUnlocked) {
+      return <PinGuard isUnlocked={false} onUnlock={handlePinUnlock} onSetPin={handleSetPin} hasPin={!!pin} onReset={handleLogout} setView={setCurrentView} />;
+  }
 
   return (
     <HashRouter>
@@ -652,63 +693,23 @@ const App: React.FC = () => {
         currentView={currentView} 
         setView={setCurrentView} 
         googleUser={googleUser} 
-        onLogin={() => googleService.login()} 
+        onLogin={googleService.login} 
         onLogout={handleLogout}
         settings={settings}
         onOpenSettings={() => setIsSettingsOpen(true)}
       >
-        {isGlobalLoading && (
-            <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[60] flex flex-col items-center justify-center">
-                <Loader2 className="w-12 h-12 text-brand-600 animate-spin mb-4" />
-                <h3 className="text-xl font-bold text-gray-800">Sincronizando dados...</h3>
-                <p className="text-gray-500">Buscando Clientes, Serviços, Agendamentos e Custos.</p>
-            </div>
-        )}
-        
-        {showPinModal && (
-            <PinGuard 
-                isUnlocked={isPinUnlocked} 
-                onUnlock={handleUnlockPin} 
-                onSetPin={handleSetPin} 
-                hasPin={!!pin} 
-                onReset={handleResetPin}
-                setView={setCurrentView}
-            />
-        )}
-        
-        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={handleSaveSettings} />
-
-        {/* --- MAIN NAVIGATION SWITCH --- */}
-        
-        {/* Tab 1: Home/Daily Revenue */}
-        {currentView === 'home' && (
-             <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="daily" />
-        )}
-
-        {/* Tab 2: Payments */}
-        {currentView === 'payments' && (
-            <PaymentManager appointments={appointments} clients={clients} services={services} onUpdateAppointment={handleUpdateApp} accessToken={accessToken} sheetId={SHEET_ID} />
-        )}
-
-        {/* Tab 3: Agenda */}
-        {currentView === 'schedule' && (
-            <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateAppStatus} onDelete={handleDeleteApp} googleUser={googleUser} />
-        )}
-
-        {/* Tab 4: Menu */}
-        {currentView === 'menu' && (
-            <MenuView setView={setCurrentView} />
-        )}
-
-        {/* --- OTHER VIEWS (ACCESSED VIA MENU) --- */}
+        {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="daily" />}
         {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="monthly" />}
         {currentView === 'costs' && <CostsView costs={costs} />}
+        {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services} onUpdateAppointment={handleUpdateApp} accessToken={accessToken} sheetId={SHEET_ID} />}
         {currentView === 'clients' && <ClientManager clients={clients} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
-        {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => handleSyncServices(accessToken!, false)} accessToken={accessToken} sheetId={SHEET_ID} />}
-        
+        {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
+        {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} />}
+        {currentView === 'menu' && <MenuView setView={setCurrentView} />}
       </Layout>
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }} />
     </HashRouter>
   );
-};
+}
 
 export default App;
