@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { ViewState, GoogleUser } from '../types';
-import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Menu, Lock } from 'lucide-react';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { ViewState, GoogleUser, AppSettings } from '../types';
+import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Menu, Lock, Home, Settings } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,6 +10,8 @@ interface LayoutProps {
   googleUser: GoogleUser | null;
   onLogin: () => void;
   onLogout: () => void;
+  settings?: AppSettings;
+  onOpenSettings?: () => void;
 }
 
 const NavItem = ({ 
@@ -40,41 +43,43 @@ const NavItem = ({
   );
 };
 
-export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout, settings, onOpenSettings }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const touchStart = useRef<number | null>(null);
-  const touchEnd = useRef<number | null>(null);
+  
+  // Default Order if not set
+  const menuGroups = settings?.sidebarOrder || ['operacional', 'cadastros', 'gerencial'];
 
-  // --- SWIPE LOGIC (Only for Closing) ---
-  const minSwipeDistance = 50;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchEnd.current = null;
-    touchStart.current = e.targetTouches[0].clientX;
-  }
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    touchEnd.current = e.targetTouches[0].clientX;
-  }
-
-  const onTouchEnd = () => {
-    if (!touchStart.current || !touchEnd.current) return;
-    const distance = touchStart.current - touchEnd.current;
-    const isLeftSwipe = distance > minSwipeDistance;
-    
-    // Only allow closing via swipe (Left Swipe), never opening
-    if (isLeftSwipe && isSidebarOpen) {
-      setIsSidebarOpen(false);
-    }
-  }
+  const renderGroup = (group: string) => {
+      switch(group) {
+          case 'operacional':
+              return (
+                  <div key="operacional" className="pb-2">
+                     <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Página Inicial</p>
+                     <NavItem view="home" current={currentView} icon={Home} label="Início (Diário/Agenda)" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+                  </div>
+              );
+          case 'cadastros':
+              return (
+                  <div key="cadastros" className="border-t border-gray-100 pt-2 pb-2">
+                     <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Cadastros e Serviços</p>
+                     <NavItem view="clients" current={currentView} icon={Users} label="Clientes & Pets" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+                     <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+                  </div>
+              );
+          case 'gerencial':
+              return (
+                  <div key="gerencial" className="border-t border-gray-100 pt-2">
+                    <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1"><Lock size={10}/> Gerencial</p>
+                    <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+                    <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+                  </div>
+              );
+          default: return null;
+      }
+  };
 
   return (
-    <div 
-      className="flex h-screen bg-gray-50 overflow-hidden relative"
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-    >
+    <div className="flex h-screen bg-gray-50 overflow-hidden relative">
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
@@ -92,13 +97,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       `}>
         <div className="p-6 flex items-center justify-between border-b border-gray-100 h-[72px]">
             <div className="flex items-center space-x-2">
-                <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" onError={(e) => {
-                    // Fallback if image fails
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                }}/>
-                <div className="hidden w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">P</div>
-                <h1 className="text-xl font-bold text-gray-800">PomPomPet</h1>
+                 {settings?.logoUrl ? (
+                    <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
+                 ) : (
+                    <>
+                        <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}/>
+                        <div className="hidden w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">P</div>
+                    </>
+                 )}
+                <h1 className="text-xl font-bold text-gray-800 truncate">{settings?.appName || 'PomPomPet'}</h1>
             </div>
             {/* Close button inside sidebar on mobile */}
             <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-500">
@@ -106,27 +113,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
             </button>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {/* 1. Operacional Group */}
-          <div className="pb-2">
-             <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Operacional</p>
-             <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-             <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-          </div>
-
-          {/* 2. Cadastros e Serviços Group */}
-          <div className="border-t border-gray-100 pt-2 pb-2">
-             <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Cadastros e Serviços</p>
-             <NavItem view="clients" current={currentView} icon={Users} label="Clientes & Pets" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-             <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-          </div>
-
-          {/* 3. Gerencial Group (Last) */}
-          <div className="border-t border-gray-100 pt-2">
-            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1"><Lock size={10}/> Gerencial</p>
-            <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-            <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-          </div>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+          {menuGroups.map(group => renderGroup(group))}
         </nav>
         
         {/* Google Auth Section */}
@@ -140,9 +128,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
                             <p className="text-[10px] text-green-600 flex items-center gap-1 font-medium">● Conectado</p>
                         </div>
                     </div>
-                    <button onClick={onLogout} className="w-full text-xs flex items-center justify-center gap-1 text-red-500 hover:bg-red-50 p-2 rounded transition font-medium border border-transparent hover:border-red-100">
-                        <LogOut size={12} /> Sair
-                    </button>
+                    <div className="flex gap-2">
+                        {onOpenSettings && (
+                            <button onClick={onOpenSettings} className="flex-1 text-xs flex items-center justify-center gap-1 text-gray-500 hover:bg-gray-50 p-2 rounded transition font-medium border border-gray-200 hover:border-brand-200 hover:text-brand-600">
+                                <Settings size={12} /> Config
+                            </button>
+                        )}
+                        <button onClick={onLogout} className="flex-1 text-xs flex items-center justify-center gap-1 text-red-500 hover:bg-red-50 p-2 rounded transition font-medium border border-transparent hover:border-red-100">
+                            <LogOut size={12} /> Sair
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <button onClick={onLogin} className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 p-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition shadow-sm">
@@ -167,7 +162,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden w-full bg-gray-50">
-        <div className="flex-1 overflow-auto p-3 md:p-8 pb-24 md:pb-8">
+        <div className="flex-1 overflow-auto p-2 md:p-8 pb-24 md:pb-8">
             {children}
         </div>
       </main>
