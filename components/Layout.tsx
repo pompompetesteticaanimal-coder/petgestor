@@ -1,6 +1,7 @@
+
 import React, { useState, useRef } from 'react';
-import { ViewState, GoogleUser } from '../types';
-import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Menu, Lock } from 'lucide-react';
+import { ViewState, GoogleUser, AppSettings } from '../types';
+import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Menu, Lock, Home, Settings } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,6 +10,8 @@ interface LayoutProps {
   googleUser: GoogleUser | null;
   onLogin: () => void;
   onLogout: () => void;
+  settings?: AppSettings;
+  onOpenSettings: () => void;
 }
 
 const NavItem = ({ 
@@ -24,7 +27,7 @@ const NavItem = ({
   label: string; 
   onClick: (v: ViewState) => void 
 }) => {
-  const isActive = view === current;
+  const isActive = view === current || (view === 'home' && (current === 'payments' || current === 'schedule')); // Keep home active logic
   return (
     <button
       onClick={() => onClick(view)}
@@ -40,7 +43,7 @@ const NavItem = ({
   );
 };
 
-export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout, settings, onOpenSettings }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const touchStart = useRef<number | null>(null);
   const touchEnd = useRef<number | null>(null);
@@ -68,6 +71,32 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
     }
   }
 
+  // Define menu groups
+  const menuGroups = {
+      operacional: (
+          <div className="pb-2" key="operacional">
+             <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Página Inicial</p>
+             <NavItem view="home" current={currentView} icon={Home} label="Início" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+          </div>
+      ),
+      cadastros: (
+          <div className="border-t border-gray-100 pt-2 pb-2" key="cadastros">
+             <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Cadastros e Serviços</p>
+             <NavItem view="clients" current={currentView} icon={Users} label="Clientes & Pets" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+             <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+          </div>
+      ),
+      gerencial: (
+          <div className="border-t border-gray-100 pt-2" key="gerencial">
+            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1"><Lock size={10}/> Gerencial</p>
+            <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+            <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+          </div>
+      )
+  };
+
+  const order = settings?.sidebarOrder || ['operacional', 'cadastros', 'gerencial'];
+
   return (
     <div 
       className="flex h-screen bg-gray-50 overflow-hidden relative"
@@ -92,13 +121,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       `}>
         <div className="p-6 flex items-center justify-between border-b border-gray-100 h-[72px]">
             <div className="flex items-center space-x-2">
-                <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" onError={(e) => {
-                    // Fallback if image fails
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                }}/>
+                 {settings?.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" /> : <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}/>}
                 <div className="hidden w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">P</div>
-                <h1 className="text-xl font-bold text-gray-800">PomPomPet</h1>
+                <h1 className="text-xl font-bold text-gray-800 truncate">{settings?.appName || 'PomPomPet'}</h1>
             </div>
             {/* Close button inside sidebar on mobile */}
             <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-500">
@@ -107,30 +132,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         </div>
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {/* 1. Operacional Group */}
-          <div className="pb-2">
-             <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Operacional</p>
-             <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-             <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-          </div>
-
-          {/* 2. Cadastros e Serviços Group */}
-          <div className="border-t border-gray-100 pt-2 pb-2">
-             <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Cadastros e Serviços</p>
-             <NavItem view="clients" current={currentView} icon={Users} label="Clientes & Pets" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-             <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-          </div>
-
-          {/* 3. Gerencial Group (Last) */}
-          <div className="border-t border-gray-100 pt-2">
-            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1"><Lock size={10}/> Gerencial</p>
-            <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-            <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-          </div>
+          {order.map(key => menuGroups[key as keyof typeof menuGroups])}
         </nav>
         
         {/* Google Auth Section */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+        <div className="p-4 border-t border-gray-100 bg-gray-50/50 space-y-2">
+            <button onClick={onOpenSettings} className="w-full text-xs flex items-center justify-center gap-2 text-gray-500 hover:text-brand-600 hover:bg-gray-100 p-2 rounded transition font-medium border border-gray-200">
+                <Settings size={14} /> Configurações
+            </button>
+
             {googleUser ? (
                 <div className="bg-white border border-gray-200 p-3 rounded-lg shadow-sm">
                     <div className="flex items-center gap-3 mb-2">
