@@ -63,8 +63,4 @@ export interface GoogleUser {
   picture: string;
 }
 
-export interface AppSettings {
-  theme: string;
-}
-
 export type ViewState = 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services';
