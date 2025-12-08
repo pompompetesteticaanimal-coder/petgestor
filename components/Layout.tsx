@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ViewState, GoogleUser } from '../types';
-import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Menu, Lock } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -107,25 +107,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         </div>
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {/* Operacional Group */}
+          {/* 1. Operacional Group */}
           <div className="pb-2">
              <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Operacional</p>
              <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
              <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
           </div>
 
-          {/* Gerencial Group */}
+          {/* 2. Cadastros e Serviços Group */}
           <div className="border-t border-gray-100 pt-2 pb-2">
-            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Gerencial</p>
-            <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-            <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
-          </div>
-
-          {/* Cadastros e Serviços Group */}
-          <div className="border-t border-gray-100 pt-2">
              <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2">Cadastros e Serviços</p>
              <NavItem view="clients" current={currentView} icon={Users} label="Clientes & Pets" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
              <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+          </div>
+
+          {/* 3. Gerencial Group (Last) */}
+          <div className="border-t border-gray-100 pt-2">
+            <p className="px-3 text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1"><Lock size={10}/> Gerencial</p>
+            <NavItem view="revenue" current={currentView} icon={TrendingUp} label="Faturamento" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
+            <NavItem view="costs" current={currentView} icon={TrendingDown} label="Custo Mensal" onClick={(v) => {setView(v); setIsSidebarOpen(false);}} />
           </div>
         </nav>
         
