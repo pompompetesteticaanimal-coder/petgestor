@@ -68,7 +68,7 @@ const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void }> = ({ o
         <div className="min-h-screen bg-brand-50 flex flex-col items-center justify-center p-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
                 <div className="w-full flex justify-center mb-6">
-                    <img src="/logo.png" alt="PomPomPet" className="w-48 h-auto object-contain" />
+                    <img src="/logo.png" alt="PomPomPet" className="w-48 h-auto object-contain" onError={(e) => e.currentTarget.style.display='none'} />
                 </div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">PomPomPet</h1>
                 <p className="text-gray-500 mb-8">Faça login para acessar sua agenda e clientes.</p>
@@ -445,9 +445,195 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const getApplicableServices = (category: 'principal' | 'adicional') => { if (!selectedPetData) return []; return services.filter(s => { const matchesCategory = s.category === category; const matchesSize = s.targetSize === 'Todos' || !s.targetSize || (selectedPetData.size && s.targetSize.toLowerCase().includes(selectedPetData.size.toLowerCase())); const matchesCoat = s.targetCoat === 'Todos' || !s.targetCoat || (selectedPetData.coat && s.targetCoat.toLowerCase().includes(selectedPetData.coat.toLowerCase())); return matchesCategory && matchesSize && matchesCoat; }); };
     const navigate = (direction: 'prev' | 'next') => { const newDate = new Date(currentDate); if (viewMode === 'day') newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1)); if (viewMode === 'week') newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7)); if (viewMode === 'month') newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1)); setCurrentDate(newDate); };
     const timeOptions = []; for (let h = 9; h <= 18; h++) { ['00', '15', '30', '45'].forEach(m => { if(h === 18 && m !== '00') return; timeOptions.push(`${String(h).padStart(2, '0')}:${m}`); }); }
-    const AppointmentCard = ({ app, isSmall }: { app: Appointment, isSmall?: boolean }) => { const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x=>x) as Service[] || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase(); let colorClass = 'bg-sky-100 border-sky-300 text-sky-900'; if (allServiceNames.includes('tesoura')) colorClass = 'bg-pink-100 border-pink-300 text-pink-900'; else if (allServiceNames.includes('tosa normal')) colorClass = 'bg-orange-100 border-orange-300 text-orange-900'; else if (allServiceNames.includes('higi')) colorClass = 'bg-yellow-100 border-yellow-300 text-yellow-900'; else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) colorClass = 'bg-purple-100 border-purple-300 text-purple-900'; else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) colorClass = 'bg-indigo-100 border-indigo-300 text-indigo-900'; return ( <div className={`relative flex-1 w-full rounded-lg p-1.5 border shadow-sm ${colorClass} z-20 min-h-[50px] cursor-pointer select-none hover:opacity-90 active:scale-95 transition-all overflow-hidden flex flex-col justify-center`} onClick={(e) => { e.stopPropagation(); setDetailsApp(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, appId: app.id }); }} > <div className="font-bold text-[10px] leading-tight truncate">{client?.name}</div> <div className="font-bold text-[10px] leading-tight truncate opacity-80">{pet?.name}</div> <div className="mt-1 flex flex-wrap gap-0.5"> {mainSvc && <span className="text-[8px] bg-white/40 px-1 rounded-sm leading-tight">{mainSvc.name}</span>} {addSvcs.map((s, idx) => ( <span key={idx} className="text-[8px] bg-white/40 px-1 rounded-sm leading-tight">{s.name}</span> ))} </div> </div> ) }
-    const renderCalendar = () => { const start = new Date(currentDate); start.setHours(0,0,0,0); if (viewMode === 'month') { const year = start.getFullYear(); const month = start.getMonth(); const daysInMonth = new Date(year, month + 1, 0).getDate(); const days = []; for(let i=0; i<new Date(year, month, 1).getDay(); i++) days.push(null); for(let i=1; i<=daysInMonth; i++) days.push(new Date(year, month, i)); return ( <div className="grid grid-cols-7 gap-px h-full auto-rows-fr bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-inner"> {['D','S','T','Q','Q','S','S'].map(d => <div key={d} className="bg-gray-50 text-center py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">{d}</div>)} {days.map((d, idx) => { if (!d) return <div key={`pad-${idx}`} className="bg-white min-h-[50px]" />; const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const isToday = dateStr === new Date().toISOString().split('T')[0]; return ( <div key={idx} className={`bg-white p-0.5 min-h-[60px] flex flex-col border border-gray-50 ${isToday ? 'bg-blue-50/50' : ''}`}> <div className={`text-[10px] font-bold mb-0.5 text-center w-5 h-5 mx-auto rounded-full flex items-center justify-center ${isToday ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500'}`}>{d.getDate()}</div> <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar p-0.5">{dayApps.map(app => <AppointmentCard key={app.id} app={app} isSmall />)}</div> </div> ) })} </div> ) } const startOfWeek = new Date(start); startOfWeek.setDate(start.getDate() - start.getDay()); let daysIndices = viewMode === 'week' ? [2, 3, 4, 5, 6] : [start.getDay()]; const hours = Array.from({length: 10}, (_, i) => i + 9); return ( <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"> <div className="flex border-b border-gray-200"> <div className="w-10 md:w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50"></div> {daysIndices.map((dayIdx) => { const d = new Date(startOfWeek); d.setDate(d.getDate() + dayIdx); const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]; return ( <div key={dayIdx} className={`flex-1 text-center py-2 border-r border-gray-200 ${isToday ? 'bg-blue-50/50' : 'bg-gray-50'}`}> <div className={`text-[10px] font-bold uppercase tracking-wide ${isToday ? 'text-brand-600' : 'text-gray-500'}`}>{d.toLocaleDateString('pt-BR', {weekday: 'short'})}</div> <div className={`text-sm font-bold w-7 h-7 mx-auto rounded-full flex items-center justify-center mt-1 ${isToday ? 'bg-brand-600 text-white shadow' : 'text-gray-700'}`}>{d.getDate()}</div> </div> ) })} </div> <div className="flex-1 overflow-y-auto" onClick={() => setContextMenu(null)}> {hours.map(h => ( <div key={h} className="flex min-h-[60px] md:min-h-[100px] border-b border-gray-100 relative group"> <div className="w-10 md:w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50 text-[10px] text-gray-400 font-medium p-1 text-right sticky left-0 z-10">{String(h).padStart(2,'0')}:00</div> {daysIndices.map((dayIdx) => { const d = new Date(startOfWeek); d.setDate(d.getDate() + dayIdx); const dateStr = d.toISOString().split('T')[0]; const slotApps = appointments.filter(a => { if(a.status === 'cancelado') return false; const aDate = new Date(a.date); return aDate.getDate() === d.getDate() && aDate.getMonth() === d.getMonth() && aDate.getFullYear() === d.getFullYear() && aDate.getHours() === h; }); return ( <div key={`${dateStr}-${h}`} className="flex-1 border-r border-gray-100 relative p-1 hover:bg-gray-50/80 transition flex flex-col gap-1 min-w-0" onClick={() => { setDate(dateStr); setTime(`${String(h).padStart(2,'0')}:00`); setIsModalOpen(true); }} onContextMenu={(e) => e.preventDefault()} > {slotApps.map(app => <AppointmentCard key={app.id} app={app} />)} </div> ) })} </div> ))} </div> </div> ) };
-    return ( <div className="space-y-3 animate-fade-in relative h-full flex flex-col"> <div className="flex flex-col md:flex-row justify-between items-center gap-2 flex-shrink-0 bg-white p-2 rounded-xl shadow-sm border border-gray-200"> <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar"> <div className="flex bg-gray-100 p-1 rounded-lg flex-shrink-0"> <button onClick={() => setViewMode('day')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'day' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Dia</button> <button onClick={() => setViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'week' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Semana</button> <button onClick={() => setViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'month' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Mês</button> </div> <div className="flex items-center gap-1 flex-shrink-0 ml-2"> <button onClick={() => navigate('prev')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronLeft size={18}/></button> <span className="text-sm font-bold text-gray-800 min-w-[90px] text-center truncate">{viewMode === 'day' && currentDate.toLocaleDateString('pt-BR')} {viewMode === 'week' && `Sem ${currentDate.getDate()}`} {viewMode === 'month' && currentDate.toLocaleDateString('pt-BR', {month:'short', year: 'numeric'})}</span> <button onClick={() => navigate('next')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronRight size={18}/></button> </div> </div> <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="w-full md:w-auto bg-brand-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-brand-200 hover:bg-brand-700 active:scale-95 transition flex items-center justify-center gap-1.5 text-xs"><Plus size={18} /> Novo Agendamento</button> </div> <div className="flex-1 min-h-0 relative"> {renderCalendar()} {contextMenu && ( <div className="fixed bg-white shadow-xl border border-gray-200 rounded-xl z-[100] py-1 min-w-[160px] overflow-hidden" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(appointments.find(a => a.id === contextMenu.appId)!)} className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm flex items-center gap-3 text-gray-700 font-medium border-b border-gray-50"><Edit2 size={16}/> Editar</button> <button onClick={handleDeleteFromContext} className="w-full text-left px-4 py-3 hover:bg-red-50 text-red-600 text-sm flex items-center gap-3 font-medium"><Trash2 size={16}/> Excluir</button> </div> )} </div> {detailsApp && (() => { const client = clients.find(c => c.id === detailsApp.clientId); const pet = client?.pets.find(p => p.id === detailsApp.petId); const s = services.find(srv => srv.id === detailsApp.serviceId); const addSvcs = detailsApp.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x=>x); return ( <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setDetailsApp(null)}> <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up" onClick={e => e.stopPropagation()}> <button onClick={() => setDetailsApp(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"><X size={20}/></button> <div className="mb-6 text-center"> <h3 className="text-2xl font-bold text-gray-800">{pet?.name}</h3> <p className="text-gray-500 font-medium">{client?.name}</p> </div> <div className="bg-gray-50 rounded-2xl p-4 space-y-3 text-sm mb-6"> <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Phone size={16}/></div><span className="font-medium text-gray-700">{client?.phone}</span></div> <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><MapPin size={16}/></div><span className="font-medium text-gray-700 truncate">{client?.address} {client?.complement}</span></div> <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0"><FileText size={16}/></div><span className="font-medium italic text-gray-600 pt-1">{detailsApp.notes || pet?.notes || 'Sem obs'}</span></div> </div> <div className="mb-6"> <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Serviços</h4> <div className="flex flex-wrap gap-2"> <span className="px-3 py-1.5 bg-brand-100 text-brand-700 rounded-lg text-xs font-bold shadow-sm">{s?.name}</span> {addSvcs?.map(as => <span key={as?.id} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold border border-gray-200">{as?.name}</span>)} </div> </div> <button onClick={() => handleStartEdit(detailsApp)} className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brand-700 active:scale-95 transition shadow-lg shadow-brand-200"><Edit2 size={18}/> Editar Agendamento</button> </div> </div> ) })()} {isModalOpen && ( <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm"> <div className="bg-white rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] md:min-h-[600px] animate-scale-up"> <div className="p-4 border-b flex justify-between items-center bg-gray-50"> <h3 className="font-bold text-lg text-gray-800">{editingAppId ? 'Editar Agendamento' : 'Novo Agendamento'}</h3> <button onClick={resetForm}><X size={24} className="text-gray-400 hover:text-gray-600"/></button> </div> <div className="p-4 overflow-y-auto custom-scrollbar space-y-4"> <div> <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente / Pet</label> <div className="relative"> <Search className="absolute left-3 top-2.5 text-gray-400" size={16} /> <input value={selectedClientData ? selectedClientData.name : clientSearch} onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(''); setSelectedPet(''); }} placeholder="Buscar..." className="w-full pl-9 pr-8 py-3 border rounded-xl outline-none focus:ring-2 ring-brand-200 text-base" /> {selectedClientData && <button onClick={() => { setClientSearch(''); setSelectedClient(''); }} className="absolute right-2 top-3 text-gray-400"><X size={16}/></button>} </div> {clientSearch.length > 0 && !selectedClient && filteredClients.length > 0 && ( <div className="mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto z-50"> {filteredClients.map(c => ( <button key={c.id} onClick={() => { setSelectedClient(c.id); setClientSearch(''); }} className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-50 flex justify-between items-center"> <div className="text-base font-bold text-gray-800">{c.name} <span className="text-xs font-normal text-gray-500">({c.pets.map(p=>p.name).join(', ')})</span></div> </button> ))} </div> )} </div> {selectedClient && ( <div className="grid grid-cols-2 gap-2"> {pets.map(p => ( <button key={p.id} onClick={() => { setSelectedPet(p.id); setSelectedService(''); }} className={`p-3 rounded-xl border text-left text-sm transition-all ${selectedPet === p.id ? 'bg-brand-50 border-brand-500 shadow-sm ring-1 ring-brand-200' : 'hover:bg-gray-50'}`}> <div className="font-bold">{p.name}</div><div className="text-gray-500 text-xs">{p.size}</div> </button> ))} </div> )} {selectedPet && ( <div className="space-y-4"> <div className="space-y-1"> <label className="text-xs font-bold text-gray-400 uppercase">Serviço Principal</label> <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full border p-3 rounded-xl bg-white text-base outline-none focus:border-brand-500"><option value="">Selecione...</option>{getApplicableServices('principal').map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}</select> </div> <div className="space-y-1"> <label className="text-xs font-bold text-gray-400 uppercase">Serviço Adicional</label> <select className="w-full border p-3 rounded-xl bg-white text-base outline-none focus:border-brand-500" onChange={(e) => { const val = e.target.value; if(val && !selectedAddServices.includes(val)) setSelectedAddServices(prev => [...prev, val]); e.target.value = ''; }} > <option value="">Adicionar serviço...</option> {getApplicableServices('adicional').filter((service, index, self) => index === self.findIndex((t) => t.name === service.name)).map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)} </select> </div> <div className="flex flex-wrap gap-2 min-h-[30px]">{selectedAddServices.map(id => <span key={id} onClick={() => setSelectedAddServices(p => p.filter(x => x !== id))} className="bg-purple-50 border border-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs font-bold cursor-pointer hover:bg-purple-100 flex items-center gap-1">{services.find(s=>s.id===id)?.name} <X size={12}/></span>)}</div> <div className="grid grid-cols-2 gap-3"><input type="date" value={date} onChange={e => setDate(e.target.value)} className="border p-3 rounded-xl text-base outline-none" /><select value={time} onChange={e => setTime(e.target.value)} className="border p-3 rounded-xl text-base outline-none">{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select></div> <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Duração Estimada</label><select value={manualDuration} onChange={e => setManualDuration(e.target.value)} className="w-full border p-3 rounded-xl bg-white text-base outline-none focus:border-brand-500"><option value="0">Automático (pelo serviço)</option><option value="30">30 minutos</option><option value="60">1 hora</option><option value="90">1 hora e 30 min</option><option value="120">2 horas</option><option value="150">2 horas e 30 min</option><option value="180">3 horas</option><option value="240">4 horas</option></select></div> <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full border p-3 rounded-xl text-sm outline-none focus:border-gray-400" rows={3} placeholder="Observações..." /> </div> )} </div> <div className="p-4 border-t bg-gray-50 flex justify-end gap-3"> <button onClick={resetForm} className="px-5 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-xl text-sm transition">Cancelar</button> <button onClick={handleSave} disabled={!selectedClient || !selectedPet || !selectedService} className="px-8 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-50 text-sm shadow-lg shadow-brand-200 active:scale-95 transition">Salvar</button> </div> </div> </div> )} </div> );
+    
+    // --- SMART OVERLAP LOGIC ---
+    const getLayout = (dayApps: Appointment[]) => {
+        const sorted = [...dayApps].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const columns: Appointment[][] = [];
+        sorted.forEach(app => {
+            let placed = false;
+            for (const col of columns) {
+                const lastInCol = col[col.length - 1];
+                const lastEnd = new Date(lastInCol.date).getTime() + (lastInCol.durationTotal || 60) * 60000;
+                const currentStart = new Date(app.date).getTime();
+                if (currentStart >= lastEnd) {
+                    col.push(app);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) columns.push([app]);
+        });
+        return columns; // Returns array of columns, each containing non-overlapping apps
+    };
+
+    const AppointmentCard = ({ app, style, onClick, onContext }: any) => {
+        const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x=>x) as Service[] || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase(); let colorClass = 'bg-sky-100 border-sky-300 text-sky-900'; if (allServiceNames.includes('tesoura')) colorClass = 'bg-pink-100 border-pink-300 text-pink-900'; else if (allServiceNames.includes('tosa normal')) colorClass = 'bg-orange-100 border-orange-300 text-orange-900'; else if (allServiceNames.includes('higi')) colorClass = 'bg-yellow-100 border-yellow-300 text-yellow-900'; else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) colorClass = 'bg-purple-100 border-purple-300 text-purple-900'; else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) colorClass = 'bg-indigo-100 border-indigo-300 text-indigo-900';
+        return (
+            <div
+                style={style}
+                className={`absolute rounded-lg p-1.5 border shadow-sm ${colorClass} text-xs cursor-pointer hover:brightness-95 hover:z-50 transition-all overflow-hidden flex flex-col leading-tight`}
+                onClick={(e) => { e.stopPropagation(); onClick(app); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}
+            >
+                <div className="font-bold truncate">{client?.name}</div>
+                <div className="truncate opacity-90">{pet?.name}</div>
+                 <div className="mt-0.5 flex flex-wrap gap-0.5 opacity-80"> {mainSvc && <span>{mainSvc.name}</span>} {addSvcs.length > 0 && <span>+ {addSvcs.length}</span>} </div>
+            </div>
+        );
+    };
+
+    const renderDayView = () => {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado');
+        const columns = getLayout(dayApps);
+        
+        return (
+            <div className="relative h-[1200px] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex">
+                <div className="w-12 bg-gray-50 border-r border-gray-200 flex-shrink-0">
+                    {Array.from({length: 10}, (_, i) => i + 9).map(h => (
+                        <div key={h} className="h-[120px] border-b border-gray-200 text-[10px] text-gray-400 font-bold p-1 text-right relative">
+                            <span className="-top-2 relative">{h}:00</span>
+                        </div>
+                    ))}
+                </div>
+                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,#f3f4f6_120px)]">
+                     {/* 10 min grid lines */}
+                     {Array.from({length: 60}, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{top: i * 20}} />)}
+                    
+                    {columns.map((col, colIdx) => (
+                        col.map(app => {
+                            const d = new Date(app.date);
+                            const startMin = (d.getHours() - 9) * 60 + d.getMinutes();
+                            const duration = app.durationTotal || 60;
+                            const width = 100 / columns.length;
+                            const left = width * colIdx;
+                            
+                            return (
+                                <AppointmentCard 
+                                    key={app.id} 
+                                    app={app} 
+                                    style={{
+                                        top: `${startMin * 2}px`,
+                                        height: `${duration * 2}px`,
+                                        left: `${left}%`,
+                                        width: `${width}%`
+                                    }}
+                                    onClick={setDetailsApp}
+                                    onContext={(e: any, id: string) => setContextMenu({x: e.clientX, y: e.clientY, appId: id})}
+                                />
+                            );
+                        })
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderWeekView = () => {
+        const start = new Date(currentDate); start.setDate(start.getDate() - start.getDay()); // Sunday
+        const days = [2,3,4,5,6]; // Tue-Sat
+        
+        return (
+             <div className="flex h-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-col">
+                {/* Header */}
+                <div className="flex border-b border-gray-200">
+                    <div className="w-10 bg-gray-50 border-r border-gray-200"></div>
+                    {days.map(dIdx => {
+                         const d = new Date(start); d.setDate(d.getDate() + dIdx);
+                         const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+                         return (
+                             <div key={dIdx} className={`flex-1 text-center py-2 text-xs font-bold border-r border-gray-100 ${isToday ? 'bg-blue-50 text-brand-600' : 'text-gray-500'}`}>
+                                 {d.toLocaleDateString('pt-BR', {weekday: 'short'})} {d.getDate()}
+                             </div>
+                         )
+                    })}
+                </div>
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto relative flex">
+                     <div className="w-10 bg-gray-50 border-r border-gray-200 flex-shrink-0">
+                        {Array.from({length: 10}, (_, i) => i + 9).map(h => (
+                            <div key={h} className="h-[120px] border-b border-gray-200 text-[9px] text-gray-400 font-bold p-1 text-right relative">
+                                <span className="-top-2 relative">{h}:00</span>
+                            </div>
+                        ))}
+                    </div>
+                     {days.map(dIdx => {
+                         const d = new Date(start); d.setDate(d.getDate() + dIdx);
+                         const dateStr = d.toISOString().split('T')[0];
+                         const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado');
+                         const columns = getLayout(dayApps);
+
+                         return (
+                             <div key={dIdx} className="flex-1 border-r border-gray-100 relative min-w-[60px]">
+                                  {Array.from({length: 10}, (_, i) => i + 9).map(h => <div key={h} className="h-[120px] border-b border-gray-50" />)}
+                                  
+                                  {columns.map((col, colIdx) => (
+                                    col.map(app => {
+                                        const ad = new Date(app.date);
+                                        const startMin = (ad.getHours() - 9) * 60 + ad.getMinutes();
+                                        const duration = app.durationTotal || 60;
+                                        const width = 100 / columns.length;
+                                        const left = width * colIdx;
+                                        return (
+                                            <AppointmentCard 
+                                                key={app.id} app={app} 
+                                                style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: `${left}%`, width: `${width}%` }}
+                                                onClick={setDetailsApp}
+                                                onContext={(e: any, id: string) => setContextMenu({x: e.clientX, y: e.clientY, appId: id})}
+                                            />
+                                        )
+                                    })
+                                  ))}
+                             </div>
+                         )
+                     })}
+                </div>
+             </div>
+        )
+    }
+
+    const renderMonthView = () => {
+        const year = currentDate.getFullYear(); const month = currentDate.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const startDay = firstDay.getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const slots = [];
+        for(let i=0; i<startDay; i++) slots.push(null);
+        for(let i=1; i<=daysInMonth; i++) slots.push(new Date(year, month, i));
+
+        return (
+            <div className="h-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                 <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+                     {['D','S','T','Q','Q','S','S'].map(d => <div key={d} className="py-2 text-center text-xs font-bold text-gray-500">{d}</div>)}
+                 </div>
+                 <div className="flex-1 grid grid-cols-7 auto-rows-fr">
+                     {slots.map((date, idx) => {
+                         if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/30 border-b border-r border-gray-100" />;
+                         const dateStr = date.toISOString().split('T')[0];
+                         const isToday = dateStr === new Date().toISOString().split('T')[0];
+                         const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado').sort((a,b) => a.date.localeCompare(b.date));
+                         
+                         return (
+                             <div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col ${isToday ? 'bg-blue-50/30' : ''}`} onClick={() => { setDate(dateStr); setViewMode('day'); }}>
+                                 <span className={`text-[10px] font-bold mb-1 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-brand-600 text-white' : 'text-gray-500'}`}>{date.getDate()}</span>
+                                 <div className="flex-1 overflow-hidden space-y-1">
+                                     {dayApps.slice(0, 3).map(app => (
+                                         <div key={app.id} className="text-[8px] bg-sky-100 text-sky-800 rounded px-1 truncate font-medium">
+                                             {clients.find(c=>c.id===app.clientId)?.pets.find(p=>p.id===app.petId)?.name}
+                                         </div>
+                                     ))}
+                                     {dayApps.length > 3 && <div className="text-[8px] text-gray-400 pl-1">+ {dayApps.length - 3} mais</div>}
+                                 </div>
+                             </div>
+                         )
+                     })}
+                 </div>
+            </div>
+        )
+    };
+
+    return ( <div className="space-y-3 animate-fade-in relative h-full flex flex-col"> <div className="flex flex-col md:flex-row justify-between items-center gap-2 flex-shrink-0 bg-white p-2 rounded-xl shadow-sm border border-gray-200"> <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar"> <div className="flex bg-gray-100 p-1 rounded-lg flex-shrink-0"> <button onClick={() => setViewMode('day')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'day' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Dia</button> <button onClick={() => setViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'week' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Semana</button> <button onClick={() => setViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'month' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Mês</button> </div> <div className="flex items-center gap-1 flex-shrink-0 ml-2"> <button onClick={() => navigate('prev')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronLeft size={18}/></button> <span className="text-sm font-bold text-gray-800 min-w-[90px] text-center truncate">{viewMode === 'day' && currentDate.toLocaleDateString('pt-BR')} {viewMode === 'week' && `Sem ${currentDate.getDate()}`} {viewMode === 'month' && currentDate.toLocaleDateString('pt-BR', {month:'short', year: 'numeric'})}</span> <button onClick={() => navigate('next')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronRight size={18}/></button> </div> </div> <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="w-full md:w-auto bg-brand-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-brand-200 hover:bg-brand-700 active:scale-95 transition flex items-center justify-center gap-1.5 text-xs"><Plus size={18} /> Novo Agendamento</button> </div> <div className="flex-1 min-h-0 relative overflow-hidden"> {viewMode === 'day' && <div className="h-full overflow-y-auto">{renderDayView()}</div>} {viewMode === 'week' && renderWeekView()} {viewMode === 'month' && renderMonthView()} {contextMenu && ( <div className="fixed bg-white shadow-xl border border-gray-200 rounded-xl z-[100] py-1 min-w-[160px] overflow-hidden" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(appointments.find(a => a.id === contextMenu.appId)!)} className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm flex items-center gap-3 text-gray-700 font-medium border-b border-gray-50"><Edit2 size={16}/> Editar</button> <button onClick={handleDeleteFromContext} className="w-full text-left px-4 py-3 hover:bg-red-50 text-red-600 text-sm flex items-center gap-3 font-medium"><Trash2 size={16}/> Excluir</button> </div> )} </div> {detailsApp && (() => { const client = clients.find(c => c.id === detailsApp.clientId); const pet = client?.pets.find(p => p.id === detailsApp.petId); const s = services.find(srv => srv.id === detailsApp.serviceId); const addSvcs = detailsApp.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x=>x); return ( <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setDetailsApp(null)}> <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up" onClick={e => e.stopPropagation()}> <button onClick={() => setDetailsApp(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"><X size={20}/></button> <div className="mb-6 text-center"> <h3 className="text-2xl font-bold text-gray-800">{pet?.name}</h3> <p className="text-gray-500 font-medium">{client?.name}</p> </div> <div className="bg-gray-50 rounded-2xl p-4 space-y-3 text-sm mb-6"> <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Phone size={16}/></div><span className="font-medium text-gray-700">{client?.phone}</span></div> <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><MapPin size={16}/></div><span className="font-medium text-gray-700 truncate">{client?.address} {client?.complement}</span></div> <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0"><FileText size={16}/></div><span className="font-medium italic text-gray-600 pt-1">{detailsApp.notes || pet?.notes || 'Sem obs'}</span></div> </div> <div className="mb-6"> <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Serviços</h4> <div className="flex flex-wrap gap-2"> <span className="px-3 py-1.5 bg-brand-100 text-brand-700 rounded-lg text-xs font-bold shadow-sm">{s?.name}</span> {addSvcs?.map(as => <span key={as?.id} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold border border-gray-200">{as?.name}</span>)} </div> </div> <button onClick={() => handleStartEdit(detailsApp)} className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brand-700 active:scale-95 transition shadow-lg shadow-brand-200"><Edit2 size={18}/> Editar Agendamento</button> </div> </div> ) })()} {isModalOpen && ( <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm"> <div className="bg-white rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] md:min-h-[600px] animate-scale-up"> <div className="p-4 border-b flex justify-between items-center bg-gray-50"> <h3 className="font-bold text-lg text-gray-800">{editingAppId ? 'Editar Agendamento' : 'Novo Agendamento'}</h3> <button onClick={resetForm}><X size={24} className="text-gray-400 hover:text-gray-600"/></button> </div> <div className="p-4 overflow-y-auto custom-scrollbar space-y-4"> <div> <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente / Pet</label> <div className="relative"> <Search className="absolute left-3 top-2.5 text-gray-400" size={16} /> <input value={selectedClientData ? selectedClientData.name : clientSearch} onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(''); setSelectedPet(''); }} placeholder="Buscar..." className="w-full pl-9 pr-8 py-3 border rounded-xl outline-none focus:ring-2 ring-brand-200 text-base" /> {selectedClientData && <button onClick={() => { setClientSearch(''); setSelectedClient(''); }} className="absolute right-2 top-3 text-gray-400"><X size={16}/></button>} </div> {clientSearch.length > 0 && !selectedClient && filteredClients.length > 0 && ( <div className="mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto z-50"> {filteredClients.map(c => ( <button key={c.id} onClick={() => { setSelectedClient(c.id); setClientSearch(''); }} className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-50 flex justify-between items-center"> <div className="text-base font-bold text-gray-800">{c.name} <span className="text-xs font-normal text-gray-500">({c.pets.map(p=>p.name).join(', ')})</span></div> </button> ))} </div> )} </div> {selectedClient && ( <div className="grid grid-cols-2 gap-2"> {pets.map(p => ( <button key={p.id} onClick={() => { setSelectedPet(p.id); setSelectedService(''); }} className={`p-3 rounded-xl border text-left text-sm transition-all ${selectedPet === p.id ? 'bg-brand-50 border-brand-500 shadow-sm ring-1 ring-brand-200' : 'hover:bg-gray-50'}`}> <div className="font-bold">{p.name}</div><div className="text-gray-500 text-xs">{p.size}</div> </button> ))} </div> )} {selectedPet && ( <div className="space-y-4"> <div className="space-y-1"> <label className="text-xs font-bold text-gray-400 uppercase">Serviço Principal</label> <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full border p-3 rounded-xl bg-white text-base outline-none focus:border-brand-500"><option value="">Selecione...</option>{getApplicableServices('principal').map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}</select> </div> <div className="space-y-1"> <label className="text-xs font-bold text-gray-400 uppercase">Serviço Adicional</label> <select className="w-full border p-3 rounded-xl bg-white text-base outline-none focus:border-brand-500" onChange={(e) => { const val = e.target.value; if(val && !selectedAddServices.includes(val)) setSelectedAddServices(prev => [...prev, val]); e.target.value = ''; }} > <option value="">Adicionar serviço...</option> {getApplicableServices('adicional').filter((service, index, self) => index === self.findIndex((t) => t.name === service.name)).map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)} </select> </div> <div className="flex flex-wrap gap-2 min-h-[30px]">{selectedAddServices.map(id => <span key={id} onClick={() => setSelectedAddServices(p => p.filter(x => x !== id))} className="bg-purple-50 border border-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs font-bold cursor-pointer hover:bg-purple-100 flex items-center gap-1">{services.find(s=>s.id===id)?.name} <X size={12}/></span>)}</div> <div className="grid grid-cols-2 gap-3"><input type="date" value={date} onChange={e => setDate(e.target.value)} className="border p-3 rounded-xl text-base outline-none" /><select value={time} onChange={e => setTime(e.target.value)} className="border p-3 rounded-xl text-base outline-none">{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select></div> <div className="space-y-1"><label className="text-xs font-bold text-gray-400 uppercase">Duração Estimada</label><select value={manualDuration} onChange={e => setManualDuration(e.target.value)} className="w-full border p-3 rounded-xl bg-white text-base outline-none focus:border-brand-500"><option value="0">Automático (pelo serviço)</option><option value="30">30 minutos</option><option value="60">1 hora</option><option value="90">1 hora e 30 min</option><option value="120">2 horas</option><option value="150">2 horas e 30 min</option><option value="180">3 horas</option><option value="240">4 horas</option></select></div> <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full border p-3 rounded-xl text-sm outline-none focus:border-gray-400" rows={3} placeholder="Observações..." /> </div> )} </div> <div className="p-4 border-t bg-gray-50 flex justify-end gap-3"> <button onClick={resetForm} className="px-5 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-xl text-sm transition">Cancelar</button> <button onClick={handleSave} disabled={!selectedClient || !selectedPet || !selectedService} className="px-8 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-50 text-sm shadow-lg shadow-brand-200 active:scale-95 transition">Salvar</button> </div> </div> </div> )} </div> );
 };
 
 const App: React.FC = () => {
@@ -612,14 +798,8 @@ const App: React.FC = () => {
           if(!rows || rows.length < 5) { if(!silent) alert('Aba Agendamento vazia ou não encontrada (Linhas 1-4 ignoradas).'); return; }
           const loadedApps: Appointment[] = []; const newTempClients: Client[] = []; const currentClients = db.getClients(); const existingClientIds = new Set(currentClients.map(c => c.id));
           
-          // Slice 4 para ignorar as primeiras 4 linhas (títulos)
           rows.forEach((row: string[], idx: number) => {
-              // idx 0 do forEach corresponde à linha 1 da planilha.
-              // Como queremos ignorar as primeiras 4, checamos:
               if (idx < 4) return;
-              
-              // O ID do agendamento deve refletir o índice real para edição posterior
-              // idx 4 é a linha 5.
               
               const petName = row[0]; const clientName = row[1]; const clientPhone = row[2] || ''; const clientAddr = row[3] || ''; const petBreed = row[4]; const datePart = row[11]; const timePart = row[12]; const serviceName = row[7];
               const paidAmountStr = row[17]; const paymentMethod = row[18];
@@ -634,7 +814,7 @@ const App: React.FC = () => {
               const currentServices = db.getServices(); const service = currentServices.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || currentServices[0];
               const addServiceIds: string[] = []; [row[8], row[9], row[10]].forEach(name => { if (name) { const foundSvc = currentServices.find(s => s.name.toLowerCase() === name.toLowerCase().trim()); if (foundSvc) addServiceIds.push(foundSvc.id); } });
               let paidAmount = 0; if (paidAmountStr) { paidAmount = parseFloat(paidAmountStr.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')); if(isNaN(paidAmount)) paidAmount = 0; }
-              if(client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: 'agendado', notes: row[13], durationTotal: parseInt(row[14] || '0'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: undefined }); }
+              if(client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: 'agendado', notes: row[13], durationTotal: parseInt(row[14] || '60'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: undefined }); }
           });
           if (newTempClients.length > 0) { const updatedClients = [...currentClients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))]; setClients(updatedClients); db.saveClients(updatedClients); }
           if(loadedApps.length > 0) { setAppointments(loadedApps); db.saveAppointments(loadedApps); if(!silent) alert(`${loadedApps.length} agendamentos carregados!`); } else { if(!silent) alert('Nenhum agendamento válido encontrado.'); }
@@ -645,7 +825,6 @@ const App: React.FC = () => {
     let googleEventId = '';
     let totalDuration = 0;
 
-    // Use manual duration if provided (> 0), otherwise calculate from services
     if (manualDuration > 0) {
         totalDuration = manualDuration;
     } else {
@@ -679,7 +858,7 @@ const App: React.FC = () => {
          await googleService.updateEvent(accessToken, googleEventId, { summary: `Banho/Tosa: ${pet.name} - ${client.name}`, description: `Serviços: ${description}\nObs: ${pet.notes}`, startTime: app.date, durationMin: totalDuration });
     }
     if (accessToken && app.id.startsWith('sheet_')) {
-        const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1; // Google Sheets API uses 1-based index for Range
+        const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1; 
         const range = `Agendamento!A${rowNumber}:O${rowNumber}`; const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
         const rowData = [ pet.name, client.name, client.phone, `${client.address} ${client.complement || ''}`.trim(), pet.breed, pet.size, pet.coat, appServices[0]?.name || '', appServices[1]?.name || '', appServices[2]?.name || '', appServices[3]?.name || '', dateStr, timeStr, pet.notes, totalDuration ];
         try { await googleService.updateSheetValues(accessToken, SHEET_ID, range, rowData); } catch(e) { console.error("Update sheet failed", e); }
@@ -692,17 +871,14 @@ const App: React.FC = () => {
   const handleDeleteApp = async (id: string) => {
      const appToDelete = appointments.find(a => a.id === id);
      if (appToDelete && accessToken) {
-         // 1. Delete from Google Calendar
          if (appToDelete.googleEventId) {
             try { await googleService.deleteEvent(accessToken, appToDelete.googleEventId); } 
             catch (e) { console.error("Failed to delete from Google Calendar", e); }
          }
-         // 2. Clear from Google Sheets
          if (appToDelete.id.startsWith('sheet_')) {
              try {
                  const idx = parseInt(appToDelete.id.split('_')[1]);
-                 const row = idx + 1; // 1-based index
-                 // Clear range A to S for that row
+                 const row = idx + 1;
                  await googleService.clearSheetValues(accessToken, SHEET_ID, `Agendamento!A${row}:S${row}`);
              } catch (e) { console.error("Failed to clear row from Sheet", e); }
          }
@@ -710,7 +886,6 @@ const App: React.FC = () => {
      const updated = appointments.filter(a => a.id !== id); setAppointments(updated); db.saveAppointments(updated);
   }
 
-  // --- PIN LOGIC HANDLERS ---
   const handleSetPin = (newPin: string) => {
       localStorage.setItem('petgestor_pin', newPin);
       setPin(newPin);
@@ -753,7 +928,6 @@ const App: React.FC = () => {
             </div>
         )}
         
-        {/* PIN GUARD OVERLAY */}
         {showPinModal && (
             <PinGuard 
                 isUnlocked={isPinUnlocked} 
@@ -764,7 +938,6 @@ const App: React.FC = () => {
             />
         )}
 
-        {/* Conditional Rendering based on PIN */}
         {(!isRestrictedView || isPinUnlocked) && (
             <>
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} />}
