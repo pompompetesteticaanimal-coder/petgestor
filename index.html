@@ -6,22 +6,37 @@
     <title>PomPomPet</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+      /* Cores Padrão (Rose) para inicialização - Serão sobrescritas pelo React */
+      :root {
+        --color-brand-50: 255 241 242;
+        --color-brand-100: 255 228 230;
+        --color-brand-200: 254 205 211;
+        --color-brand-300: 253 164 175;
+        --color-brand-400: 251 113 133;
+        --color-brand-500: 244 63 94;
+        --color-brand-600: 225 29 72;
+        --color-brand-700: 190 18 60;
+        --color-brand-800: 159 18 57;
+        --color-brand-900: 136 19 55;
+      }
+    </style>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
               brand: {
-                50: '#fff1f2',
-                100: '#ffe4e6',
-                200: '#fecdd3',
-                300: '#fda4af',
-                400: '#fb7185',
-                500: '#f43f5e',
-                600: '#e11d48',
-                700: '#be123c',
-                800: '#9f1239',
-                900: '#881337',
+                50: 'rgb(var(--color-brand-50) / <alpha-value>)',
+                100: 'rgb(var(--color-brand-100) / <alpha-value>)',
+                200: 'rgb(var(--color-brand-200) / <alpha-value>)',
+                300: 'rgb(var(--color-brand-300) / <alpha-value>)',
+                400: 'rgb(var(--color-brand-400) / <alpha-value>)',
+                500: 'rgb(var(--color-brand-500) / <alpha-value>)',
+                600: 'rgb(var(--color-brand-600) / <alpha-value>)',
+                700: 'rgb(var(--color-brand-700) / <alpha-value>)',
+                800: 'rgb(var(--color-brand-800) / <alpha-value>)',
+                900: 'rgb(var(--color-brand-900) / <alpha-value>)',
               }
             }
           }
@@ -31,14 +46,14 @@
 <script type="importmap">
 {
   "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.10.1",
-    "vite": "https://aistudiocdn.com/vite@^7.2.7",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
     "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1"
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.10.1",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.7",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
