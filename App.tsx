@@ -439,7 +439,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const [clientSearch, setClientSearch] = useState(''); const [selectedClient, setSelectedClient] = useState(''); const [selectedPet, setSelectedPet] = useState(''); const [selectedService, setSelectedService] = useState(''); const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]); const [date, setDate] = useState(new Date().toISOString().split('T')[0]); const [time, setTime] = useState('09:00'); const [notes, setNotes] = useState(''); const [manualDuration, setManualDuration] = useState('0');
     const resetForm = () => { setClientSearch(''); setSelectedClient(''); setSelectedPet(''); setSelectedService(''); setSelectedAddServices([]); setTime('09:00'); setNotes(''); setManualDuration('0'); setEditingAppId(null); setIsModalOpen(false); };
     const handleStartEdit = (app: Appointment) => { setEditingAppId(app.id); setSelectedClient(app.clientId); setSelectedPet(app.petId); setSelectedService(app.serviceId); setSelectedAddServices(app.additionalServiceIds || []); const d = new Date(app.date); setDate(d.toISOString().split('T')[0]); setTime(d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})); setNotes(app.notes || ''); setManualDuration(app.durationTotal ? app.durationTotal.toString() : '0'); setDetailsApp(null); setIsModalOpen(true); };
-    const handleSave = () => { if (!selectedClient || !selectedPet || !selectedService || !date || !time) return; const client = clients.find(c => c.id === selectedClient); const pet = client?.pets.find(p => p.id === selectedPet); const mainSvc = services.find(s => s.id === selectedService); const addSvcs = selectedAddServices.map(id => services.find(s => s.id === id)).filter(s => s) as Service[]; if (client && pet && mainSvc) { const newApp: Appointment = { id: editingAppId || `local_${Date.now()}`, clientId: client.id, petId: pet.id, serviceId: mainSvc.id, additionalServiceIds: selectedAddServices, date: `${date}T${time}:00`, status: 'agendado', notes: notes, googleEventId: editingAppId ? appointments.find(a=>a.id===editingAppId)?.googleEventId : undefined }; if (editingAppId) { onEdit(newApp, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration)); } else { onAdd(newApp, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration)); } resetForm(); } };
+    const handleSave = () => { if (!selectedClient || !selectedPet || !selectedService || !date || !time) return; const client = clients.find(c => c.id === selectedClient); const pet = client?.pets.find(p => p.id === selectedPet); const mainSvc = services.find(s => s.id === selectedService); const addSvcs = selectedAddServices.map(id => services.find(s => s.id === id)).filter(s => s) as Service[]; if (client && pet && mainSvc) { const newApp: Appointment = { id: editingAppId || `local_${Date.now()}`, clientId: client.id, petId: pet.id, serviceId: mainSvc.id, additionalServiceIds: selectedAddServices, date: `${date}T${time}:00`, status: 'agendado', notes: notes, googleEventId: editingAppId ? appointments.find(a=>a.id===editingAppId)?.googleEventId : undefined }; if (editingAppId) { const original = appointments.find(a => a.id === editingAppId); newApp.paidAmount = original?.paidAmount; newApp.paymentMethod = original?.paymentMethod; onEdit(newApp, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration)); } else { onAdd(newApp, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration)); } resetForm(); } };
     const handleDeleteFromContext = () => { if(contextMenu && confirm('Excluir?')) onDelete(contextMenu.appId); setContextMenu(null); }
     const filteredClients = clientSearch.length > 0 ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch) || c.pets.some(p => p.name.toLowerCase().includes(clientSearch.toLowerCase()))).slice(0, 5) : []; const selectedClientData = clients.find(c => c.id === selectedClient); const pets = selectedClientData?.pets || []; const selectedPetData = pets.find(p => p.id === selectedPet);
     const getApplicableServices = (category: 'principal' | 'adicional') => { if (!selectedPetData) return []; return services.filter(s => { const matchesCategory = s.category === category; const matchesSize = s.targetSize === 'Todos' || !s.targetSize || (selectedPetData.size && s.targetSize.toLowerCase().includes(selectedPetData.size.toLowerCase())); const matchesCoat = s.targetCoat === 'Todos' || !s.targetCoat || (selectedPetData.coat && s.targetCoat.toLowerCase().includes(selectedPetData.coat.toLowerCase())); return matchesCategory && matchesSize && matchesCoat; }); };
@@ -837,8 +837,30 @@ const App: React.FC = () => {
         const googleResponse = await googleService.createEvent(accessToken, { summary: `Banho/Tosa: ${pet.name} - ${client.name}`, description: `Serviços: ${description}\nObs: ${pet.notes}`, startTime: app.date, durationMin: totalDuration });
         if (googleResponse && googleResponse.id) { googleEventId = googleResponse.id; }
         const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-        const rowData = [ pet.name, client.name, client.phone, `${client.address} ${client.complement || ''}`.trim(), pet.breed, pet.size, pet.coat, appServices[0]?.name || '', appServices[1]?.name || '', appServices[2]?.name || '', appServices[3]?.name || '', dateStr, timeStr, pet.notes, totalDuration ];
-        try { await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:O', rowData); alert('Agendamento salvo no Calendar e na Planilha!'); } catch (e) { alert('Erro ao salvar na planilha (verifique permissões). Salvo apenas localmente e no Calendar.'); }
+        // Columns A-S mapping (Index 0-18)
+        // A:Pet, B:Client, C:Phone, D:Addr, E:Breed, F:Size, G:Coat, H:MainSvc, I:Add1, J:Add2, K:Add3, L:Date, M:Time, N:Obs, O:Dur, P:Status, Q:sdd, R:Val, S:Pay
+        const rowData = [ 
+            pet.name, 
+            client.name, 
+            client.phone, 
+            `${client.address} ${client.complement || ''}`.trim(), 
+            pet.breed, 
+            pet.size, 
+            pet.coat, 
+            appServices[0]?.name || '', 
+            appServices[1]?.name || '', 
+            appServices[2]?.name || '', 
+            appServices[3]?.name || '', 
+            dateStr, 
+            timeStr, 
+            app.notes || '', 
+            totalDuration,
+            'Agendado', // Col P (Status)
+            '', // Col Q (sdd)
+            '', // Col R (Valor - initially empty)
+            ''  // Col S (Payment - initially empty)
+        ];
+        try { await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:S', rowData); alert('Agendamento salvo no Calendar e na Planilha!'); } catch (e) { alert('Erro ao salvar na planilha (verifique permissões). Salvo apenas localmente e no Calendar.'); }
     }
     const newApp = { ...app, googleEventId, durationTotal: totalDuration }; const updated = [...appointments, newApp]; setAppointments(updated); db.saveAppointments(updated);
   }
@@ -859,8 +881,33 @@ const App: React.FC = () => {
     }
     if (accessToken && app.id.startsWith('sheet_')) {
         const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1; 
-        const range = `Agendamento!A${rowNumber}:O${rowNumber}`; const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-        const rowData = [ pet.name, client.name, client.phone, `${client.address} ${client.complement || ''}`.trim(), pet.breed, pet.size, pet.coat, appServices[0]?.name || '', appServices[1]?.name || '', appServices[2]?.name || '', appServices[3]?.name || '', dateStr, timeStr, pet.notes, totalDuration ];
+        const range = `Agendamento!A${rowNumber}:S${rowNumber}`; const dateObj = new Date(app.date); const dateStr = dateObj.toLocaleDateString('pt-BR'); const timeStr = dateObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        
+        // Preserve existing payment data if available
+        const currentPaidAmount = app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '';
+        const currentPaymentMethod = app.paymentMethod || '';
+
+        const rowData = [ 
+            pet.name, 
+            client.name, 
+            client.phone, 
+            `${client.address} ${client.complement || ''}`.trim(), 
+            pet.breed, 
+            pet.size, 
+            pet.coat, 
+            appServices[0]?.name || '', 
+            appServices[1]?.name || '', 
+            appServices[2]?.name || '', 
+            appServices[3]?.name || '', 
+            dateStr, 
+            timeStr, 
+            app.notes || '', 
+            totalDuration,
+            'Agendado', // Col P
+            '', // Col Q
+            currentPaidAmount, // Col R (Preserve)
+            currentPaymentMethod // Col S (Preserve)
+        ];
         try { await googleService.updateSheetValues(accessToken, SHEET_ID, range, rowData); } catch(e) { console.error("Update sheet failed", e); }
     }
     const updated = appointments.map(a => a.id === app.id ? { ...app, durationTotal: totalDuration } : a); setAppointments(updated); db.saveAppointments(updated); alert('Agendamento atualizado!');
