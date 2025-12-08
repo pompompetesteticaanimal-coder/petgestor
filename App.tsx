@@ -345,7 +345,7 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
 };
 
 // ... PaymentManager, ClientManager, ServiceManager, ScheduleManager logic (keeping same code, just ensuring it's defined for the App) ...
-const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; accessToken: string | null; sheetId: string; }> = ({ appointments, clients, services, onUpdateAppointment, accessToken, sheetId }) => {
+const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void | Promise<void>; accessToken: string | null; sheetId: string; }> = ({ appointments, clients, services, onUpdateAppointment, accessToken, sheetId }) => {
     // ... Copy Logic ...
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
     const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid'>('toReceive'); const [contextMenu, setContextMenu] = useState<{x: number, y: number, app: Appointment} | null>(null); const touchStart = useRef<number | null>(null); const touchEnd = useRef<number | null>(null); const minSwipeDistance = 50; const todayStr = getLocalISODate();
@@ -362,21 +362,8 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         setIsSaving(true); 
         const finalAmount = parseFloat(amount); 
         const updatedApp = { ...app, paidAmount: finalAmount, paymentMethod: method as any }; 
-        if (app.id.startsWith('sheet_') && accessToken && sheetId) { 
-            try { 
-                const parts = app.id.split('_'); 
-                const index = parseInt(parts[1]); 
-                const rowNumber = index + 1; 
-                const range = `Agendamento!Q${rowNumber}:R${rowNumber}`; 
-                const values = [finalAmount.toString().replace('.', ','), method]; 
-                await googleService.updateSheetValues(accessToken, sheetId, range, values); 
-            } catch (e) { 
-                console.error("Failed", e); alert("Erro ao salvar na planilha."); 
-            } 
-        } else {
-             alert('Aviso: Este agendamento ainda não foi sincronizado com a planilha. O pagamento será salvo localmente, mas recarregue a página para sincronizar com a planilha.');
-        }
-        onUpdateAppointment(updatedApp); setEditingId(null); setIsSaving(false); 
+        await onUpdateAppointment(updatedApp);
+        setEditingId(null); setIsSaving(false); 
     };
     
     // ... [PaymentRow Logic] ...
@@ -757,8 +744,26 @@ const App: React.FC = () => {
       }
   };
 
-  const handleEditAppointment = async (app: Appointment, client: Client, pet: Pet, svcs: Service[], duration: number) => {
-      setAppointments(appointments.map(a => a.id === app.id ? { ...app, durationTotal: duration } : a));
+  const handleEditAppointment = async (app: Appointment, clientIn?: Client, petIn?: Pet, svcsIn?: Service[], durationIn?: number) => {
+      let client = clientIn;
+      if (!client) client = clients.find(c => c.id === app.clientId);
+      
+      let pet = petIn;
+      if (!pet && client) pet = client.pets.find(p => p.id === app.petId);
+      
+      let svcs = svcsIn;
+      if (!svcs) {
+          const main = services.find(s => s.id === app.serviceId);
+          const adds = (app.additionalServiceIds || []).map(id => services.find(s => s.id === id)).filter((s): s is Service => !!s);
+          if (main) svcs = [main, ...adds];
+      }
+
+      const duration = durationIn !== undefined ? durationIn : (app.durationTotal || 60);
+
+      setAppointments(prev => prev.map(a => a.id === app.id ? { ...app, durationTotal: duration } : a));
+      
+      if (!client || !pet || !svcs || svcs.length === 0) return;
+
       const mainSvc = svcs[0]; const addSvcs = svcs.slice(1);
       
       if (accessToken && app.googleEventId) {
