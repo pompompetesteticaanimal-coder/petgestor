@@ -523,7 +523,7 @@ const ClientManager: React.FC<{ clients: Client[]; onDeleteClient: (id: string) 
                             <div className="space-y-2 relative z-10">
                                 {client.pets.map(pet => (
                                     <div key={pet.id} className="bg-white p-3 rounded-2xl flex items-center gap-3 text-sm border border-gray-100 shadow-sm hover:shadow transition group/pet">
-                                        <div className="w-9 h-9 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center font-bold flex-shrink-0 text-xs shadow-inner group-hover/pet:scale-110 transition-transform">{pet.name[0]}</div>
+                                        <div className="w-9 h-9 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center font-bold flex-shrink-0 text-xs shadow-inner group-hover/pet:scale-110 transition-transform">{pet.name ? pet.name[0] : '?'}</div>
                                         <div className="min-w-0 truncate">
                                             <span className="font-bold text-gray-800 block leading-tight">{pet.name}</span>
                                             <span className="text-gray-400 text-[10px] font-medium uppercase tracking-wide">{pet.breed}</span>
@@ -829,7 +829,7 @@ const App: React.FC = () => {
     };
     const handleAddAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
         // ... [Add Appointment Logic same as before] ...
-        let googleEventId = ''; const totalDuration = manualDuration > 0 ? manualDuration : appServices[0].durationMin + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
+        let googleEventId = ''; const totalDuration = manualDuration > 0 ? manualDuration : (appServices[0] ? appServices[0].durationMin : 60) + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
         if (accessToken) { const description = appServices.map(s => s.name).join(' + '); const googleResponse = await googleService.createEvent(accessToken, { summary: `Banho/Tosa: ${pet.name}`, description: `${description}\nCliente: ${client.name}\nTel: ${client.phone}\nObs: ${app.notes}`, startTime: app.date, durationMin: totalDuration }); if (googleResponse) googleEventId = googleResponse.id; }
         const newApp = { ...app, googleEventId, durationTotal: totalDuration };
         const updatedApps = [...appointments, newApp];
@@ -852,7 +852,7 @@ const App: React.FC = () => {
     };
 
     const handleEditAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
-        const googleEventId = app.googleEventId; const totalDuration = manualDuration > 0 ? manualDuration : appServices[0].durationMin + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
+        const googleEventId = app.googleEventId; const totalDuration = manualDuration > 0 ? manualDuration : (appServices[0] ? appServices[0].durationMin : 60) + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
         const updatedApp = { ...app, durationTotal: totalDuration };
         if (accessToken && googleEventId) {
             const description = appServices.map(s => s.name).join(' + ');

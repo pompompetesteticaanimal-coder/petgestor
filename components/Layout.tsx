@@ -34,8 +34,8 @@ const NavItem = ({
     <button
       onClick={() => onClick(view)}
       className={`group flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 outline-none ${isActive
-          ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 scale-100'
-          : 'text-gray-500 hover:bg-white hover:text-brand-600 hover:shadow-ios'
+        ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 scale-100'
+        : 'text-gray-500 hover:bg-white hover:text-brand-600 hover:shadow-ios'
         }`}
     >
       <div className={`p-2 rounded-lg transition-colors ${isActive ? 'bg-white/20' : 'group-hover:bg-brand-50'}`}>
@@ -140,7 +140,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
                 {googleUser.picture ? (
                   <img src={googleUser.picture} alt="Profile" className="w-10 h-10 rounded-full ring-2 ring-white shadow-sm" />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold">{googleUser.name[0]}</div>
+                  <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold">{googleUser.name ? googleUser.name[0] : 'U'}</div>
                 )}
                 <div className="overflow-hidden">
                   <p className="text-sm font-bold text-gray-800 truncate">{googleUser.name}</p>
