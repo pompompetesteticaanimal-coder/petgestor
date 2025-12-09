@@ -12,7 +12,7 @@ import {
   ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
   Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
   Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon,
-  ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft
+  ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft, Star
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
@@ -371,27 +371,113 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     );
 };
 
+// PaymentRow Component (Extracted to prevent re-renders losing focus)
+const PaymentRow = ({ 
+    app, statusColor, clients, services, calculateExpected, isEditing, editingId, 
+    amount, method, rating, setAmount, setMethod, setRating, handleSave, setEditingId, 
+    handleStartEdit, setContextMenu 
+}: any) => {
+    const client = clients.find((c: Client) => c.id === app.clientId); 
+    const pet = client?.pets.find((p: Pet) => p.id === app.petId); 
+    const mainSvc = services.find((s: Service) => s.id === app.serviceId); 
+    const addSvcs = app.additionalServiceIds?.map((id: string) => services.find((s: Service) => s.id === id)).filter((x: any) => x) as Service[] || []; 
+    const expected = calculateExpected(app); 
+    const isPaid = !!app.paidAmount && !!app.paymentMethod; 
+    const allServiceNames = [mainSvc?.name, ...addSvcs.map((s: Service) => s.name)].filter(n => n).join(' ').toLowerCase(); 
+    let serviceBorderColor = 'border-sky-400'; 
+    if (allServiceNames.includes('tesoura')) serviceBorderColor = 'border-pink-500'; 
+    else if (allServiceNames.includes('tosa normal')) serviceBorderColor = 'border-orange-500'; 
+    else if (allServiceNames.includes('higi')) serviceBorderColor = 'border-yellow-500'; 
+    else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) serviceBorderColor = 'border-purple-500'; 
+    else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) serviceBorderColor = 'border-indigo-500';
+
+    if(isEditing) { 
+        return ( 
+            <div key={app.id} className="bg-brand-50 border border-brand-200 p-4 rounded-lg mb-4 shadow-sm animate-fade-in">
+                <div className="flex flex-col gap-3">
+                    <div className="flex justify-between items-center"><span className="font-bold text-gray-800">{pet?.name}</span><span className="text-xs text-gray-500">Editando...</span></div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div><label className="text-[10px] font-bold text-gray-500 uppercase">Valor R$</label><input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full border p-2 rounded bg-white" autoFocus /></div>
+                        <div><label className="text-[10px] font-bold text-gray-500 uppercase">Método</label><select value={method} onChange={e => setMethod(e.target.value)} className="w-full border p-2 rounded bg-white"><option value="Credito">Crédito</option><option value="Debito">Débito</option><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option></select></div>
+                    </div>
+                    
+                    {/* STAR RATING SYSTEM */}
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Comportamento do Cliente/Pet</label>
+                        <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <button key={star} onClick={() => setRating(star)} className="focus:outline-none transition-transform active:scale-95">
+                                    <Star size={24} className={star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} />
+                                </button>
+                            ))}
+                            <span className="text-xs font-bold ml-2 text-gray-600">
+                                {rating === 1 && "Muito Difícil"}
+                                {rating === 2 && "Difícil"}
+                                {rating === 3 && "Normal"}
+                                {rating === 4 && "Bom"}
+                                {rating === 5 && "Excelente"}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-2"><button onClick={() => handleSave(app)} className="flex-1 bg-green-600 text-white p-2 rounded text-sm font-bold">OK</button><button onClick={() => setEditingId(null)} className="flex-1 bg-gray-200 text-gray-700 p-2 rounded text-sm">Cancel</button></div>
+                </div>
+            </div> 
+        );
+    }
+    return ( 
+        <div key={app.id} className={`p-3 rounded-lg shadow-sm border border-gray-100 mb-2 border-l-[6px] ${serviceBorderColor} ${statusColor} min-w-0`} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, app }); }}> 
+            <div className="flex justify-between items-start mb-2"> 
+                <div className="min-w-0 flex-1 pr-2"> 
+                    <div className="text-base font-bold text-gray-800 truncate flex items-center gap-1">
+                        {pet?.name}
+                        {app.rating && <div className="flex items-center bg-yellow-50 px-1 rounded border border-yellow-100"><Star size={8} className="fill-yellow-400 text-yellow-400"/><span className="text-[8px] font-bold text-yellow-700 ml-0.5">{app.rating}</span></div>}
+                    </div> 
+                    <div className="text-xs text-gray-500 truncate">{client?.name}</div> 
+                    <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-1"> <Clock size={10}/> {new Date(app.date).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} </div> 
+                </div> 
+                <div className="text-right flex-shrink-0"> 
+                    <div className="text-base font-bold text-brand-700">R$ {expected.toFixed(2)}</div> 
+                    {isPaid ? ( <div className="inline-block bg-green-100 text-green-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase"> {app.paymentMethod} </div> ) : ( <div className="inline-block bg-red-100 text-red-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase"> Pendente </div> )} 
+                </div> 
+            </div> 
+            <div className="flex flex-wrap gap-1 mb-2"> 
+                {mainSvc && <span className="text-[9px] bg-white border border-gray-200 px-1.5 py-0.5 rounded text-gray-600">{mainSvc.name}</span>} 
+                {addSvcs.map((s, idx) => ( <span key={idx} className="text-[9px] bg-white border border-gray-200 px-1.5 py-0.5 rounded text-gray-600">{s.name}</span> ))} 
+            </div> 
+            <button onClick={() => handleStartEdit(app)} className="w-full bg-white/50 hover:bg-white text-gray-700 p-2 rounded flex items-center justify-center gap-2 font-bold text-xs transition border border-gray-200"> <DollarSign size={14}/> {isPaid ? 'Editar Pagamento' : 'Receber Valor'} </button> 
+        </div> 
+    );
+};
+
 const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; accessToken: string | null; sheetId: string; }> = ({ appointments, clients, services, onUpdateAppointment, accessToken, sheetId }) => {
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
-    const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid'>('toReceive'); const [contextMenu, setContextMenu] = useState<{x: number, y: number, app: Appointment} | null>(null); const touchStart = useRef<number | null>(null);
+    const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [rating, setRating] = useState(5); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid'>('toReceive'); const [contextMenu, setContextMenu] = useState<{x: number, y: number, app: Appointment} | null>(null); const touchStart = useRef<number | null>(null);
     const getAppLocalDateStr = (dateStr: string) => { const d = new Date(dateStr); return getLocalISODate(d); };
     const pendingApps = appointments.filter(a => { const appDate = getAppLocalDateStr(a.date); const isPast = appDate < getLocalISODate(); const isUnpaid = !a.paymentMethod || a.paymentMethod.trim() === ''; return isPast && isUnpaid; }).sort((a,b) => b.date.localeCompare(a.date));
     const dailyApps = appointments.filter(a => getAppLocalDateStr(a.date) === selectedDate); const toReceiveApps = dailyApps.filter(a => !a.paymentMethod || a.paymentMethod.trim() === ''); const paidApps = dailyApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== '');
     const navigateDate = (days: number) => { const [year, month, day] = selectedDate.split('-').map(Number); const date = new Date(year, month - 1, day); date.setDate(date.getDate() + days); setSelectedDate(getLocalISODate(date)); }; const goToToday = () => setSelectedDate(getLocalISODate());
     const calculateExpected = (app: Appointment) => { const main = services.find(s => s.id === app.serviceId); let total = main?.price || 0; app.additionalServiceIds?.forEach(id => { const s = services.find(srv => srv.id === id); if(s) total += s.price; }); return total; };
-    const handleStartEdit = (app: Appointment) => { setEditingId(app.id); const expected = calculateExpected(app); setAmount(app.paidAmount ? app.paidAmount.toString() : expected.toString()); setMethod(app.paymentMethod || 'Credito'); setContextMenu(null); };
+    const handleStartEdit = (app: Appointment) => { setEditingId(app.id); const expected = calculateExpected(app); setAmount(app.paidAmount ? app.paidAmount.toString() : expected.toString()); setMethod(app.paymentMethod || 'Credito'); setRating(app.rating || 5); setContextMenu(null); };
     const handleSave = async (app: Appointment) => { 
         setIsSaving(true); 
         const finalAmount = parseFloat(amount); 
-        const updatedApp = { ...app, paidAmount: finalAmount, paymentMethod: method as any }; 
+        const updatedApp = { ...app, paidAmount: finalAmount, paymentMethod: method as any, rating: rating }; 
         if (app.id.startsWith('sheet_') && accessToken && sheetId) { 
             try { 
                 const parts = app.id.split('_'); 
                 const index = parseInt(parts[1]); 
                 const rowNumber = index + 5; 
-                const range = `Agendamento!Q${rowNumber}:R${rowNumber}`; 
-                const values = [finalAmount.toString().replace('.', ','), method]; 
-                await googleService.updateSheetValues(accessToken, sheetId, range, values); 
+                // Write Payment Info to Q:R
+                const rangePayment = `Agendamento!Q${rowNumber}:R${rowNumber}`; 
+                const valuesPayment = [finalAmount.toString().replace('.', ','), method]; 
+                await googleService.updateSheetValues(accessToken, sheetId, rangePayment, valuesPayment);
+                
+                // Write Rating to U
+                const rangeRating = `Agendamento!U${rowNumber}:U${rowNumber}`;
+                const valuesRating = [rating.toString()];
+                await googleService.updateSheetValues(accessToken, sheetId, rangeRating, valuesRating);
+
             } catch (e) { 
                 console.error("Failed", e); alert("Erro ao salvar na planilha."); 
             } 
@@ -409,59 +495,17 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         touchStart.current = null;
     };
 
-    const renderPaymentRow = (app: Appointment, statusColor: string) => { 
-        const client = clients.find(c => c.id === app.clientId); 
-        const pet = client?.pets.find(p => p.id === app.petId); 
-        const mainSvc = services.find(s => s.id === app.serviceId); 
-        const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x=>x) as Service[] || []; 
-        const expected = calculateExpected(app); 
-        const isPaid = !!app.paidAmount && !!app.paymentMethod; 
-        const isEditing = editingId === app.id; 
-        const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase(); 
-        let serviceBorderColor = 'border-sky-400'; 
-        if (allServiceNames.includes('tesoura')) serviceBorderColor = 'border-pink-500'; 
-        else if (allServiceNames.includes('tosa normal')) serviceBorderColor = 'border-orange-500'; 
-        else if (allServiceNames.includes('higi')) serviceBorderColor = 'border-yellow-500'; 
-        else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) serviceBorderColor = 'border-purple-500'; 
-        else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) serviceBorderColor = 'border-indigo-500';
-
-        if(isEditing) { 
-            return ( 
-                <div key={app.id} className="bg-brand-50 border border-brand-200 p-4 rounded-lg mb-4 shadow-sm animate-fade-in">
-                    <div className="flex flex-col gap-3">
-                        <div className="flex justify-between items-center"><span className="font-bold text-gray-800">{pet?.name}</span><span className="text-xs text-gray-500">Editando...</span></div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div><label className="text-[10px] font-bold text-gray-500 uppercase">Valor R$</label><input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full border p-2 rounded bg-white" autoFocus /></div>
-                            <div><label className="text-[10px] font-bold text-gray-500 uppercase">Método</label><select value={method} onChange={e => setMethod(e.target.value)} className="w-full border p-2 rounded bg-white"><option value="Credito">Crédito</option><option value="Debito">Débito</option><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option></select></div>
-                        </div>
-                        <div className="flex gap-2 mt-2"><button onClick={() => handleSave(app)} disabled={isSaving} className="flex-1 bg-green-600 text-white p-2 rounded text-sm font-bold">{isSaving ? '...' : 'OK'}</button><button onClick={() => setEditingId(null)} className="flex-1 bg-gray-200 text-gray-700 p-2 rounded text-sm">Cancel</button></div>
-                    </div>
-                </div> 
-            );
-        }
-        return ( 
-            <div key={app.id} className={`p-3 rounded-lg shadow-sm border border-gray-100 mb-2 border-l-[6px] ${serviceBorderColor} ${statusColor} min-w-0`} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, app }); }}> 
-                <div className="flex justify-between items-start mb-2"> 
-                    <div className="min-w-0 flex-1 pr-2"> 
-                        <div className="text-base font-bold text-gray-800 truncate">{pet?.name}</div> 
-                        <div className="text-xs text-gray-500 truncate">{client?.name}</div> 
-                        <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-1"> <Clock size={10}/> {new Date(app.date).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} </div> 
-                    </div> 
-                    <div className="text-right flex-shrink-0"> 
-                        <div className="text-base font-bold text-brand-700">R$ {expected.toFixed(2)}</div> 
-                        {isPaid ? ( <div className="inline-block bg-green-100 text-green-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase"> {app.paymentMethod} </div> ) : ( <div className="inline-block bg-red-100 text-red-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase"> Pendente </div> )} 
-                    </div> 
-                </div> 
-                <div className="flex flex-wrap gap-1 mb-2"> 
-                    {mainSvc && <span className="text-[9px] bg-white border border-gray-200 px-1.5 py-0.5 rounded text-gray-600">{mainSvc.name}</span>} 
-                    {addSvcs.map((s, idx) => ( <span key={idx} className="text-[9px] bg-white border border-gray-200 px-1.5 py-0.5 rounded text-gray-600">{s.name}</span> ))} 
-                </div> 
-                <button onClick={() => handleStartEdit(app)} className="w-full bg-white/50 hover:bg-white text-gray-700 p-2 rounded flex items-center justify-center gap-2 font-bold text-xs transition border border-gray-200"> <DollarSign size={14}/> {isPaid ? 'Editar Pagamento' : 'Receber Valor'} </button> 
-            </div> 
-        );
-    };
-
-    return ( <div className="space-y-4 h-full flex flex-col" onClick={() => setContextMenu(null)} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}> <div className="flex flex-col md:flex-row justify-between items-center gap-2 flex-shrink-0"> <h2 className="text-xl font-bold text-gray-800 self-start md:self-center">Pagamentos</h2> <div className="flex items-center gap-1 w-full md:w-auto bg-white p-1 rounded-lg border shadow-sm flex-shrink-0"> <button onClick={() => navigateDate(-1)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><ChevronLeft size={18} /></button> <button onClick={goToToday} className="flex-1 px-2 py-1 bg-brand-50 text-brand-700 font-bold rounded-lg text-xs hover:bg-brand-100">Hoje</button> <button onClick={() => navigateDate(1)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><ChevronRight size={18} /></button> <div className="text-xs font-bold text-gray-700 px-2 min-w-[100px] text-center">{formatDateWithWeek(selectedDate)}</div> </div> </div> <div className="flex p-1 bg-gray-100 rounded-xl overflow-x-auto"> <button onClick={() => setActiveTab('toReceive')} className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'toReceive' ? 'bg-white shadow text-yellow-600' : 'text-gray-500'}`}> Receber ({toReceiveApps.length}) </button> <button onClick={() => setActiveTab('pending')} className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'pending' ? 'bg-white shadow text-red-600' : 'text-gray-500'}`}> Pendentes ({pendingApps.length}) </button> <button onClick={() => setActiveTab('paid')} className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'paid' ? 'bg-white shadow text-green-600' : 'text-gray-500'}`}> Pagos ({paidApps.length}) </button> </div> <div className="flex-1 overflow-y-auto min-h-0 bg-gray-50/50 rounded-xl border border-gray-100 p-2"> {activeTab === 'toReceive' && toReceiveApps.map(app => renderPaymentRow(app, "bg-yellow-50"))} {activeTab === 'pending' && pendingApps.map(app => renderPaymentRow(app, "bg-red-50"))} {activeTab === 'paid' && paidApps.map(app => renderPaymentRow(app, "bg-green-50/50"))} </div> {contextMenu && ( <div className="fixed bg-white shadow-xl border border-gray-200 rounded-lg z-[100] py-1 min-w-[150px]" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(contextMenu.app)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex items-center gap-2"><Edit2 size={14}/> Editar Valor</button> </div> )} </div> )
+    return ( <div className="space-y-4 h-full flex flex-col" onClick={() => setContextMenu(null)} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}> <div className="flex flex-col md:flex-row justify-between items-center gap-2 flex-shrink-0"> <h2 className="text-xl font-bold text-gray-800 self-start md:self-center">Pagamentos</h2> <div className="flex items-center gap-1 w-full md:w-auto bg-white p-1 rounded-lg border shadow-sm flex-shrink-0"> <button onClick={() => navigateDate(-1)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><ChevronLeft size={18} /></button> <button onClick={goToToday} className="flex-1 px-2 py-1 bg-brand-50 text-brand-700 font-bold rounded-lg text-xs hover:bg-brand-100">Hoje</button> <button onClick={() => navigateDate(1)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><ChevronRight size={18} /></button> <div className="text-xs font-bold text-gray-700 px-2 min-w-[100px] text-center">{formatDateWithWeek(selectedDate)}</div> </div> </div> <div className="flex p-1 bg-gray-100 rounded-xl overflow-x-auto"> <button onClick={() => setActiveTab('toReceive')} className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'toReceive' ? 'bg-white shadow text-yellow-600' : 'text-gray-500'}`}> Receber ({toReceiveApps.length}) </button> <button onClick={() => setActiveTab('pending')} className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'pending' ? 'bg-white shadow text-red-600' : 'text-gray-500'}`}> Pendentes ({pendingApps.length}) </button> <button onClick={() => setActiveTab('paid')} className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'paid' ? 'bg-white shadow text-green-600' : 'text-gray-500'}`}> Pagos ({paidApps.length}) </button> </div> <div className="flex-1 overflow-y-auto min-h-0 bg-gray-50/50 rounded-xl border border-gray-100 p-2"> 
+        {activeTab === 'toReceive' && toReceiveApps.map(app => 
+            <PaymentRow key={app.id} app={app} statusColor="bg-yellow-50" clients={clients} services={services} calculateExpected={calculateExpected} isEditing={editingId === app.id} editingId={editingId} amount={amount} method={method} rating={rating} setAmount={setAmount} setMethod={setMethod} setRating={setRating} handleSave={handleSave} setEditingId={setEditingId} handleStartEdit={handleStartEdit} setContextMenu={setContextMenu} />
+        )} 
+        {activeTab === 'pending' && pendingApps.map(app => 
+            <PaymentRow key={app.id} app={app} statusColor="bg-red-50" clients={clients} services={services} calculateExpected={calculateExpected} isEditing={editingId === app.id} editingId={editingId} amount={amount} method={method} rating={rating} setAmount={setAmount} setMethod={setMethod} setRating={setRating} handleSave={handleSave} setEditingId={setEditingId} handleStartEdit={handleStartEdit} setContextMenu={setContextMenu} />
+        )} 
+        {activeTab === 'paid' && paidApps.map(app => 
+            <PaymentRow key={app.id} app={app} statusColor="bg-green-50/50" clients={clients} services={services} calculateExpected={calculateExpected} isEditing={editingId === app.id} editingId={editingId} amount={amount} method={method} rating={rating} setAmount={setAmount} setMethod={setMethod} setRating={setRating} handleSave={handleSave} setEditingId={setEditingId} handleStartEdit={handleStartEdit} setContextMenu={setContextMenu} />
+        )} 
+    </div> {contextMenu && ( <div className="fixed bg-white shadow-xl border border-gray-200 rounded-lg z-[100] py-1 min-w-[150px]" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(contextMenu.app)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex items-center gap-2"><Edit2 size={14}/> Editar Valor</button> </div> )} </div> )
 };
 
 const ClientManager: React.FC<{ clients: Client[]; onDeleteClient: (id: string) => void; googleUser: GoogleUser | null; accessToken: string | null; }> = ({ clients, onDeleteClient }) => {
@@ -692,7 +736,7 @@ const App: React.FC = () => {
   const handleUpdateApp = (updatedApp: Appointment) => { const updated = appointments.map(a => a.id === updatedApp.id ? updatedApp : a); setAppointments(updated); db.saveAppointments(updated); };
   const handleSyncAppointments = async (token: string, silent = false) => {
       // ... [Sync Appointments Logic same as before] ...
-      if (!token || !SHEET_ID) return; try { const rows = await googleService.getSheetValues(token, SHEET_ID, 'Agendamento!A:T'); if(!rows || rows.length < 5) { if(!silent) alert('Aba Agendamento vazia (Linhas 1-4 ignoradas).'); return; } const loadedApps: Appointment[] = []; const newTempClients: Client[] = []; const currentClients = db.getClients(); const existingClientIds = new Set(currentClients.map(c => c.id)); rows.forEach((row: string[], idx: number) => { if (idx < 4) return; const petName = row[0]; const clientName = row[1]; const clientPhone = row[2] || ''; const clientAddr = row[3] || ''; const petBreed = row[4]; const datePart = row[11]; const timePart = row[12]; const serviceName = row[7]; const paidAmountStr = row[16]; const paymentMethod = row[17]; const googleEventId = row[19]; if(!clientName || !datePart) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = datePart.split('/'); if(day && month && year) isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`; } catch(e){} const cleanPhone = clientPhone.replace(/\D/g, '') || `temp_${idx}`; let client = currentClients.find(c => c.id === cleanPhone) || currentClients.find(c => c.name.toLowerCase() === clientName.toLowerCase()) || newTempClients.find(c => c.id === cleanPhone); if (!client) { client = { id: cleanPhone, name: clientName, phone: clientPhone, address: clientAddr, pets: [] }; newTempClients.push(client); } let pet = client.pets.find(p => p.name.toLowerCase() === petName?.toLowerCase()); if (!pet && petName) { pet = { id: `${client.id}_p_${idx}`, name: petName, breed: petBreed || 'SRD', age: '', gender: '', size: row[5] || '', coat: row[6] || '', notes: row[13] || '' }; client.pets.push(pet); } const currentServices = db.getServices(); const service = currentServices.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || currentServices[0]; const addServiceIds: string[] = []; [row[8], row[9], row[10]].forEach(name => { if (name) { const foundSvc = currentServices.find(s => s.name.toLowerCase() === name.toLowerCase().trim()); if (foundSvc) addServiceIds.push(foundSvc.id); } }); let paidAmount = 0; if (paidAmountStr) { paidAmount = parseFloat(paidAmountStr.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')); if(isNaN(paidAmount)) paidAmount = 0; } if(client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: 'agendado', notes: row[13], durationTotal: parseInt(row[14] || '60'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: googleEventId }); } }); if (newTempClients.length > 0) { const updatedClients = [...currentClients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))]; setClients(updatedClients); db.saveClients(updatedClients); } if(loadedApps.length > 0) { setAppointments(loadedApps); db.saveAppointments(loadedApps); if(!silent) alert(`${loadedApps.length} agendamentos carregados!`); } else { if(!silent) alert('Nenhum agendamento encontrado.'); } } catch (error) { console.error(error); if(!silent) alert('Erro ao sincronizar agendamentos.'); }
+      if (!token || !SHEET_ID) return; try { const rows = await googleService.getSheetValues(token, SHEET_ID, 'Agendamento!A:U'); if(!rows || rows.length < 5) { if(!silent) alert('Aba Agendamento vazia (Linhas 1-4 ignoradas).'); return; } const loadedApps: Appointment[] = []; const newTempClients: Client[] = []; const currentClients = db.getClients(); const existingClientIds = new Set(currentClients.map(c => c.id)); rows.forEach((row: string[], idx: number) => { if (idx < 4) return; const petName = row[0]; const clientName = row[1]; const clientPhone = row[2] || ''; const clientAddr = row[3] || ''; const petBreed = row[4]; const datePart = row[11]; const timePart = row[12]; const serviceName = row[7]; const paidAmountStr = row[16]; const paymentMethod = row[17]; const googleEventId = row[19]; const ratingStr = row[20]; if(!clientName || !datePart) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = datePart.split('/'); if(day && month && year) isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`; } catch(e){} const cleanPhone = clientPhone.replace(/\D/g, '') || `temp_${idx}`; let client = currentClients.find(c => c.id === cleanPhone) || currentClients.find(c => c.name.toLowerCase() === clientName.toLowerCase()) || newTempClients.find(c => c.id === cleanPhone); if (!client) { client = { id: cleanPhone, name: clientName, phone: clientPhone, address: clientAddr, pets: [] }; newTempClients.push(client); } let pet = client.pets.find(p => p.name.toLowerCase() === petName?.toLowerCase()); if (!pet && petName) { pet = { id: `${client.id}_p_${idx}`, name: petName, breed: petBreed || 'SRD', age: '', gender: '', size: row[5] || '', coat: row[6] || '', notes: row[13] || '' }; client.pets.push(pet); } const currentServices = db.getServices(); const service = currentServices.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || currentServices[0]; const addServiceIds: string[] = []; [row[8], row[9], row[10]].forEach(name => { if (name) { const foundSvc = currentServices.find(s => s.name.toLowerCase() === name.toLowerCase().trim()); if (foundSvc) addServiceIds.push(foundSvc.id); } }); let paidAmount = 0; if (paidAmountStr) { paidAmount = parseFloat(paidAmountStr.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')); if(isNaN(paidAmount)) paidAmount = 0; } const rating = ratingStr ? parseInt(ratingStr) : undefined; if(client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: 'agendado', notes: row[13], durationTotal: parseInt(row[14] || '60'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: googleEventId, rating: rating }); } }); if (newTempClients.length > 0) { const updatedClients = [...currentClients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))]; setClients(updatedClients); db.saveClients(updatedClients); } if(loadedApps.length > 0) { setAppointments(loadedApps); db.saveAppointments(loadedApps); if(!silent) alert(`${loadedApps.length} agendamentos carregados!`); } else { if(!silent) alert('Nenhum agendamento encontrado.'); } } catch (error) { console.error(error); if(!silent) alert('Erro ao sincronizar agendamentos.'); }
   };
   const handleAddAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
     // ... [Add Appointment Logic same as before] ...
@@ -709,9 +753,9 @@ const App: React.FC = () => {
             const rowData = [
                 pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
                 appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
-                dateStr, timeStr, app.notes || '', totalDuration.toString(), 'Agendado', '', '', '', googleEventId
+                dateStr, timeStr, app.notes || '', totalDuration.toString(), 'Agendado', '', '', '', googleEventId, (app.rating || '').toString()
             ];
-            await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData);
+            await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:U', rowData);
             // Silent Sync to update IDs
             handleSyncAppointments(accessToken, true);
         } catch (e) { console.error(e); alert("Salvo no app, mas erro na planilha."); }
@@ -735,9 +779,9 @@ const App: React.FC = () => {
               const rowData = [
                   pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
                   appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
-                  dateStr, timeStr, app.notes || '', totalDuration.toString(), 'Agendado', '', app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '', app.paymentMethod || '', googleEventId
+                  dateStr, timeStr, app.notes || '', totalDuration.toString(), 'Agendado', '', app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '', app.paymentMethod || '', googleEventId, (app.rating || '').toString()
               ];
-              await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`, rowData);
+              await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:U${rowNumber}`, rowData);
           } catch(e) { console.error(e); alert("Erro ao atualizar planilha."); }
       }
   };
@@ -751,7 +795,7 @@ const App: React.FC = () => {
       if (id.startsWith('sheet_') && accessToken && SHEET_ID) {
            try {
                const parts = id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 5;
-               await googleService.clearSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`);
+               await googleService.clearSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:U${rowNumber}`);
            } catch(e) { console.error(e); }
       }
   };
