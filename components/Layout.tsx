@@ -194,14 +194,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/50 pointer-events-none" />
-        <PullToRefresh
-          onRefresh={handleRefresh}
-          className="flex-1 p-4 md:p-8 pb-28 md:pb-8 no-scrollbar scroll-smooth"
+        <div
+          id="main-scroll"
+          className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8 scroll-smooth"
         >
           <div key={currentView} className="max-w-7xl mx-auto w-full animate-slide-in-right">
             {children}
           </div>
-        </PullToRefresh>
+        </div>
       </main>
 
       {/* Mobile Floating Tab Bar */}

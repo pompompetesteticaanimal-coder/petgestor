@@ -478,7 +478,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
             {activeTab === 'daily' && (
                 <section key={selectedDate} className={animationClass}>
-                    <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800">Diário</h2><div className="text-sm font-bold text-gray-600 px-3">{formatDateWithWeek(selectedDate)}</div></div>
+                    <div className="sticky top-0 z-30 flex justify-between items-center mb-4 bg-white/90 backdrop-blur-md p-3 rounded-xl border border-gray-200 shadow-sm transition-all"><h2 className="text-lg font-bold text-gray-800">Diário</h2><div className="text-sm font-bold text-gray-600 px-3">{formatDateWithWeek(selectedDate)}</div></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" /><StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Normal e Tesoura" /><StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" /><StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" /></div>
                     <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
                         <h3 className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 border-b border-gray-100/50 dark:border-gray-700/50 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento do Dia</h3>
@@ -534,7 +534,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             )}
             {activeTab === 'weekly' && metricData && (
                 <section className="animate-fade-in text-left">
-                    <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
+                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
 
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
                         <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
@@ -551,7 +551,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
             {activeTab === 'monthly' && metricData && (
                 <section className="animate-fade-in text-left">
-                    <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
+                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
 
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
                         <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
@@ -568,7 +568,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
             {activeTab === 'yearly' && metricData && (
                 <section className="animate-fade-in text-left">
-                    <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
+                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
 
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
                         <StatCard title="Faturamento Total" value={`R$ ${(metricData.current.grossRevenue / 1000).toFixed(1)}k`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />

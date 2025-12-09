@@ -11,13 +11,20 @@
   --safe-area-bottom: env(safe-area-inset-bottom);
 }
 
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior-y: none;
+  /* Prevent pull-to-refresh */
+}
+
 body {
   background-color: #f2f2f7;
   /* iOS System Gray 6 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden;
-  /* Prevent body scroll, use containers */
   padding-top: var(--safe-area-top);
 }
 
