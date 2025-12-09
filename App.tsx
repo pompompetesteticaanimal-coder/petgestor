@@ -1044,7 +1044,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 </div>
             </div>
         );
-    })(), document.body)} {isModalOpen && createPortal(<div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm"> <div className="bg-white rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] md:min-h-[600px] animate-scale-up"> <div className="p-4 border-b flex justify-between items-center bg-gray-50"> <h3 className="font-bold text-lg text-gray-800">{editingAppId ? 'Editar Agendamento' : 'Novo Agendamento'}</h3> <button onClick={resetForm}><X size={24} className="text-gray-400 hover:text-gray-600" /></button> </div> <div className="p-4 overflow-y-auto custom-scrollbar space-y-4"> <div> <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente / Pet</label> <div className="relative"> <Search className="absolute left-3 top-2.5 text-gray-400" size={16} /> <input value={selectedClientData ? selectedClientData.name : clientSearch} onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(''); setSelectedPet(''); }} placeholder="Buscar..." className="w-full pl-9 pr-8 py-3 border rounded-xl outline-none focus:ring-2 ring-brand-200 text-base" /> {selectedClientData && <button onClick={() => { setClientSearch(''); setSelectedClient(''); }} className="absolute right-2 top-3 text-gray-400"><X size={16} /></button>} </div> {clientSearch.length > 0 && !selectedClient && filteredClients.length > 0 && (<div className="mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto z-50"> {filteredClients.map(c => (<button key={c.id} onClick={() => { setSelectedClient(c.id); setClientSearch(''); }} className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-50 flex justify-between items-center"> <div className="text-base font-bold text-gray-800">{c.name} <span className="text-xs font-normal text-gray-500">({c.pets.map(p => p.name).join(', ')})</span></div> </button>))} </div>)} </div> {selectedClient && (<div className="grid grid-cols-2 gap-2"> {pets.map(p => {
+    })(), document.body)} {isModalOpen && createPortal(<div className="fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm"> <div className="bg-gray-50/95 rounded-t-[2.5rem] md:rounded-3xl w-full max-w-5xl overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.2)] md:shadow-2xl flex flex-col h-[92vh] md:h-auto md:max-h-[90vh] animate-slide-up-mobile"> <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white"> <div><h3 className="font-bold text-xl text-gray-800 tracking-tight">{editingAppId ? '✏️ Editar Agendamento' : '✨ Novo Agendamento'}</h3><p className="text-xs text-gray-400 font-medium">Preencha os dados abaixo</p></div> <button onClick={resetForm}><div className="bg-gray-100 p-2 rounded-full hover:bg-gray-200 transition"><X size={20} className="text-gray-500" /></div></button> </div> <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar space-y-6 bg-gray-50/50"> <div> <label className="block text-xs font-bold text-gray-500 uppercase mb-2 px-1">👤 Cliente e Pet</label> <div className="relative"> <Search className="absolute left-4 top-3.5 text-gray-400" size={18} /> <input value={selectedClientData ? selectedClientData.name : clientSearch} onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(''); setSelectedPet(''); }} placeholder="Buscar cliente..." className="w-full pl-11 pr-10 py-3.5 border-0 bg-white shadow-sm rounded-2xl outline-none focus:ring-2 ring-brand-200 text-base font-medium" /> {selectedClientData && <button onClick={() => { setClientSearch(''); setSelectedClient(''); }} className="absolute right-3 top-3.5 text-gray-400 hover:text-red-500"><X size={18} /></button>} </div> {clientSearch.length > 0 && !selectedClient && filteredClients.length > 0 && (<div className="mt-2 bg-white rounded-2xl shadow-xl max-h-60 overflow-y-auto z-50 border border-gray-100"> {filteredClients.map(c => (<button key={c.id} onClick={() => { setSelectedClient(c.id); setClientSearch(''); }} className="w-full text-left p-4 hover:bg-gray-50 border-b border-gray-50 flex justify-between items-center last:border-0"> <div className="text-base font-bold text-gray-800">{c.name} <span className="text-xs font-normal text-gray-500 block">({c.pets.map(p => p.name).join(', ')})</span></div> <ChevronRight size={16} className="text-gray-300" /> </button>))} </div>)} </div> {selectedClient && (<div className="grid grid-cols-2 gap-3"> {pets.map(p => {
         const pApps = appointments.filter(a => a.petId === p.id && a.rating);
         const avg = pApps.length > 0 ? pApps.reduce((acc, c) => acc + (c.rating || 0), 0) / pApps.length : 0;
         const allTags = pApps.flatMap(a => a.ratingTags || []);
@@ -1060,62 +1060,79 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 {topTags.length > 0 && <div className="flex gap-1 mt-1 opacity-80">{topTags.map(t => <span key={t} className="text-[9px] bg-gray-100 px-1 rounded border border-gray-200">{t}</span>)}</div>}
             </button>
         );
-    })} </div>)} {selectedPet && (<div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    })} </div>)} {selectedPet && (<div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500 pb-20">
 
-        <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Serviço Principal</label>
-            <div className="relative">
-                <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-medium outline-none transition-all cursor-pointer">
-                    <option value="">Selecione o serviço...</option>{getApplicableServices('principal').map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+        {/* SERVIÇOS CARD */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-brand-50 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
+            <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-4 text-sm"><Scissors size={18} className="text-blue-500" /> O que vamos fazer?</h4>
+
+            <div className="space-y-4">
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Principal</label>
+                    <div className="relative">
+                        <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all cursor-pointer">
+                            <option value="">Selecione...</option>{getApplicableServices('principal').map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Adicional</label>
+                    <div className="relative">
+                        <select className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all cursor-pointer" onChange={(e) => { const val = e.target.value; if (val && !selectedAddServices.includes(val)) setSelectedAddServices(prev => [...prev, val]); e.target.value = ''; }} >
+                            <option value="">+ Adicionar extra</option> {getApplicableServices('adicional').filter((service, index, self) => index === self.findIndex((t) => t.name === service.name)).map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-brand-100 text-brand-600 rounded-lg p-1.5 pointer-events-none"><Plus size={14} strokeWidth={3} /></div>
+                    </div>
+                </div>
+
+                {selectedAddServices.length > 0 && <div className="flex flex-wrap gap-2 pt-2">{selectedAddServices.map(id => <span key={id} onClick={() => setSelectedAddServices(p => p.filter(x => x !== id))} className="bg-blue-50 text-blue-700 pl-3 pr-2 py-1.5 rounded-xl text-xs font-bold cursor-pointer hover:bg-red-50 hover:text-red-600 flex items-center gap-1 transition-colors select-none group border border-blue-100 shadow-sm">{services.find(s => s.id === id)?.name} <X size={14} className="group-hover:scale-110" /></span>)}</div>}
             </div>
         </div>
 
-        <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Serviço Adicional</label>
-            <div className="relative">
-                <select className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-medium outline-none transition-all cursor-pointer" onChange={(e) => { const val = e.target.value; if (val && !selectedAddServices.includes(val)) setSelectedAddServices(prev => [...prev, val]); e.target.value = ''; }} >
-                    <option value="">Adicionar extra...</option> {getApplicableServices('adicional').filter((service, index, self) => index === self.findIndex((t) => t.name === service.name)).map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-brand-100 text-brand-600 rounded-lg p-1 pointer-events-none"><Plus size={14} strokeWidth={3} /></div>
-            </div>
-        </div>
+        {/* DATA CARD */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-brand-50 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-500" />
+            <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-4 text-sm"><Calendar size={18} className="text-purple-500" /> Quando?</h4>
 
-        {selectedAddServices.length > 0 && <div className="flex flex-wrap gap-2 min-h-[30px] animate-fade-in">{selectedAddServices.map(id => <span key={id} onClick={() => setSelectedAddServices(p => p.filter(x => x !== id))} className="bg-purple-100 text-purple-700 pl-3 pr-2 py-1.5 rounded-xl text-xs font-bold cursor-pointer hover:bg-red-100 hover:text-red-600 flex items-center gap-1 transition-colors select-none group border border-purple-200">{services.find(s => s.id === id)?.name} <X size={14} className="group-hover:scale-110" /></span>)}</div>}
-
-        <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Data</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-semibold outline-none transition-all" />
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Dia</label>
+                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all min-w-0" />
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Hora</label>
+                    <div className="relative">
+                        <select value={time} onChange={e => setTime(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all cursor-pointer">
+                            {timeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                    </div>
+                </div>
             </div>
-            <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Horário</label>
+
+            <div className="space-y-1.5 mt-4">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Tempo Estimado</label>
                 <div className="relative">
-                    <select value={time} onChange={e => setTime(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-semibold outline-none transition-all cursor-pointer">
-                        {timeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                    <select value={manualDuration} onChange={e => setManualDuration(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all cursor-pointer">
+                        <option value="0">⚡ Automático (pelo serviço)</option><option value="30">30 min</option><option value="60">1 hora</option><option value="90">1h 30min</option><option value="120">2 horas</option><option value="150">2h 30min</option><option value="180">3 horas</option><option value="240">4 horas</option>
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
                 </div>
             </div>
         </div>
 
-        <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Duração Estimada</label>
-            <div className="relative">
-                <select value={manualDuration} onChange={e => setManualDuration(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-medium outline-none transition-all cursor-pointer">
-                    <option value="0">Automático (baseado no serviço)</option><option value="30">30 minutos</option><option value="60">1 hora</option><option value="90">1 hora e 30 min</option><option value="120">2 horas</option><option value="150">2 horas e 30 min</option><option value="180">3 horas</option><option value="240">4 horas</option>
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
-            </div>
+        {/* DETAILS CARD */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-brand-50 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500" />
+            <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-4 text-sm"><FileText size={18} className="text-orange-500" /> Detalhes</h4>
+
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-sm outline-none transition-all resize-none font-medium placeholder:text-gray-400 h-28 leading-relaxed" placeholder="Alguma observação, cuidado especial ou pedido do cliente?" />
         </div>
 
-        <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Observações</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-sm outline-none transition-all resize-none font-medium placeholder:text-gray-300" rows={3} placeholder="Alguma observação especial sobre o pet?" />
-        </div>
-
-    </div>)} </div> <div className="p-4 border-t border-gray-100 bg-white/50 backdrop-blur-sm flex justify-end gap-3 rounded-b-2xl"> <button onClick={resetForm} className="px-6 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-2xl text-sm transition">Cancelar</button> <button onClick={handleSave} disabled={!selectedClient || !selectedPet || !selectedService} className="px-8 py-4 bg-brand-600 text-white font-bold rounded-2xl hover:bg-brand-700 disabled:opacity-50 text-sm shadow-xl shadow-brand-200 hover:shadow-brand-300 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"> <Check size={20} strokeWidth={2.5} /> Confirmar Agendamento</button> </div> </div> </div>, document.body)} </div>);
+    </div>)} </div> <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white/80 backdrop-blur-xl flex justify-end gap-3 z-20 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.05)] md:static md:bg-transparent md:border-0 md:shadow-none"> <button onClick={resetForm} className="px-6 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-2xl text-sm transition h-14 w-full md:w-auto">Cancelar</button> <button onClick={handleSave} disabled={!selectedClient || !selectedPet || !selectedService} className="px-8 py-4 bg-brand-600 text-white font-bold rounded-2xl hover:bg-brand-700 disabled:opacity-50 text-sm shadow-xl shadow-brand-200 hover:shadow-brand-300 active:scale-95 transition-all flex items-center justify-center gap-2 h-14 w-full md:w-auto"> <Check size={20} strokeWidth={2.5} /> <span className="md:hidden">Confirmar</span><span className="hidden md:inline">Confirmar Agendamento</span></button> </div> </div> </div>, document.body)} </div>);
 };
 
 // --- MENU VIEW (Mobile Only - 4th Tab) ---
