@@ -13,6 +13,7 @@ interface LayoutProps {
   onLogout: () => void;
   settings?: AppSettings;
   onOpenSettings: () => void;
+  isLoading?: boolean;
 }
 
 const DEFAULT_LOGO_URL = 'https://photos.app.goo.gl/xs394sFQNYBBocea8';
@@ -76,7 +77,7 @@ const BottomNavItem = ({
   );
 };
 
-export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout, settings, onOpenSettings }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout, settings, onOpenSettings, isLoading }) => {
   const menuGroups = {
     operacional: (
       <div className="pb-4" key="operacional">
@@ -172,6 +173,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
           </button>
         </div>
       </aside>
+
+      {/* Sync Indicator (Absolute for both Desktop/Mobile) */}
+      {isLoading && (
+        <div className="fixed top-4 right-4 z-[60] bg-white/90 backdrop-blur-xl shadow-lg border border-brand-100 rounded-full py-1.5 px-3 flex items-center gap-2 animate-slide-in-right">
+          <div className="w-3 h-3 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-[10px] font-bold text-brand-700 uppercase tracking-wider">Sincronizando</span>
+        </div>
+      )}
 
 
 

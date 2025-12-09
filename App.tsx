@@ -1324,7 +1324,7 @@ const App: React.FC = () => {
 
     if (!googleUser) return <LoginScreen onLogin={googleService.login} onReset={handleResetConfig} settings={settings} googleLoaded={googleLoaded} />;
 
-    if (isGlobalLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-brand-50"><Loader2 size={48} className="text-brand-600 animate-spin mb-4" /><p className="text-brand-700 font-bold animate-pulse">Sincronizando dados...</p></div>;
+    // if (isGlobalLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-brand-50"><Loader2 size={48} className="text-brand-600 animate-spin mb-4" /><p className="text-brand-700 font-bold animate-pulse">Sincronizando dados...</p></div>;
 
     // Views that require PIN
     const secureViews: ViewState[] = ['revenue', 'costs'];
@@ -1342,6 +1342,7 @@ const App: React.FC = () => {
                 onLogout={handleLogout}
                 settings={settings}
                 onOpenSettings={() => setIsSettingsOpen(true)}
+                isLoading={isGlobalLoading}
             >
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="daily" />}
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="monthly" />}
