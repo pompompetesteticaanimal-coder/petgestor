@@ -645,7 +645,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             }
             clusters.push(currentCluster);
         }
-        const layoutResult: { app: Appointment, left: string, width: string }[] = [];
+        const layoutResult: { app: Appointment, left: string, width: string, zIndex: number }[] = [];
         clusters.forEach(cluster => {
             const columns: typeof nodes[] = [];
             cluster.forEach(node => {
@@ -653,8 +653,33 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 for (let i = 0; i < columns.length; i++) { const lastInCol = columns[i][columns[i].length - 1]; if (node.start >= lastInCol.end) { columns[i].push(node); placed = true; break; } }
                 if (!placed) columns.push([node]);
             });
-            const count = columns.length; const widthPct = 100 / count;
-            columns.forEach((col, colIdx) => { col.forEach(node => { layoutResult.push({ app: node.app, left: `${colIdx * widthPct}%`, width: `${widthPct}%` }); }); });
+            const count = columns.length;
+            // Cascading Stack for > 2 columns (or if preferred for any overlap)
+            if (count > 2) {
+                columns.forEach((col, colIdx) => {
+                    col.forEach(node => {
+                        layoutResult.push({
+                            app: node.app,
+                            left: `${colIdx * 10}%`, // 10% offset per card
+                            width: '85%',            // Wide cards for readability
+                            zIndex: 10 + colIdx      // Stack z-index
+                        });
+                    });
+                });
+            } else {
+                // Standard Side-by-Side
+                const widthPct = 100 / count;
+                columns.forEach((col, colIdx) => {
+                    col.forEach(node => {
+                        layoutResult.push({
+                            app: node.app,
+                            left: `${colIdx * widthPct}%`,
+                            width: `${widthPct}%`,
+                            zIndex: 10
+                        });
+                    });
+                });
+            }
         });
         return layoutResult;
     };
@@ -675,7 +700,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div className="relative h-[1200px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
-                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 9) * 60 + d.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: 10 }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />); })}
+                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 9) * 60 + d.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />); })}
                     {/* Current Time Indicator (Visual Mockup) */}
                     <div className="absolute w-full border-t-2 border-red-400 border-dashed opacity-50 pointer-events-none" style={{ top: '400px' }}><span className="bg-red-400 text-white text-[9px] px-1 rounded-r absolute -top-2 left-0">Now</span></div>
                 </div>
@@ -688,7 +713,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div className="flex h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex-col mx-1">
                 <div className="flex border-b border-gray-100 bg-gray-50/50 backdrop-blur-sm"> <div className="w-10 bg-transparent border-r border-gray-100"></div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]; return (<div key={dIdx} className={`flex-1 text-center py-3 text-xs font-bold border-r border-gray-100 ${isToday ? 'bg-brand-50/50 text-brand-600' : 'text-gray-500'}`}> {d.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()} <div className={`text-sm mt-0.5 ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{d.getDate()}</div> </div>) })} </div>
-                <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 9) * 60 + ad.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: 10 }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />) })} </div>) })} </div>
+                <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 9) * 60 + ad.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />) })} </div>) })} </div>
             </div>
         )
     }
