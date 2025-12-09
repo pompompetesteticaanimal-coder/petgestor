@@ -1414,6 +1414,7 @@ const App: React.FC = () => {
                 settings={settings}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 isLoading={isGlobalLoading}
+                onManualRefresh={async () => { if (accessToken) await performFullSync(accessToken); else window.location.reload(); }}
             >
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="daily" />}
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="monthly" />}
