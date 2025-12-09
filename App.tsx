@@ -1077,13 +1077,22 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         if (!clientSearch) return [];
         const term = clientSearch.toLowerCase();
         const termClean = term.replace(/\D/g, ''); // Digits only
-        return clients.filter(c => {
+
+        const uniqueClients = new Map<string, Client>();
+
+        clients.forEach(c => {
             const nameMatch = c.name.toLowerCase().includes(term);
             const phoneRawMatch = c.phone.includes(clientSearch);
             const phoneCleanMatch = termClean.length > 2 && c.phone.replace(/\D/g, '').includes(termClean);
             const petMatch = c.pets.some(p => p.name.toLowerCase().includes(term));
-            return nameMatch || phoneRawMatch || phoneCleanMatch || petMatch;
-        }).slice(0, 20);
+
+            if (nameMatch || phoneRawMatch || phoneCleanMatch || petMatch) {
+                const key = c.phone.replace(/\D/g, '') || c.id;
+                if (!uniqueClients.has(key)) uniqueClients.set(key, c);
+            }
+        });
+
+        return Array.from(uniqueClients.values()).slice(0, 20);
     }, [clients, clientSearch]);
     const selectedClientData = selectedClient; // selectedClient is now Client object
     const pets = selectedClientData?.pets || [];
@@ -1364,9 +1373,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                                                         <span className="font-bold text-gray-800 group-hover/item:text-brand-700 transition-colors">{c.name}</span>
                                                                         <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">{c.phone}</span>
                                                                     </div>
-                                                                    <div className="flex gap-2">
-                                                                        {c.pets.slice(0, 3).map(p => (
-                                                                            <span key={p.id} className="text-[10px] bg-gray-50 text-gray-500 border border-gray-100 px-1.5 py-0.5 rounded uppercase tracking-wide font-bold">{p.name}</span>
+                                                                    <div className="flex gap-2 flex-wrap mt-1.5">
+                                                                        {c.pets.slice(0, 5).map(p => (
+                                                                            <span key={p.id} className="text-[11px] bg-brand-50 text-brand-700 border border-brand-100 px-2 py-0.5 rounded-md font-bold shadow-sm">{p.name}</span>
                                                                         ))}
                                                                     </div>
                                                                 </div>
@@ -1557,10 +1566,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                                             className="w-full p-2.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 outline-none focus:ring-2 ring-purple-500/20 focus:border-purple-500 transition-all appearance-none cursor-pointer hover:bg-white hover:border-purple-300 hover:text-purple-600"
                                                         >
                                                             <option value="">+ Adicionar serviço extra...</option>
-                                                            {getApplicableServices('adicional')
-                                                                .filter(s => !selectedAddServices.includes(s.id))
-                                                                .map(s => (<option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>))
-                                                            }
+                                                            {(() => {
+                                                                const available = getApplicableServices('adicional').filter(s => !selectedAddServices.includes(s.id));
+                                                                // Deduplicate by name
+                                                                const uniqueAvailable = Array.from(new Map(available.map(s => [s.name, s])).values());
+
+                                                                return uniqueAvailable.map(s => (<option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>));
+                                                            })()}
                                                         </select>
                                                         <Plus className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
                                                     </div>
