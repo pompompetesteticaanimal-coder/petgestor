@@ -1402,28 +1402,40 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                                     <div>
                                                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 block ml-1">Selecionar Pet</label>
                                                         <div className="space-y-2">
-                                                            {selectedClient.pets.map(p => (
-                                                                <div
-                                                                    key={p.id}
-                                                                    onClick={() => setSelectedPet(p.id)}
-                                                                    className={`group p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center justify-between ${selectedPet === p.id
-                                                                        ? 'border-brand-500 bg-brand-50 shadow-md transform scale-[1.02]'
-                                                                        : 'border-gray-100 hover:border-brand-200 bg-white hover:bg-gray-50'}`}
-                                                                >
-                                                                    <div className="flex items-center gap-4">
-                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${selectedPet === p.id ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-brand-100 group-hover:text-brand-500'}`}>
-                                                                            <PawPrint size={18} />
+                                                            {selectedClient.pets.map(p => {
+                                                                const pApps = appointments.filter(a => a.petId === p.id && a.rating);
+                                                                const pAvg = pApps.length > 0 ? pApps.reduce((acc, curr) => acc + (curr.rating || 0), 0) / pApps.length : 0;
+                                                                return (
+                                                                    <div
+                                                                        key={p.id}
+                                                                        onClick={() => setSelectedPet(p.id)}
+                                                                        className={`group p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center justify-between ${selectedPet === p.id
+                                                                            ? 'border-brand-500 bg-brand-50 shadow-md transform scale-[1.02]'
+                                                                            : 'border-gray-100 hover:border-brand-200 bg-white hover:bg-gray-50'}`}
+                                                                    >
+                                                                        <div className="flex items-center gap-4">
+                                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${selectedPet === p.id ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-brand-100 group-hover:text-brand-500'}`}>
+                                                                                <PawPrint size={18} />
+                                                                            </div>
+                                                                            <div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <h5 className={`font-bold text-sm ${selectedPet === p.id ? 'text-brand-900' : 'text-gray-700'}`}>{p.name}</h5>
+                                                                                    {pAvg > 0 && (
+                                                                                        <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded-md border border-yellow-100">
+                                                                                            <Star size={10} className="fill-yellow-400 text-yellow-400" />
+                                                                                            <span className="text-[10px] font-bold text-yellow-600">{pAvg.toFixed(1)}</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                                <p className="text-xs text-gray-500 font-medium">{p.breed} • {p.size || '?'} • {p.coat || '?'}</p>
+                                                                            </div>
                                                                         </div>
-                                                                        <div>
-                                                                            <h5 className={`font-bold text-sm ${selectedPet === p.id ? 'text-brand-900' : 'text-gray-700'}`}>{p.name}</h5>
-                                                                            <p className="text-xs text-gray-500 font-medium">{p.breed} • {p.size || '?'} • {p.coat || '?'}</p>
+                                                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedPet === p.id ? 'border-brand-500 bg-brand-500' : 'border-gray-200'}`}>
+                                                                            {selectedPet === p.id && <Check size={12} className="text-white" strokeWidth={4} />}
                                                                         </div>
                                                                     </div>
-                                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedPet === p.id ? 'border-brand-500 bg-brand-500' : 'border-gray-200'}`}>
-                                                                        {selectedPet === p.id && <Check size={12} className="text-white" strokeWidth={4} />}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
+                                                                );
+                                                            })}
                                                             <button className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 font-bold text-xs hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50/50 transition-all flex items-center justify-center gap-2">
                                                                 <Plus size={16} /> Adicionar Novo Pet
                                                             </button>
@@ -1472,13 +1484,20 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                                     />
                                                 </div>
                                                 <div className="relative">
-                                                    <label className="text-[10px] font-bold text-gray-400 uppercase absolute left-3 top-2">Duração (min)</label>
-                                                    <input
-                                                        type="number"
+                                                    <label className="text-[10px] font-bold text-gray-400 uppercase absolute left-3 top-2">Duração Estimada</label>
+                                                    <select
                                                         value={manualDuration}
-                                                        onChange={e => setManualDuration(e.target.value)}
-                                                        className="w-full pt-6 pb-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all"
-                                                    />
+                                                        onChange={e => setManualDuration(Number(e.target.value))}
+                                                        className="w-full pt-6 pb-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        <option value={0}>Automático (Soma dos serviços)</option>
+                                                        {Array.from({ length: 10 }, (_, i) => (i + 1) * 30).map(min => {
+                                                            const h = Math.floor(min / 60);
+                                                            const m = min % 60;
+                                                            const label = h > 0 ? `${h}h ${m > 0 ? m + 'min' : ''}` : `${m}min`;
+                                                            return <option key={min} value={min}>{label}</option>;
+                                                        })}
+                                                    </select>
                                                 </div>
                                             </div>
                                         </div>
@@ -1508,20 +1527,42 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
                                                 <div>
                                                     <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Adicionais</label>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {getApplicableServices('adicional').map(s => (
-                                                            <button
-                                                                key={s.id}
-                                                                onClick={() => setSelectedAddServices(prev => prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id])}
-                                                                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 ${selectedAddServices.includes(s.id)
-                                                                    ? 'bg-purple-600 text-white border-purple-600 shadow-md transform scale-105'
-                                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:bg-purple-50'}`}
-                                                            >
-                                                                {s.name}
-                                                                <span className={`text-[10px] px-1.5 rounded-md ${selectedAddServices.includes(s.id) ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>+R${s.price}</span>
-                                                            </button>
-                                                        ))}
-                                                        {getApplicableServices('adicional').length === 0 && <span className="text-gray-400 text-xs italic">Nenhum adicional disponível</span>}
+
+                                                    {/* Selected Chips */}
+                                                    {selectedAddServices.length > 0 && (
+                                                        <div className="flex flex-wrap gap-2 mb-3">
+                                                            {selectedAddServices.map(id => {
+                                                                const s = services.find(srv => srv.id === id);
+                                                                if (!s) return null;
+                                                                return (
+                                                                    <div key={id} className="flex items-center gap-1 pl-3 pr-1 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs font-bold border border-purple-200 shadow-sm animate-scale-up-sm">
+                                                                        <span>{s.name}</span>
+                                                                        <span className="opacity-60 text-[10px]">+R${s.price}</span>
+                                                                        <button onClick={() => setSelectedAddServices(prev => prev.filter(pid => pid !== id))} className="p-1 hover:bg-white/50 rounded-md transition-colors text-purple-800"><X size={12} /></button>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Add Dropdown */}
+                                                    <div className="relative">
+                                                        <select
+                                                            value=""
+                                                            onChange={e => {
+                                                                if (e.target.value) {
+                                                                    setSelectedAddServices(prev => [...prev, e.target.value]);
+                                                                }
+                                                            }}
+                                                            className="w-full p-2.5 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 outline-none focus:ring-2 ring-purple-500/20 focus:border-purple-500 transition-all appearance-none cursor-pointer hover:bg-white hover:border-purple-300 hover:text-purple-600"
+                                                        >
+                                                            <option value="">+ Adicionar serviço extra...</option>
+                                                            {getApplicableServices('adicional')
+                                                                .filter(s => !selectedAddServices.includes(s.id))
+                                                                .map(s => (<option key={s.id} value={s.id}>{s.name} (+R$ {s.price})</option>))
+                                                            }
+                                                        </select>
+                                                        <Plus className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
                                                     </div>
                                                 </div>
                                             </div>
