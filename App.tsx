@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-    LineChart, Line, CartesianGrid, Legend, ComposedChart, LabelList, PieChart, Pie
+    LineChart, Line, CartesianGrid, Legend, ComposedChart, LabelList, PieChart, Pie, AreaChart, Area
 } from 'recharts';
 
 // --- CONSTANTS ---
@@ -316,27 +316,85 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const yearlyApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
     const yearlyStats = calculateStats(yearlyApps);
 
-    // Métricas de Média Pets/Dia
-    const weeklyAvgPets = weeklyStats.totalPets / 5; // Aprox 5 dias úteis
-    const monthlyAvgPets = monthlyStats.totalPets / 22; // Aprox 22 dias úteis
-    const yearlyAvgPets = yearlyStats.totalPets / (selectedYear === 2025 ? 110 : 260); // Aprox
+    // --- NEW STATS LOGIC ---
+    const calculatePeriodStats = (rangeApps: Appointment[], daysCount: number) => {
+        const stats = calculateStats(rangeApps);
+        const avgRevPerDay = daysCount > 0 ? stats.grossRevenue / daysCount : 0;
+        const avgPetsPerDay = daysCount > 0 ? stats.totalPets / daysCount : 0;
+        return { ...stats, avgRevPerDay, avgPetsPerDay };
+    };
 
-    const StatCard = ({ title, value, icon: Icon, colorClass, subValue }: any) => (
-        <div className="bg-white/60 backdrop-blur-md p-5 rounded-3xl border border-white/40 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between min-h-[110px] group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110 duration-500">
-                <Icon size={48} className={colorClass.replace('bg-', 'text-').replace('500', '600')} />
-            </div>
-            <div className="flex justify-between items-start z-10">
-                <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</p>
-                    <h3 className="text-3xl font-bold text-gray-800 tracking-tight">{value}</h3>
-                    {subValue && <p className="text-xs font-medium text-gray-400 mt-1 flex items-center gap-1">{subValue}</p>}
+    const getGrowth = (current: number, previous: number) => {
+        if (previous === 0) return current > 0 ? 100 : 0;
+        return ((current - previous) / previous) * 100;
+    };
+
+    // Calculate Data for Tabs
+    const metricData = useMemo(() => {
+        // Current Date Reference
+        const currDate = new Date(selectedDate);
+        if (activeTab === 'weekly') {
+            const getWeekRange = (date: Date) => {
+                const day = date.getDay();
+                const start = new Date(date); start.setDate(date.getDate() - day); start.setHours(0, 0, 0, 0);
+                const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
+                return { start, end };
+            };
+            const curr = getWeekRange(currDate);
+            const prevStart = new Date(curr.start); prevStart.setDate(prevStart.getDate() - 7);
+            const prev = getWeekRange(prevStart);
+
+            const currApps = appointments.filter(a => { const d = new Date(a.date); return d >= curr.start && d <= curr.end; });
+            const prevApps = appointments.filter(a => { const d = new Date(a.date); return d >= prev.start && d <= prev.end; });
+
+            const cStats = calculatePeriodStats(currApps, 6); // 6 working days approx
+            const pStats = calculatePeriodStats(prevApps, 6);
+
+            return { current: cStats, previous: pStats, rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` };
+        }
+        else if (activeTab === 'monthly') {
+            const [yStr, mStr] = selectedMonth.split('-');
+            const y = parseInt(yStr), m = parseInt(mStr) - 1;
+            const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
+            const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
+
+            const currApps = appointments.filter(a => { const d = new Date(a.date); return d >= currStart && d <= currEnd; });
+            const prevApps = appointments.filter(a => { const d = new Date(a.date); return d >= prevStart && d <= prevEnd; });
+
+            const cStats = calculatePeriodStats(currApps, 24); // ~24 working days
+            const pStats = calculatePeriodStats(prevApps, 24);
+
+            return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
+        }
+        else if (activeTab === 'yearly') {
+            const currApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
+            const prevApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear - 1);
+
+            const cStats = calculatePeriodStats(currApps, 300); // ~300 working days
+            const pStats = calculatePeriodStats(prevApps, 300);
+
+            return { current: cStats, previous: pStats, rangeLabel: selectedYear.toString() };
+        }
+        return null;
+    }, [activeTab, appointments, selectedDate, selectedMonth, selectedYear]);
+
+    const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: any) => (
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100/80 hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group h-full">
+            <div className="flex justify-between items-start mb-4">
+                <div className={`p-2.5 rounded-2xl ${colorClass} bg-opacity-10 text-${colorClass.split('-')[1]}-600`}>
+                    <Icon size={20} />
                 </div>
-                <div className={`p-2.5 rounded-2xl ${colorClass} bg-opacity-20 shadow-inner md:group-hover:bg-opacity-30 transition-all`}>
-                    <div className={`p-1.5 rounded-xl bg-white shadow-sm`}>
-                        <Icon size={18} className={colorClass.replace('bg-', 'text-').replace('500', '600')} />
+                {growth !== undefined && (
+                    <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 ${growth >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        {growth >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                        {Math.abs(growth).toFixed(0)}%
                     </div>
-                </div>
+                )}
+            </div>
+            <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</p>
+                <h3 className="text-2xl font-bold text-gray-800 tracking-tight leading-none">{value}</h3>
+                {subValue && <p className="text-xs font-medium text-gray-400 mt-2">{subValue}</p>}
             </div>
         </div>
     );
@@ -410,25 +468,63 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                     </div>
                 </section>
             )}
-            {activeTab === 'weekly' && (
-                <section>
-                    <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200 gap-2"><h2 className="text-lg font-bold text-gray-800">Semana</h2></div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Pets da Semana" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-indigo-500" /><StatCard title="Total Faturamento" value={`R$ ${weeklyStats.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-teal-500" /><StatCard title="Média Pets/Dia" value={weeklyAvgPets.toFixed(1)} icon={Activity} colorClass="bg-amber-500" /><StatCard title="Pendente" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-rose-500" /></div>
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-96"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2"><TrendingUp size={16} /> Faturamento x Pets</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={weeklyChartData} margin={{ top: 20, right: 0, bottom: 40, left: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" interval={0} tick={<CustomXAxisTick data={weeklyChartData} />} height={60} axisLine={false} tickLine={false} /><YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} tickFormatter={(val) => `R$${val}`} domain={['auto', 'auto']} /><YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><Bar yAxisId="right" dataKey="pets" fill="#c7d2fe" radius={[4, 4, 0, 0]} barSize={40}><LabelList dataKey="pets" position="top" style={{ fontSize: 9, fill: '#6366f1' }} /></Bar><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} /></ComposedChart></ResponsiveContainer></div>
+            {activeTab === 'weekly' && metricData && (
+                <section className="animate-fade-in text-left">
+                    <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+                        <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                        <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
+                        <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                        <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
+                    </div>
+
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-80 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Diária</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={weeklyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} dy={10} /><YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Bar dataKey="faturamento" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={20} /><Line type="monotone" dataKey="pets" stroke="#f97316" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
                 </section>
             )}
-            {activeTab === 'monthly' && (
-                <section>
-                    <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800">Mês</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none" /></div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Total de Pets" value={monthlyStats.totalPets} icon={PawPrint} colorClass="bg-purple-500" /><StatCard title="Ticket Médio" value={`R$ ${monthlyStats.averageTicket.toFixed(2)}`} icon={DollarSign} colorClass="bg-teal-500" /><StatCard title="Média Pets/Dia" value={monthlyAvgPets.toFixed(1)} icon={Activity} colorClass="bg-amber-500" /><StatCard title="A Receber" value={`R$ ${monthlyStats.pendingRevenue.toFixed(2)}`} icon={AlertOctagon} colorClass="bg-red-500" /></div>
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-96"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2"><TrendingUp size={16} /> Comparativo Semanal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 20, right: 0, bottom: 40, left: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" interval={0} tick={<CustomXAxisTick data={monthlyChartData} />} height={60} axisLine={false} tickLine={false} /><YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} tickFormatter={(val) => `R$${val}`} domain={['auto', 'auto']} /><YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><Bar yAxisId="right" dataKey="pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={40}><LabelList dataKey="pets" position="top" style={{ fontSize: 9, fill: '#9333ea' }} /></Bar><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} /></ComposedChart></ResponsiveContainer></div>
+
+            {activeTab === 'monthly' && metricData && (
+                <section className="animate-fade-in text-left">
+                    <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+                        <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                        <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
+                        <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                        <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div className="lg:col-span-2 bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-80"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas</h3><ResponsiveContainer width="100%" height="80%"><BarChart data={monthlyChartData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar dataKey="faturamento" fill="#ec4899" radius={[4, 4, 0, 0]} barSize={30} /></BarChart></ResponsiveContainer></div>
+                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-80 overflow-y-auto custom-scrollbar">
+                            <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2 uppercase tracking-wide"><Star size={16} /> Top Clientes</h3>
+                            {/* Simplified Top Clients List */}
+                            {(() => {
+                                const clientRevenue = new Map<string, number>();
+                                appointments.filter(a => a.date.startsWith(selectedMonth) && a.status !== 'cancelado').forEach(a => { const cId = a.clientId; clientRevenue.set(cId, (clientRevenue.get(cId) || 0) + calculateGrossRevenue(a)); });
+                                const topClients = Array.from(clientRevenue.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, rev]) => { const c = clients.find(cl => cl.id === id); return { name: c?.name || 'Desc.', rev }; });
+                                return <div className="space-y-3">{topClients.map((c, i) => <div key={i} className="flex justify-between items-center text-sm"><span className="font-bold text-gray-700 truncate max-w-[120px]">{i + 1}. {c.name}</span><span className="bg-green-50 text-green-700 px-2 py-0.5 rounded-lg text-xs font-bold">R$ {c.rev.toFixed(0)}</span></div>)}</div>
+                            })()}
+                        </div>
+                    </div>
                 </section>
             )}
-            {activeTab === 'yearly' && (
-                <section>
-                    <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800">Ano</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none">{[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Total Pets" value={yearlyStats.totalPets} icon={PawPrint} colorClass="bg-sky-500" /><StatCard title="Média Pets/Dia" value={yearlyAvgPets.toFixed(1)} icon={Activity} colorClass="bg-amber-500" /><StatCard title="Faturamento Total" value={`R$ ${yearlyStats.grossRevenue.toFixed(2)}`} icon={Wallet} colorClass="bg-green-500" /><StatCard title="Pendência Total" value={`R$ ${yearlyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" /></div>
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 20, right: 0, bottom: 40, left: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" interval={0} tick={<CustomXAxisTick data={yearlyChartData} />} height={60} axisLine={false} tickLine={false} /><YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} tickFormatter={(val) => `R$${val / 1000}k`} domain={['auto', 'auto']} /><YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><Bar yAxisId="right" dataKey="pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={30}><LabelList dataKey="pets" position="top" style={{ fontSize: 9, fill: '#059669' }} /></Bar><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} /></ComposedChart></ResponsiveContainer></div>
+
+            {activeTab === 'yearly' && metricData && (
+                <section className="animate-fade-in text-left">
+                    <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+                        <StatCard title="Faturamento Total" value={`R$ ${(metricData.current.grossRevenue / 1000).toFixed(1)}k`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                        <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
+                        <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                        <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
+                    </div>
+
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><AreaChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><defs><linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><Tooltip /><Area type="monotone" dataKey="faturamento" stroke="#10b981" fillOpacity={1} fill="url(#colorRev)" strokeWidth={3} /></AreaChart></ResponsiveContainer></div>
                 </section>
             )}
         </div>
