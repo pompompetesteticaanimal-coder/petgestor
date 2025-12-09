@@ -179,7 +179,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
           onRefresh={handleRefresh}
           className="flex-1 p-4 md:p-8 pb-28 md:pb-8 no-scrollbar scroll-smooth"
         >
-          <div className="max-w-7xl mx-auto w-full">
+          <div key={currentView} className="max-w-7xl mx-auto w-full page-transition">
             {children}
           </div>
         </PullToRefresh>
