@@ -14,7 +14,7 @@ import {
     ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
     Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
     Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon,
-    ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft, Star
+    ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft, Star, Moon
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -143,6 +143,21 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: 
                                     {localSettings.theme === t.value && <div className="bg-brand-600 text-white p-1 rounded-full"><Check size={16} /></div>}
                                 </button>
                             ))}
+                            <div className="mt-4 p-4 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center"><Moon size={20} /></div>
+                                    <div>
+                                        <span className="block font-bold text-gray-800">Modo Escuro</span>
+                                        <span className="text-xs text-gray-500">Interface com cores escuras</span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setLocalSettings({ ...localSettings, darkMode: !localSettings.darkMode })}
+                                    className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 ${localSettings.darkMode ? 'bg-brand-600' : 'bg-gray-300'}`}
+                                >
+                                    <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${localSettings.darkMode ? 'translate-x-5' : ''}`} />
+                                </button>
+                            </div>
                         </div>
                     )}
                     {activeTab === 'menu' && (
@@ -1035,7 +1050,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 };
 
 // --- MENU VIEW (Mobile Only - 4th Tab) ---
-const MenuView: React.FC<{ setView: (v: ViewState) => void }> = ({ setView }) => {
+// --- MENU VIEW (Mobile Only - 4th Tab) ---
+const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () => void }> = ({ setView, onOpenSettings }) => {
     const MenuCard = ({ icon: Icon, title, onClick, colorClass }: any) => (
         <button onClick={onClick} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-3 aspect-square active:scale-95 transition">
             <div className={`w-12 h-12 rounded-full ${colorClass} flex items-center justify-center text-white`}><Icon size={24} /></div>
@@ -1074,6 +1090,33 @@ const MenuView: React.FC<{ setView: (v: ViewState) => void }> = ({ setView }) =>
                     </div>
                     <ChevronRight className="ml-auto text-gray-300" />
                 </button>
+
+                <button onClick={() => setIsSettingsOpen(true)} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md group">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><Settings size={32} /></div>
+                    <div className="text-left">
+                        <span className="block text-xl font-bold text-gray-800">Configurações</span>
+                        <span className="text-sm text-gray-400 font-medium">Tema e preferências</span>
+                    </div>
+                    <ChevronRight className="ml-auto text-gray-300" />
+                </button>
+
+                <button onClick={onOpenSettings} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md group">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><Settings size={32} /></div>
+                    <div className="text-left">
+                        <span className="block text-xl font-bold text-gray-800">Configurações</span>
+                        <span className="text-sm text-gray-400 font-medium">Tema e preferências</span>
+                    </div>
+                    <ChevronRight className="ml-auto text-gray-300" />
+                </button>
+
+                <button onClick={onOpenSettings} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md group">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><Settings size={32} /></div>
+                    <div className="text-left">
+                        <span className="block text-xl font-bold text-gray-800">Configurações</span>
+                        <span className="text-sm text-gray-400 font-medium">Tema e preferências</span>
+                    </div>
+                    <ChevronRight className="ml-auto text-gray-300" />
+                </button>
             </div>
 
             <p className="text-center text-xs text-gray-300 font-medium mt-auto">Versão 1.2.0 • PetGestor AI</p>
@@ -1094,7 +1137,16 @@ const App: React.FC = () => {
     const [accessToken, setAccessToken] = useState<string | null>(null);
     const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
-    const [settings, setSettings] = useState<AppSettings>({ appName: 'PomPomPet', logoUrl: '', theme: 'rose', sidebarOrder: ['operacional', 'cadastros', 'gerencial'] });
+    const [settings, setSettings] = useState<AppSettings>({ appName: 'PomPomPet', logoUrl: '', theme: 'rose', sidebarOrder: ['operacional', 'cadastros', 'gerencial'], darkMode: false });
+
+    // --- DARK MODE EFFECT ---
+    useEffect(() => {
+        if (settings.darkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [settings.darkMode]);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [googleLoaded, setGoogleLoaded] = useState(false);
 
@@ -1286,7 +1338,7 @@ const App: React.FC = () => {
                 {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
                 {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
                 {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} />}
-                {currentView === 'menu' && <MenuView setView={setCurrentView} />}
+                {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }} />
         </HashRouter>
