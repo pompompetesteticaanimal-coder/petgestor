@@ -14,7 +14,7 @@ interface LayoutProps {
   onOpenSettings: () => void;
 }
 
-const DEFAULT_LOGO_URL = 'https://photos.fife.usercontent.google.com/pw/AP1GczP9EACBPgVF1S_ZsZH7Shv62wvjBugLa7O8nvkLNpL_d19PsrqTbR4=w249-h220-no?authuser=0';
+const DEFAULT_LOGO_URL = 'https://photos.app.goo.gl/xs394sFQNYBBocea8';
 
 const NavItem = ({ 
   view, 
