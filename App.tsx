@@ -634,8 +634,11 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
-        if (scrollHeight - scrollTop <= clientHeight + 100) {
-            setVisibleCount(prev => Math.min(prev + 20, filteredClients.length));
+        if (scrollHeight - scrollTop <= clientHeight + 300) {
+            setVisibleCount(prev => {
+                if (prev >= filteredClients.length) return prev;
+                return Math.min(prev + 50, filteredClients.length);
+            });
         }
     };
 
@@ -705,8 +708,13 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
                         </div>
                     ))}
                     {visibleCount < filteredClients.length && (
-                        <div className="col-span-full py-4 flex justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
+                        <div className="col-span-full py-8 text-center pb-32">
+                            <button
+                                onClick={() => setVisibleCount(prev => Math.min(prev + 50, filteredClients.length))}
+                                className="text-sm font-bold text-brand-600 bg-brand-50 hover:bg-brand-100 px-6 py-4 rounded-2xl transition shadow-sm border border-brand-100 hover:shadow-md active:scale-95"
+                            >
+                                Carregar Mais Clientes ({filteredClients.length - visibleCount} restantes)
+                            </button>
                         </div>
                     )}
                 </div>
