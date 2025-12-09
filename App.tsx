@@ -877,7 +877,17 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     };
 
     const AppointmentCard = ({ app, style, onClick, onContext }: any) => {
-        const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x) as Service[] || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase(); let colorClass = 'bg-sky-100 border-sky-200 text-sky-900'; if (allServiceNames.includes('tesoura')) colorClass = 'bg-pink-100 border-pink-200 text-pink-900'; else if (allServiceNames.includes('tosa normal')) colorClass = 'bg-orange-100 border-orange-200 text-orange-900'; else if (allServiceNames.includes('higi')) colorClass = 'bg-yellow-100 border-yellow-200 text-yellow-900'; else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) colorClass = 'bg-purple-100 border-purple-200 text-purple-900'; else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) colorClass = 'bg-indigo-100 border-indigo-200 text-indigo-900';
+        const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x) as Service[] || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
+        let colorClass = 'bg-sky-100 border-sky-200 text-sky-900';
+        if (allServiceNames.includes('tesoura')) colorClass = 'bg-pink-100 border-pink-200 text-pink-900';
+        else if (allServiceNames.includes('tosa normal')) colorClass = 'bg-orange-100 border-orange-200 text-orange-900';
+        else if (allServiceNames.includes('higi')) colorClass = 'bg-yellow-100 border-yellow-200 text-yellow-900';
+        else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) colorClass = 'bg-purple-100 border-purple-200 text-purple-900';
+        else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) colorClass = 'bg-indigo-100 border-indigo-200 text-indigo-900';
+
+        const isPaid = !!app.paidAmount && !!app.paymentMethod;
+        if (app.status === 'concluido' || isPaid) colorClass = 'bg-green-100 border-green-200 text-green-900';
+
         return (
             <div style={style} className={`absolute rounded-xl p-2 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:brightness-105 transition-all overflow-hidden flex flex-col leading-tight group hover:z-[100]`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
                 <div className="font-bold truncate text-[11px] mb-0.5">{client?.name.split(' ')[0]} <span className="opacity-70 font-normal">- {pet?.name}</span></div>
