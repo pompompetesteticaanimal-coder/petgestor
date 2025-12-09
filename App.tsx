@@ -109,7 +109,6 @@ const PinGuard: React.FC<{ isUnlocked: boolean; onUnlock: (pin: string) => boole
 
 const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: AppSettings; onSave: (s: AppSettings) => void }> = ({ isOpen, onClose, settings, onSave }) => {
     const [localSettings, setLocalSettings] = useState(settings);
-    const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'menu'>('general');
     if (!isOpen) return null;
     const themes = [
         { name: 'Rose (Padrão)', value: 'rose', color: '#e11d48' },
@@ -118,68 +117,37 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: 
         { name: 'Verde Natureza', value: 'green', color: '#16a34a' },
         { name: 'Laranja Vibrante', value: 'orange', color: '#ea580c' },
     ];
-    const moveMenuItem = (idx: number, dir: number) => { const newOrder = [...localSettings.sidebarOrder]; const target = idx + dir; if (target >= 0 && target < newOrder.length) { [newOrder[idx], newOrder[target]] = [newOrder[target], newOrder[idx]]; setLocalSettings({ ...localSettings, sidebarOrder: newOrder }); } };
     return (
         <div className="fixed inset-0 bg-black/40 z-[80] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
             <div className="bg-white/90 backdrop-blur-xl rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/40 ring-1 ring-white/50 animate-scale-up">
                 <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white/50">
-                    <h3 className="font-bold text-xl text-gray-900 tracking-tight">Configurações</h3>
+                    <h3 className="font-bold text-xl text-gray-900 tracking-tight">Aparência</h3>
                     <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><X size={24} className="text-gray-400 hover:text-gray-600" /></button>
                 </div>
-                <div className="flex border-b border-gray-100 p-1 bg-gray-50/50">
-                    <button onClick={() => setActiveTab('general')} className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'general' ? 'bg-white shadow text-brand-600' : 'text-gray-500 hover:text-gray-700'}`}>Geral</button>
-                    <button onClick={() => setActiveTab('theme')} className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'theme' ? 'bg-white shadow text-brand-600' : 'text-gray-500 hover:text-gray-700'}`}>Aparência</button>
-                    <button onClick={() => setActiveTab('menu')} className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'menu' ? 'bg-white shadow text-brand-600' : 'text-gray-500 hover:text-gray-700'}`}>Menu</button>
-                </div>
                 <div className="p-6 overflow-y-auto space-y-6 flex-1">
-                    {activeTab === 'general' && (
-                        <div className="space-y-4">
-                            <div><label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">Nome do Petshop</label><input value={localSettings.appName} onChange={e => setLocalSettings({ ...localSettings, appName: e.target.value })} className="w-full border-none bg-gray-50 p-4 rounded-xl mt-1 text-gray-800 font-bold outline-none focus:ring-2 ring-brand-200 transition-all" /></div>
-                            <div><label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">URL do Logo</label><input value={localSettings.logoUrl} onChange={e => setLocalSettings({ ...localSettings, logoUrl: e.target.value })} placeholder="https://..." className="w-full border-none bg-gray-50 p-4 rounded-xl mt-1 text-gray-800 outline-none focus:ring-2 ring-brand-200 transition-all" /></div>
-                        </div>
-                    )}
-                    {activeTab === 'theme' && (
-                        <div className="grid grid-cols-1 gap-3">
-                            {themes.map(t => (
-                                <button key={t.value} onClick={() => setLocalSettings({ ...localSettings, theme: t.value })} className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${localSettings.theme === t.value ? 'border-brand-500 bg-brand-50 shadow-sm ring-1 ring-brand-200' : 'border-gray-200 hover:bg-gray-50'}`}>
-                                    <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full shadow-sm ring-2 ring-white" style={{ backgroundColor: t.color }}></div><span className="font-bold text-gray-800">{t.name}</span></div>
-                                    {localSettings.theme === t.value && <div className="bg-brand-600 text-white p-1 rounded-full"><Check size={16} /></div>}
-                                </button>
-                            ))}
-                            <div className="mt-4 p-4 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center"><Moon size={20} /></div>
-                                    <div>
-                                        <span className="block font-bold text-gray-800">Modo Escuro</span>
-                                        <span className="text-xs text-gray-500">Interface com cores escuras</span>
-                                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                        {themes.map(t => (
+                            <button key={t.value} onClick={() => setLocalSettings({ ...localSettings, theme: t.value })} className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${localSettings.theme === t.value ? 'border-brand-500 bg-brand-50 shadow-sm ring-1 ring-brand-200' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full shadow-sm ring-2 ring-white" style={{ backgroundColor: t.color }}></div><span className="font-bold text-gray-800">{t.name}</span></div>
+                                {localSettings.theme === t.value && <div className="bg-brand-600 text-white p-1 rounded-full"><Check size={16} /></div>}
+                            </button>
+                        ))}
+                        <div className="mt-4 p-4 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-100">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center"><Moon size={20} /></div>
+                                <div>
+                                    <span className="block font-bold text-gray-800">Modo Escuro</span>
+                                    <span className="text-xs text-gray-500">Interface com cores escuras</span>
                                 </div>
-                                <button
-                                    onClick={() => setLocalSettings({ ...localSettings, darkMode: !localSettings.darkMode })}
-                                    className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 ${localSettings.darkMode ? 'bg-brand-600' : 'bg-gray-300'}`}
-                                >
-                                    <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${localSettings.darkMode ? 'translate-x-5' : ''}`} />
-                                </button>
                             </div>
+                            <button
+                                onClick={() => setLocalSettings({ ...localSettings, darkMode: !localSettings.darkMode })}
+                                className={`w-12 h-7 rounded-full transition-colors flex items-center px-1 ${localSettings.darkMode ? 'bg-brand-600' : 'bg-gray-300'}`}
+                            >
+                                <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${localSettings.darkMode ? 'translate-x-5' : ''}`} />
+                            </button>
                         </div>
-                    )}
-                    {activeTab === 'menu' && (
-                        <div className="space-y-3">
-                            <p className="text-xs text-center text-gray-400 font-medium uppercase tracking-wide">Reorganize os grupos do menu lateral</p>
-                            {localSettings.sidebarOrder.map((item, idx) => (
-                                <div key={item} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
-                                    <span className="font-bold text-gray-800 capitalize flex items-center gap-2">
-                                        <div className="w-1.5 h-8 bg-gray-200 rounded-full"></div>
-                                        {item === 'operacional' ? 'Operacional' : item}
-                                    </span>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => moveMenuItem(idx, -1)} disabled={idx === 0} className="p-2 hover:bg-white hover:shadow-sm rounded-lg disabled:opacity-30 transition-all text-gray-600"><ChevronDown className="rotate-180" size={18} /></button>
-                                        <button onClick={() => moveMenuItem(idx, 1)} disabled={idx === localSettings.sidebarOrder.length - 1} className="p-2 hover:bg-white hover:shadow-sm rounded-lg disabled:opacity-30 transition-all text-gray-600"><ChevronDown size={18} /></button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    </div>
                 </div>
                 <div className="p-5 border-t border-gray-100/50 bg-gray-50/50 flex justify-end gap-3 glass">
                     <button onClick={onClose} className="px-5 py-3 text-gray-600 hover:bg-gray-200/50 rounded-xl font-bold text-sm transition-colors">Cancelar</button>
