@@ -1139,32 +1139,18 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 if (!placed) columns.push([node]);
             });
             const count = columns.length;
-            // Cascading Stack for > 2 columns (or if preferred for any overlap)
-            if (count > 2) {
-                columns.forEach((col, colIdx) => {
-                    col.forEach(node => {
-                        layoutResult.push({
-                            app: node.app,
-                            left: `${colIdx * 10}%`, // 10% offset per card
-                            width: '85%',            // Wide cards for readability
-                            zIndex: 10 + colIdx      // Stack z-index
-                        });
+            // Always use Side-by-Side Column Layout to prevent overlapping
+            const widthPct = 100 / count;
+            columns.forEach((col, colIdx) => {
+                col.forEach(node => {
+                    layoutResult.push({
+                        app: node.app,
+                        left: `${colIdx * widthPct}%`,
+                        width: `${widthPct}%`,
+                        zIndex: 10
                     });
                 });
-            } else {
-                // Standard Side-by-Side
-                const widthPct = 100 / count;
-                columns.forEach((col, colIdx) => {
-                    col.forEach(node => {
-                        layoutResult.push({
-                            app: node.app,
-                            left: `${colIdx * widthPct}%`,
-                            width: `${widthPct}%`,
-                            zIndex: 10
-                        });
-                    });
-                });
-            }
+            });
         });
         return layoutResult;
     };
@@ -1185,7 +1171,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const avgRating = starsValues.length > 0 ? starsValues.reduce((a, b) => a + b, 0) / starsValues.length : 0;
 
         return (
-            <div style={style} className={`animate-pop absolute rounded-xl p-2 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:brightness-105 transition-all overflow-hidden flex flex-col leading-tight group hover:z-[100]`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
+        return (
+            <div style={style} className={`animate-pop absolute rounded-lg p-1 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:brightness-105 transition-all overflow-hidden flex flex-col leading-tight group hover:z-[100]`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
                 <div className="flex justify-between items-start">
                     <div className="font-bold truncate text-[11px] mb-0.5">{client?.name.split(' ')[0]} <span className="opacity-70 font-normal">- {pet?.name}</span></div>
                     {avgRating > 0 && <div className="flex text-yellow-500 bg-white/50 px-1 rounded-md shadow-sm items-center gap-0.5"><Star size={8} fill="currentColor" /><span className="text-[9px] font-bold">{avgRating.toFixed(1)}</span></div>}
