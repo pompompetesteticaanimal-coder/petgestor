@@ -1330,13 +1330,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                             <input type="text" placeholder="Buscar cliente..." value={clientSearch} onChange={e => { setClientSearch(e.target.value); setSelectedClient(null); setSelectedPet(null); }} className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-xl text-sm outline-none transition-all font-medium placeholder:text-gray-400" />
                                             {clientSearch && !selectedClient && (
                                                 <div className="absolute top-full left-0 right-0 bg-white shadow-xl rounded-xl mt-2 z-20 border border-gray-100 max-h-48 overflow-y-auto custom-scrollbar">
-                                                    {clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase())).map(c => (
+                                                    {clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch) || c.pets.some(p => p.name.toLowerCase().includes(clientSearch.toLowerCase()))).map(c => (
                                                         <div key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(c.name); }} className="w-full text-left p-3 hover:bg-gray-50 cursor-pointer text-sm font-medium text-gray-700 border-b border-gray-50 last:border-0 flex items-center justify-between group">
                                                             <span>{c.name}</span>
                                                             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md group-hover:bg-white transition-colors">{c.phone}</span>
                                                         </div>
                                                     ))}
-                                                    {clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
+                                                    {clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch) || c.pets.some(p => p.name.toLowerCase().includes(clientSearch.toLowerCase()))).length === 0 && (
                                                         <div className="p-4 text-center text-gray-500 text-sm">Nenhum cliente encontrado</div>
                                                     )}
                                                 </div>
