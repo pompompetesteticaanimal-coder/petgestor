@@ -837,6 +837,18 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day'); const [currentDate, setCurrentDate] = useState(new Date()); const [isModalOpen, setIsModalOpen] = useState(false); const [detailsApp, setDetailsApp] = useState<Appointment | null>(null); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, appId: string } | null>(null); const [editingAppId, setEditingAppId] = useState<string | null>(null);
     const [clientSearch, setClientSearch] = useState(''); const [selectedClient, setSelectedClient] = useState(''); const [selectedPet, setSelectedPet] = useState(''); const [selectedService, setSelectedService] = useState(''); const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]); const [date, setDate] = useState(new Date().toISOString().split('T')[0]); const [time, setTime] = useState('09:00'); const [notes, setNotes] = useState(''); const [manualDuration, setManualDuration] = useState('0');
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+    const [nowMinutes, setNowMinutes] = useState(0);
+
+    useEffect(() => {
+        const updateNow = () => {
+            const now = new Date();
+            const mins = (now.getHours() - 9) * 60 + now.getMinutes();
+            setNowMinutes(mins);
+        };
+        updateNow();
+        const interval = setInterval(updateNow, 60000);
+        return () => clearInterval(interval);
+    }, []);
     const touchStart = useRef<number | null>(null);
 
     const resetForm = () => { setClientSearch(''); setSelectedClient(''); setSelectedPet(''); setSelectedService(''); setSelectedAddServices([]); setTime('09:00'); setNotes(''); setManualDuration('0'); setEditingAppId(null); setIsModalOpen(false); };
@@ -949,8 +961,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             <div key={dateStr} className={`relative h-[1200px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
                 <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 9) * 60 + d.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />); })}
-                    {/* Current Time Indicator (Visual Mockup) */}
-                    <div className="absolute w-full border-t-2 border-red-400 border-dashed opacity-50 pointer-events-none" style={{ top: '400px' }}><span className="bg-red-400 text-white text-[9px] px-1 rounded-r absolute -top-2 left-0">Now</span></div>
+                    {/* Current Time Indicator */}
+                    {nowMinutes >= 0 && nowMinutes <= 600 && (
+                        <div className="absolute w-full border-t-2 border-red-500 border-dashed opacity-70 pointer-events-none z-20 flex items-center" style={{ top: `${nowMinutes * 2}px` }}>
+                            <div className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-r shadow-sm absolute -top-2.5 left-0">Agora</div>
+                            <div className="w-2 h-2 bg-red-500 rounded-full absolute -top-1 -right-1" />
+                        </div>
+                    )}
                 </div>
             </div>
         );
