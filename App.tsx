@@ -173,7 +173,7 @@ const CustomXAxisTick = ({ x, y, payload, data }: any) => {
     );
 };
 
-const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; clients: Client[]; defaultTab?: 'daily' | 'weekly' | 'monthly' | 'yearly' }> = ({ appointments, services, clients, defaultTab = 'daily' }) => {
+const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; clients: Client[]; costs: CostItem[]; defaultTab?: 'daily' | 'weekly' | 'monthly' | 'yearly' }> = ({ appointments, services, clients, costs, defaultTab = 'daily' }) => {
     const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>(defaultTab);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -317,16 +317,49 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const yearlyStats = calculateStats(yearlyApps);
 
     // --- NEW STATS LOGIC ---
-    const calculatePeriodStats = (rangeApps: Appointment[], daysCount: number) => {
+    const calculatePeriodStats = (rangeApps: Appointment[], daysCount: number, periodCost?: number, businessDaysOverride?: number) => {
         const stats = calculateStats(rangeApps);
         const avgRevPerDay = daysCount > 0 ? stats.grossRevenue / daysCount : 0;
         const avgPetsPerDay = daysCount > 0 ? stats.totalPets / daysCount : 0;
-        return { ...stats, avgRevPerDay, avgPetsPerDay };
+
+        let dailyCost = 0;
+        const validBusinessDays = businessDaysOverride || daysCount; // Use override if provided (e.g. Tue-Sat specific count)
+        if (periodCost && validBusinessDays > 0) {
+            dailyCost = periodCost / validBusinessDays;
+        }
+
+        return { ...stats, avgRevPerDay, avgPetsPerDay, dailyCost };
     };
 
     const getGrowth = (current: number, previous: number) => {
         if (previous === 0) return current > 0 ? 100 : 0;
         return ((current - previous) / previous) * 100;
+    };
+
+    // Count Tuesdays-Saturdays in a range
+    const countBusinessDays = (start: Date, end: Date) => {
+        let count = 0;
+        const cur = new Date(start);
+        while (cur <= end) {
+            const day = cur.getDay();
+            if (day >= 2 && day <= 6) count++; // 2=Tue, 6=Sat
+            cur.setDate(cur.getDate() + 1);
+        }
+        return count;
+    };
+
+    // Helper to get cost for a specific month (YYYY-MM format in sheet usually)
+    const getCostForMonth = (date: Date) => {
+        // Month name logic or simple matching based on costs data structure
+        // Assuming costs have 'month' field like 'Janeiro', 'Fevereiro' etc or simply summing all costs in that month's date range
+        // For simplicity, let's filter costs by date if available, or just sum everything if cost date matches period.
+        // Better approach given `costs` structure: filter by ISO date range
+        const m = date.getMonth();
+        const y = date.getFullYear();
+        return costs.filter(c => {
+            const cDate = new Date(c.date);
+            return cDate.getMonth() === m && cDate.getFullYear() === y && c.category !== 'Sócio'; // Exclude withdraws? User asked for "custo mensal"
+        }).reduce((acc, c) => acc + c.amount, 0);
     };
 
     // Calculate Data for Tabs
@@ -347,8 +380,15 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const currApps = appointments.filter(a => { const d = new Date(a.date); return d >= curr.start && d <= curr.end; });
             const prevApps = appointments.filter(a => { const d = new Date(a.date); return d >= prev.start && d <= prev.end; });
 
-            const cStats = calculatePeriodStats(currApps, 6); // 6 working days approx
-            const pStats = calculatePeriodStats(prevApps, 6);
+            // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
+            // Let's use precise dates if possible, or fallback to pro-rated.
+            const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = new Date(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
+
+            const cDays = countBusinessDays(curr.start, curr.end);
+            const pDays = countBusinessDays(prev.start, prev.end);
+
+            const cStats = calculatePeriodStats(currApps, cDays, getRangeCost(curr.start, curr.end));
+            const pStats = calculatePeriodStats(prevApps, pDays, getRangeCost(prev.start, prev.end));
 
             return { current: cStats, previous: pStats, rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` };
         }
@@ -361,8 +401,14 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const currApps = appointments.filter(a => { const d = new Date(a.date); return d >= currStart && d <= currEnd; });
             const prevApps = appointments.filter(a => { const d = new Date(a.date); return d >= prevStart && d <= prevEnd; });
 
-            const cStats = calculatePeriodStats(currApps, 24); // ~24 working days
-            const pStats = calculatePeriodStats(prevApps, 24);
+            const cDays = countBusinessDays(currStart, currEnd);
+            const pDays = countBusinessDays(prevStart, prevEnd);
+
+            const cCost = getCostForMonth(currStart); // This sums all costs in that month
+            const pCost = getCostForMonth(prevStart);
+
+            const cStats = calculatePeriodStats(currApps, cDays, cCost);
+            const pStats = calculatePeriodStats(prevApps, pDays, pCost);
 
             return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
         }
@@ -370,13 +416,31 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const currApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
             const prevApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear - 1);
 
-            const cStats = calculatePeriodStats(currApps, 300); // ~300 working days
-            const pStats = calculatePeriodStats(prevApps, 300);
+            // Yearly Cost
+            const getYearCost = (year: number) => costs.filter(c => new Date(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
+
+            // Count biz days in year
+            const countYearBizDays = (year: number) => {
+                let d = new Date(year, 0, 1);
+                let count = 0;
+                while (d.getFullYear() === year) {
+                    const w = d.getDay();
+                    if (w >= 2 && w <= 6) count++;
+                    d.setDate(d.getDate() + 1);
+                }
+                return count;
+            };
+
+            const cDays = countYearBizDays(selectedYear);
+            const pDays = countYearBizDays(selectedYear - 1);
+
+            const cStats = calculatePeriodStats(currApps, cDays, getYearCost(selectedYear));
+            const pStats = calculatePeriodStats(prevApps, pDays, getYearCost(selectedYear - 1));
 
             return { current: cStats, previous: pStats, rangeLabel: selectedYear.toString() };
         }
         return null;
-    }, [activeTab, appointments, selectedDate, selectedMonth, selectedYear]);
+    }, [activeTab, appointments, selectedDate, selectedMonth, selectedYear, costs]);
 
     const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: any) => (
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100/80 hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group h-full">
@@ -426,7 +490,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                     const client = clients.find(c => c.id === app.clientId);
                                     const pet = client?.pets.find(p => p.id === app.petId);
                                     const mainSvc = services.find(s => s.id === app.serviceId);
-                                    const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x);
+                                    const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
                                     const val = calculateGrossRevenue(app);
                                     const isPaid = (!!app.paidAmount && !!app.paymentMethod) || app.status === 'concluido';
 
@@ -472,15 +536,16 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 <section className="animate-fade-in text-left">
                     <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
                         <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
                         <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
                         <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
                         <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
                         <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
                     </div>
 
-                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-80 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Diária</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={weeklyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} dy={10} /><YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Bar dataKey="faturamento" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={20} /><Line type="monotone" dataKey="pets" stroke="#f97316" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Diária</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={weeklyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} dy={10} /><YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Bar yAxisId="right" dataKey="pets" fill="#c7d2fe" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#4f46e5" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
                 </section>
             )}
 
@@ -488,27 +553,16 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 <section className="animate-fade-in text-left">
                     <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
                         <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
                         <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
                         <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
                         <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
                         <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                        <div className="lg:col-span-2 bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-80"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas</h3><ResponsiveContainer width="100%" height="80%"><BarChart data={monthlyChartData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar dataKey="faturamento" fill="#ec4899" radius={[4, 4, 0, 0]} barSize={30} /></BarChart></ResponsiveContainer></div>
-                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-80 overflow-y-auto custom-scrollbar">
-                            <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2 uppercase tracking-wide"><Star size={16} /> Top Clientes</h3>
-                            {/* Simplified Top Clients List */}
-                            {(() => {
-                                const clientRevenue = new Map<string, number>();
-                                appointments.filter(a => a.date.startsWith(selectedMonth) && a.status !== 'cancelado').forEach(a => { const cId = a.clientId; clientRevenue.set(cId, (clientRevenue.get(cId) || 0) + calculateGrossRevenue(a)); });
-                                const topClients = Array.from(clientRevenue.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, rev]) => { const c = clients.find(cl => cl.id === id); return { name: c?.name || 'Desc.', rev }; });
-                                return <div className="space-y-3">{topClients.map((c, i) => <div key={i} className="flex justify-between items-center text-sm"><span className="font-bold text-gray-700 truncate max-w-[120px]">{i + 1}. {c.name}</span><span className="bg-green-50 text-green-700 px-2 py-0.5 rounded-lg text-xs font-bold">R$ {c.rev.toFixed(0)}</span></div>)}</div>
-                            })()}
-                        </div>
-                    </div>
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas do Mês</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={30} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{ r: 4 }} /></ComposedChart></ResponsiveContainer></div>
                 </section>
             )}
 
@@ -516,15 +570,16 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 <section className="animate-fade-in text-left">
                     <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
                         <StatCard title="Faturamento Total" value={`R$ ${(metricData.current.grossRevenue / 1000).toFixed(1)}k`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
                         <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
                         <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
                         <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
                         <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
                     </div>
 
-                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><AreaChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><defs><linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><Tooltip /><Area type="monotone" dataKey="faturamento" stroke="#10b981" fillOpacity={1} fill="url(#colorRev)" strokeWidth={3} /></AreaChart></ResponsiveContainer></div>
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
                 </section>
             )}
         </div>
@@ -547,7 +602,7 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     return (
         <div className="space-y-6 animate-fade-in pb-10">
             <div className="flex justify-between items-center mb-4"><h1 className="text-2xl font-bold text-gray-800">Custo Mensal</h1><div className="flex bg-white rounded-lg p-1 border"><button onClick={() => setViewMode('monthly')} className={`px-4 py-1.5 text-xs font-bold rounded ${viewMode === 'monthly' ? 'bg-brand-600 text-white' : 'text-gray-600'}`}>Mês</button><button onClick={() => setViewMode('yearly')} className={`px-4 py-1.5 text-xs font-bold rounded ${viewMode === 'yearly' ? 'bg-brand-600 text-white' : 'text-gray-600'}`}>Ano</button></div></div>
-            <div className="flex items-center mb-6 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800 mr-4">Período:</h2>{viewMode === 'monthly' ? (<input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none" />) : (<select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none">{[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}</select>)}</div>
+            <div className="flex items-center mb-6 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800 mr-4">Período:</h2>{viewMode === 'monthly' ? (<input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" />) : (<select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none">{[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}</select>)}</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6"><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between"><p className="text-xs font-bold text-gray-500 uppercase">Total</p><h3 className="text-2xl font-bold text-rose-600">R$ {totalCost.toFixed(2)}</h3></div><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between"><p className="text-xs font-bold text-gray-500 uppercase">Pago</p><h3 className="text-2xl font-bold text-green-600">R$ {paidCost.toFixed(2)}</h3></div><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between"><p className="text-xs font-bold text-gray-500 uppercase">Pendente</p><h3 className="text-2xl font-bold text-orange-600">R$ {pendingCost.toFixed(2)}</h3></div></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><BarChart2 size={16} /> Evolução</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={getCostByMonth()} margin={{ top: 20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tickFormatter={(val) => `R$${val}`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 'auto']} /><Tooltip formatter={(val: number) => `R$ ${val.toFixed(2)}`} /><Bar dataKey="value" fill="#f43f5e" radius={[4, 4, 0, 0]}><LabelList dataKey="value" position="top" style={{ fontSize: 10, fill: '#e11d48' }} formatter={(val: number) => val > 0 ? `R$${val.toFixed(0)}` : ''} /></Bar></BarChart></ResponsiveContainer></div><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><Tag size={16} /> Categorias</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={getCostByCategory()} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value">{getCostByCategory().map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}</Pie><Tooltip formatter={(val: number) => `R$ ${val.toFixed(2)}`} /><Legend layout="vertical" verticalAlign="middle" align="right" /></PieChart></ResponsiveContainer></div></div>
         </div>
@@ -664,7 +719,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
     const renderPaymentRow = (app: Appointment, statusColor: string, index: number) => {
         const client = clients.find(c => c.id === app.clientId);
         const pet = client?.pets.find(p => p.id === app.petId);
-        const mainSvc = services.find(s => s.id === app.serviceId);
+        const mainSvc = services.find(srv => srv.id === app.serviceId);
         const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x) as Service[] || [];
         const expected = calculateExpected(app);
         const isPaid = !!app.paidAmount && !!app.paymentMethod;
@@ -930,8 +985,25 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
 };
 
 const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; googleUser: GoogleUser | null; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete }) => {
-    const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day'); const [currentDate, setCurrentDate] = useState(new Date()); const [isModalOpen, setIsModalOpen] = useState(false); const [detailsApp, setDetailsApp] = useState<Appointment | null>(null); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, appId: string } | null>(null); const [editingAppId, setEditingAppId] = useState<string | null>(null);
-    const [clientSearch, setClientSearch] = useState(''); const [selectedClient, setSelectedClient] = useState(''); const [selectedPet, setSelectedPet] = useState(''); const [selectedService, setSelectedService] = useState(''); const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]); const [date, setDate] = useState(new Date().toISOString().split('T')[0]); const [time, setTime] = useState('09:00'); const [notes, setNotes] = useState(''); const [manualDuration, setManualDuration] = useState('0');
+    const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [detailsApp, setDetailsApp] = useState<Appointment | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, appId: string } | null>(null);
+
+    // App Form State
+    const [editingApp, setEditingApp] = useState<Appointment | null>(null);
+    const [editingAppId, setEditingAppId] = useState<string | null>(null);
+    const [clientSearch, setClientSearch] = useState('');
+    const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+    const [selectedPet, setSelectedPet] = useState<string | null>(null); // Pet ID
+    const [selectedService, setSelectedService] = useState<string>(''); // Service ID
+    const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]); // Array of Service IDs
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [time, setTime] = useState('09:00');
+    const [manualDuration, setManualDuration] = useState<number | string>(0);
+    const [notes, setNotes] = useState('');
+
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const [nowMinutes, setNowMinutes] = useState(0);
 
@@ -947,11 +1019,65 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     }, []);
     const touchStart = useRef<number | null>(null);
 
-    const resetForm = () => { setClientSearch(''); setSelectedClient(''); setSelectedPet(''); setSelectedService(''); setSelectedAddServices([]); setTime('09:00'); setNotes(''); setManualDuration('0'); setEditingAppId(null); setIsModalOpen(false); };
-    const handleStartEdit = (app: Appointment) => { setEditingAppId(app.id); setSelectedClient(app.clientId); setSelectedPet(app.petId); setSelectedService(app.serviceId); setSelectedAddServices(app.additionalServiceIds || []); const d = new Date(app.date); setDate(d.toISOString().split('T')[0]); setTime(d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })); setNotes(app.notes || ''); setManualDuration(app.durationTotal ? app.durationTotal.toString() : '0'); setDetailsApp(null); setIsModalOpen(true); };
-    const handleSave = () => { if (!selectedClient || !selectedPet || !selectedService || !date || !time) return; const client = clients.find(c => c.id === selectedClient); const pet = client?.pets.find(p => p.id === selectedPet); const mainSvc = services.find(s => s.id === selectedService); const addSvcs = selectedAddServices.map(id => services.find(s => s.id === id)).filter(s => s) as Service[]; if (client && pet && mainSvc) { const newApp: Appointment = { id: editingAppId || `local_${Date.now()}`, clientId: client.id, petId: pet.id, serviceId: mainSvc.id, additionalServiceIds: selectedAddServices, date: `${date}T${time}:00`, status: 'agendado', notes: notes, googleEventId: editingAppId ? appointments.find(a => a.id === editingAppId)?.googleEventId : undefined }; if (editingAppId) { const original = appointments.find(a => a.id === editingAppId); newApp.paidAmount = original?.paidAmount; newApp.paymentMethod = original?.paymentMethod; onEdit(newApp, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration)); } else { onAdd(newApp, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration)); } resetForm(); } };
+    const resetForm = () => {
+        setEditingApp(null); setEditingAppId(null);
+        setSelectedClient(null); setSelectedPet(null);
+        setSelectedService(''); setSelectedAddServices([]);
+        setDate(new Date().toISOString().split('T')[0]); setTime('09:00');
+        setManualDuration(0); setNotes('');
+        setClientSearch('');
+        setIsModalOpen(false);
+    };
+
+    const handleStartEdit = (app: Appointment) => {
+        const client = clients.find(c => c.id === app.clientId);
+        setEditingApp(app); setEditingAppId(app.id);
+        setSelectedClient(client || null); setClientSearch(client?.name || '');
+        setSelectedPet(app.petId);
+        setSelectedService(app.serviceId); setSelectedAddServices(app.additionalServiceIds || []);
+        setDate(app.date.split('T')[0]); setTime(app.date.split('T')[1].substring(0, 5));
+        setManualDuration(app.durationTotal || 0); setNotes(app.notes || '');
+        setIsModalOpen(true); setDetailsApp(null); setContextMenu(null);
+    };
+
+    const handleSave = () => {
+        if (!selectedClient || !selectedPet || !selectedService || !date || !time) return;
+        const client = selectedClient; // selectedClient is now Client object
+        const pet = client?.pets.find(p => p.id === selectedPet);
+        const mainSvc = services.find(s => s.id === selectedService);
+        const addSvcs = selectedAddServices.map(id => services.find(s => s.id === id)).filter(s => s) as Service[];
+
+        if (client && pet && mainSvc) {
+            const newApp: Appointment = {
+                id: editingAppId || `local_${Date.now()}`,
+                clientId: client.id,
+                petId: pet.id,
+                serviceId: mainSvc.id,
+                additionalServiceIds: selectedAddServices,
+                date: `${date}T${time}:00`,
+                status: 'agendado',
+                notes: notes,
+                googleEventId: editingAppId ? appointments.find(a => a.id === editingAppId)?.googleEventId : undefined
+            };
+
+            if (editingAppId) {
+                const original = appointments.find(a => a.id === editingAppId);
+                newApp.paidAmount = original?.paidAmount;
+                newApp.paymentMethod = original?.paymentMethod;
+                onEdit(newApp, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration as string));
+            } else {
+                onAdd(newApp, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration as string));
+            }
+            resetForm();
+        }
+    };
+
     const handleDeleteFromContext = () => { if (contextMenu && confirm('Excluir?')) onDelete(contextMenu.appId); setContextMenu(null); }
-    const filteredClients = clientSearch.length > 0 ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch) || c.pets.some(p => p.name.toLowerCase().includes(clientSearch.toLowerCase()))).slice(0, 5) : []; const selectedClientData = clients.find(c => c.id === selectedClient); const pets = selectedClientData?.pets || []; const selectedPetData = pets.find(p => p.id === selectedPet);
+    const filteredClients = clientSearch.length > 0 ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch) || c.pets.some(p => p.name.toLowerCase().includes(clientSearch.toLowerCase()))).slice(0, 5) : [];
+    const selectedClientData = selectedClient; // selectedClient is now Client object
+    const pets = selectedClientData?.pets || [];
+    const selectedPetData = pets.find(p => p.id === selectedPet);
+
     const getApplicableServices = (category: 'principal' | 'adicional') => { if (!selectedPetData) return []; return services.filter(s => { const matchesCategory = s.category === category; const matchesSize = s.targetSize === 'Todos' || !s.targetSize || (selectedPetData.size && s.targetSize.toLowerCase().includes(selectedPetData.size.toLowerCase())); const matchesCoat = s.targetCoat === 'Todos' || !s.targetCoat || (selectedPetData.coat && s.targetCoat.toLowerCase().includes(selectedPetData.coat.toLowerCase())); return matchesCategory && matchesSize && matchesCoat; }); };
     const navigate = (direction: 'prev' | 'next') => {
         setSlideDirection(direction === 'next' ? 'right' : 'left');
@@ -1084,151 +1210,213 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (<div className="h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col mx-1"> <div className="grid grid-cols-7 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200"> {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>)} </div> <div className="flex-1 grid grid-cols-7 auto-rows-fr"> {slots.map((date, idx) => { if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/30 border-b border-r border-gray-100" />; const dateStr = date.toISOString().split('T')[0]; const isToday = dateStr === new Date().toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado').sort((a, b) => a.date.localeCompare(b.date)); return (<div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col transition-colors cursor-pointer hover:bg-brand-50/30 ${isToday ? 'bg-orange-50/30' : ''}`} onClick={() => { setDate(dateStr); setViewMode('day'); }}> <span className={`text-[10px] font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full transition-all ${isToday ? 'bg-brand-600 text-white shadow-md scale-110' : 'text-gray-500'}`}>{date.getDate()}</span> <div className="flex-1 overflow-hidden space-y-1"> {dayApps.slice(0, 3).map(app => (<div key={app.id} className="text-[9px] bg-white border border-gray-200 text-gray-700 rounded-md px-1.5 py-0.5 truncate font-medium shadow-sm"> {clients.find(c => c.id === app.clientId)?.pets.find(p => p.id === app.petId)?.name} </div>))} {dayApps.length > 3 && <div className="text-[8px] text-gray-400 pl-1 font-medium">+ {dayApps.length - 3} mais</div>} </div> </div>) })} </div> </div>)
     };
 
-    return (<div className="space-y-3 animate-fade-in relative h-full flex flex-col"> <div className="flex flex-col md:flex-row justify-between items-center gap-2 flex-shrink-0 bg-white p-2 rounded-xl shadow-sm border border-gray-200"> <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar"> <div className="flex bg-gray-100 p-1 rounded-lg flex-shrink-0"> <button onClick={() => setViewMode('day')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'day' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Dia</button> <button onClick={() => setViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'week' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Semana</button> <button onClick={() => setViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'month' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Mês</button> </div> <div className="flex items-center gap-1 flex-shrink-0 ml-2"> <button onClick={() => navigate('prev')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronLeft size={18} /></button> <span className="text-sm font-bold text-gray-800 min-w-[90px] text-center truncate">{formatDateWithWeek(currentDate.toISOString().split('T')[0])}</span> <button onClick={() => navigate('next')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronRight size={18} /></button> </div> </div> <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="w-full md:w-auto bg-brand-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-brand-200 hover:bg-brand-700 active:scale-95 transition flex items-center justify-center gap-1.5 text-xs"><Plus size={18} /> Novo Agendamento</button> </div> <div className="flex-1 min-h-0 relative overflow-hidden"> {viewMode === 'day' && <div className="h-full overflow-y-auto">{renderDayView()}</div>} {viewMode === 'week' && renderWeekView()} {viewMode === 'month' && renderMonthView()} {contextMenu && (<div className="fixed bg-white shadow-xl border border-gray-200 rounded-xl z-[100] py-1 min-w-[160px] overflow-hidden" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(appointments.find(a => a.id === contextMenu.appId)!)} className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm flex items-center gap-3 text-gray-700 font-medium border-b border-gray-50"><Edit2 size={16} /> Editar</button> <button onClick={handleDeleteFromContext} className="w-full text-left px-4 py-3 hover:bg-red-50 text-red-600 text-sm flex items-center gap-3 font-medium"><Trash2 size={16} /> Excluir</button> </div>)} </div> {detailsApp && createPortal((() => {
-        const client = clients.find(c => c.id === detailsApp.clientId);
-        const pet = client?.pets.find(p => p.id === detailsApp.petId);
-        const s = services.find(srv => srv.id === detailsApp.serviceId);
-        const addSvcs = detailsApp.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
+    return (
+        <div className="space-y-3 animate-fade-in relative h-full flex flex-col">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-2 flex-shrink-0 bg-white p-2 rounded-xl shadow-sm border border-gray-200">
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
+                    <div className="flex bg-gray-100 p-1 rounded-lg flex-shrink-0">
+                        <button onClick={() => setViewMode('day')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'day' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Dia</button>
+                        <button onClick={() => setViewMode('week')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'week' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Semana</button>
+                        <button onClick={() => setViewMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'month' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Mês</button>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                        <button onClick={() => navigate('prev')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronLeft size={18} /></button>
+                        <span className="text-sm font-bold text-gray-800 min-w-[90px] text-center truncate">{formatDateWithWeek(currentDate.toISOString().split('T')[0])}</span>
+                        <button onClick={() => navigate('next')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronRight size={18} /></button>
+                    </div>
+                </div>
+                <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="w-full md:w-auto bg-brand-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-brand-200 hover:bg-brand-700 active:scale-95 transition flex items-center justify-center gap-1.5 text-xs">
+                    <Plus size={18} /> Novo Agendamento
+                </button>
+            </div>
 
-        const rating = detailsApp.rating;
-        const tags = detailsApp.ratingTags;
+            <div className="flex-1 min-h-0 relative overflow-hidden">
+                {viewMode === 'day' && <div className="h-full overflow-y-auto">{renderDayView()}</div>}
+                {viewMode === 'week' && renderWeekView()}
+                {viewMode === 'month' && renderMonthView()}
 
-        return (
-            <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setDetailsApp(null)}>
-                <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setDetailsApp(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"><X size={20} /></button>
+                {contextMenu && (
+                    <div className="fixed bg-white shadow-xl border border-gray-200 rounded-xl z-[100] py-1 min-w-[160px] overflow-hidden"
+                        style={{ top: contextMenu.y, left: contextMenu.x }}>
+                        <button onClick={() => handleStartEdit(appointments.find(a => a.id === contextMenu.appId)!)} className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm flex items-center gap-3 text-gray-700 font-medium border-b border-gray-50">
+                            <Edit2 size={16} /> Editar
+                        </button>
+                        <button onClick={handleDeleteFromContext} className="w-full text-left px-4 py-3 hover:bg-red-50 text-red-600 text-sm flex items-center gap-3 font-medium">
+                            <Trash2 size={16} /> Excluir
+                        </button>
+                    </div>
+                )}
+            </div>
 
-                    {(rating || tags) && (
-                        <div className="flex justify-center flex-col items-center mb-6 bg-yellow-50/50 p-4 rounded-2xl border border-yellow-100">
-                            <div className="flex text-yellow-500 mb-2 drop-shadow-sm">
-                                {[1, 2, 3, 4, 5].map(st => <Star key={st} size={24} className={(rating || 0) >= st ? "fill-current" : "text-gray-200"} strokeWidth={(rating || 0) >= st ? 0 : 2} />)}
+            {detailsApp && createPortal((() => {
+                const client = clients.find(c => c.id === detailsApp.clientId);
+                const pet = client?.pets.find(p => p.id === detailsApp.petId);
+                const s = services.find(srv => srv.id === detailsApp.serviceId);
+                const addSvcs = detailsApp.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
+                const rating = detailsApp.rating;
+                const tags = detailsApp.ratingTags;
+
+                return (
+                    <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setDetailsApp(null)}>
+                        <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setDetailsApp(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"><X size={20} /></button>
+
+                            {(rating || tags) && (
+                                <div className="flex justify-center flex-col items-center mb-6 bg-yellow-50/50 p-4 rounded-2xl border border-yellow-100">
+                                    <div className="flex text-yellow-500 mb-2 drop-shadow-sm">
+                                        {[1, 2, 3, 4, 5].map(st => <Star key={st} size={24} className={(rating || 0) >= st ? "fill-current" : "text-gray-200"} strokeWidth={(rating || 0) >= st ? 0 : 2} />)}
+                                    </div>
+                                    {tags && tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 justify-center">
+                                            {tags.map(t => <span key={t} className="px-3 py-1 bg-white text-yellow-700 rounded-full text-xs font-bold shadow-sm border border-yellow-100">{t}</span>)}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="mb-6 text-center">
+                                <h3 className="text-2xl font-bold text-gray-800">{pet?.name}</h3>
+                                <p className="text-gray-500 font-medium">{client?.name}</p>
                             </div>
-                            {tags && tags.length > 0 && (
-                                <div className="flex flex-wrap gap-2 justify-center">
-                                    {tags.map(t => <span key={t} className="px-3 py-1 bg-white text-yellow-700 rounded-full text-xs font-bold shadow-sm border border-yellow-100">{t}</span>)}
+
+                            <div className="bg-gray-50 rounded-2xl p-4 space-y-3 text-sm mb-6">
+                                <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Phone size={16} /></div><span className="font-medium text-gray-700">{client?.phone}</span></div>
+                                <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><MapPin size={16} /></div><span className="font-medium text-gray-700 truncate">{client?.address} {client?.complement}</span></div>
+                                <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0"><FileText size={16} /></div><span className="font-medium italic text-gray-600 pt-1">{
+                                    (() => {
+                                        let displayNote = detailsApp.notes || pet?.notes || 'Sem obs';
+                                        displayNote = displayNote.replace(/\[Avaliação: \d+\/5\]/g, '').replace(/\[Tags: .*?\]/g, '').trim();
+                                        return displayNote || 'Sem obs';
+                                    })()
+                                }</span></div>
+                            </div>
+
+                            <div className="mb-6">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Serviços</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    <span className="px-3 py-1.5 bg-brand-100 text-brand-700 rounded-lg text-xs font-bold shadow-sm">{s?.name}</span>
+                                    {addSvcs?.map(as => <span key={as?.id} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold border border-gray-200">{as?.name}</span>)}
+                                </div>
+                            </div>
+
+                            <button onClick={() => handleStartEdit(detailsApp)} className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brand-700 active:scale-95 transition shadow-lg shadow-brand-200"><Edit2 size={18} /> Editar Agendamento</button>
+                        </div>
+                    </div>
+                );
+            })(), document.body)}
+
+            {isModalOpen && createPortal(
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center md:p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-t-3xl md:rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col h-[95vh] md:h-auto md:max-h-[90vh] md:min-h-[600px] animate-slide-up-mobile md:animate-scale-up">
+                        {/* Header */}
+                        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white z-10 sticky top-0">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-800">{editingAppId ? 'Editar Agendamento' : 'Novo Agendamento'}</h2>
+                                <p className="text-xs text-gray-500 font-medium mt-0.5">Preencha os dados do serviço</p>
+                            </div>
+                            <button onClick={resetForm} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition"><X size={20} /></button>
+                        </div>
+
+                        <div className="p-4 overflow-y-auto custom-scrollbar space-y-4 pb-24 md:pb-4">
+                            {/* Client/Pet Selection */}
+                            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group hover:border-brand-200 transition-colors">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-brand-500 rounded-l-2xl"></div>
+                                <div className="flex items-center gap-2 mb-3"><User size={18} className="text-brand-600" /><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Cliente e Pet</span></div>
+                                <div className="space-y-3 pl-2">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Cliente</label>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input type="text" placeholder="Buscar cliente..." value={clientSearch} onChange={e => { setClientSearch(e.target.value); setSelectedClient(null); setSelectedPet(null); }} className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-xl text-sm outline-none transition-all font-medium placeholder:text-gray-400" />
+                                            {clientSearch && !selectedClient && (
+                                                <div className="absolute top-full left-0 right-0 bg-white shadow-xl rounded-xl mt-2 z-20 border border-gray-100 max-h-48 overflow-y-auto custom-scrollbar">
+                                                    {clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase())).map(c => (
+                                                        <div key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(c.name); }} className="w-full text-left p-3 hover:bg-gray-50 cursor-pointer text-sm font-medium text-gray-700 border-b border-gray-50 last:border-0 flex items-center justify-between group">
+                                                            <span>{c.name}</span>
+                                                            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md group-hover:bg-white transition-colors">{c.phone}</span>
+                                                        </div>
+                                                    ))}
+                                                    {clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
+                                                        <div className="p-4 text-center text-gray-500 text-sm">Nenhum cliente encontrado</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {selectedClient && (
+                                        <div className="animate-fade-in">
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Pet</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {selectedClient.pets.map(p => (
+                                                    <div key={p.id} onClick={() => setSelectedPet(p.id)} className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-3 relative overflow-hidden ${selectedPet === p.id ? 'border-brand-500 bg-brand-50/50' : 'border-gray-100 hover:border-brand-200 bg-gray-50/50'}`}>
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${selectedPet === p.id ? 'bg-brand-100 text-brand-600' : 'bg-white text-gray-400'}`}><PawPrint size={16} /></div>
+                                                        <div className="min-w-0"><p className={`text-sm font-bold truncate ${selectedPet === p.id ? 'text-brand-700' : 'text-gray-700'}`}>{p.name}</p><p className="text-[10px] text-gray-500 truncate">{p.breed}</p></div>
+                                                        {selectedPet === p.id && <div className="absolute top-2 right-2 text-brand-500"><CheckCircle size={14} className="fill-brand-500 text-white" /></div>}
+                                                    </div>
+                                                ))}
+                                                <button className="p-3 rounded-xl border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 transition-all flex flex-col items-center justify-center gap-1 text-gray-400 hover:text-brand-600 group"><Plus size={20} className="group-hover:scale-110 transition-transform" /><span className="text-[10px] font-bold uppercase">Novo Pet</span></button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {selectedPet && (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group hover:border-purple-200 transition-colors">
+                                        <div className="absolute top-0 left-0 w-1 h-full bg-purple-500 rounded-l-2xl"></div>
+                                        <div className="flex items-center gap-2 mb-3"><Scissors size={18} className="text-purple-600" /><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Serviços</span></div>
+                                        <div className="space-y-3 pl-2">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Principal</label>
+                                                <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-transparent focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 rounded-xl text-sm outline-none transition-all font-medium appearance-none cursor-pointer hover:bg-white text-gray-700">
+                                                    <option value="">Selecione um serviço...</option>
+                                                    {getApplicableServices('principal').map(s => (<option key={s.id} value={s.id}>{s.name} - R$ {s.price}</option>))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Adicionais</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {getApplicableServices('adicional').map(s => (
+                                                        <button key={s.id} onClick={() => setSelectedAddServices(prev => prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id])} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${selectedAddServices.includes(s.id) ? 'bg-purple-100 text-purple-700 border-purple-200 shadow-sm' : 'bg-gray-50 text-gray-600 border-gray-100 hover:border-gray-300'}`}>{s.name} (+R${s.price})</button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group hover:border-blue-200 transition-colors">
+                                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-2xl"></div>
+                                        <div className="flex items-center gap-2 mb-3"><CalendarIcon size={18} className="text-blue-600" /><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Data e Hora</span></div>
+                                        <div className="grid grid-cols-2 gap-3 pl-2">
+                                            <div><label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Dia</label><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-transparent focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none transition-all font-medium text-gray-700" /></div>
+                                            <div><label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Hora</label><input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-transparent focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none transition-all font-medium text-gray-700" /></div>
+                                        </div>
+                                        <div className="mt-3 pl-2"><label className="text-xs font-bold text-gray-400 uppercase mb-1.5 block">Duração (min)</label><input type="number" value={manualDuration} onChange={e => setManualDuration(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-transparent focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none transition-all font-medium text-gray-700" /></div>
+                                    </div>
+
+                                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group hover:border-orange-200 transition-colors">
+                                        <div className="absolute top-0 left-0 w-1 h-full bg-orange-500 rounded-l-2xl"></div>
+                                        <div className="flex items-center gap-2 mb-3"><FileText size={18} className="text-orange-600" /><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Detalhes</span></div>
+                                        <div className="pl-2">
+                                            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-gray-50 hover:bg-white border border-transparent focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 rounded-2xl p-4 text-sm outline-none transition-all resize-none font-medium placeholder:text-gray-400 h-28 leading-relaxed" placeholder="Alguma observação, cuidado especial ou pedido do cliente?" />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
-                    )}
 
-                    <div className="mb-6 text-center">
-                        <h3 className="text-2xl font-bold text-gray-800">{pet?.name}</h3>
-                        <p className="text-gray-500 font-medium">{client?.name}</p>
-                    </div>
-
-                    <div className="bg-gray-50 rounded-2xl p-4 space-y-3 text-sm mb-6">
-                        <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Phone size={16} /></div><span className="font-medium text-gray-700">{client?.phone}</span></div>
-                        <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><MapPin size={16} /></div><span className="font-medium text-gray-700 truncate">{client?.address} {client?.complement}</span></div>
-                        <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0"><FileText size={16} /></div><span className="font-medium italic text-gray-600 pt-1">{
-                            (() => {
-                                let displayNote = detailsApp.notes || pet?.notes || 'Sem obs';
-                                displayNote = displayNote.replace(/\[Avaliação: \d+\/5\]/g, '').replace(/\[Tags: .*?\]/g, '').trim();
-                                return displayNote || 'Sem obs';
-                            })()
-                        }</span></div>
-                    </div>
-
-                    <div className="mb-6">
-                        <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Serviços</h4>
-                        <div className="flex flex-wrap gap-2">
-                            <span className="px-3 py-1.5 bg-brand-100 text-brand-700 rounded-lg text-xs font-bold shadow-sm">{s?.name}</span>
-                            {addSvcs?.map(as => <span key={as?.id} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold border border-gray-200">{as?.name}</span>)}
+                        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white/80 backdrop-blur-xl flex justify-end gap-3 z-20 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.05)] md:static md:bg-transparent md:border-0 md:shadow-none">
+                            <button onClick={resetForm} className="px-6 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-2xl text-sm transition h-14 w-full md:w-auto">Cancelar</button>
+                            <button onClick={handleSave} disabled={!selectedClient || !selectedPet || !selectedService} className="px-8 py-4 bg-brand-600 text-white font-bold rounded-2xl hover:bg-brand-700 disabled:opacity-50 text-sm shadow-xl shadow-brand-200 hover:shadow-brand-300 active:scale-95 transition-all flex items-center justify-center gap-2 h-14 w-full md:w-auto">
+                                <Check size={20} strokeWidth={2.5} /> <span className="md:hidden">Confirmar</span><span className="hidden md:inline">Confirmar Agendamento</span>
+                            </button>
                         </div>
                     </div>
-
-                    <button onClick={() => handleStartEdit(detailsApp)} className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brand-700 active:scale-95 transition shadow-lg shadow-brand-200"><Edit2 size={18} /> Editar Agendamento</button>
-                </div>
-            </div>
-        );
-    })(), document.body)} {isModalOpen && createPortal(<div className="fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm"> <div className="bg-gray-50/95 rounded-t-[2.5rem] md:rounded-3xl w-full max-w-5xl overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.2)] md:shadow-2xl flex flex-col h-[92vh] md:h-auto md:max-h-[90vh] animate-slide-up-mobile"> <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white"> <div><h3 className="font-bold text-xl text-gray-800 tracking-tight">{editingAppId ? '✏️ Editar Agendamento' : '✨ Novo Agendamento'}</h3><p className="text-xs text-gray-400 font-medium">Preencha os dados abaixo</p></div> <button onClick={resetForm}><div className="bg-gray-100 p-2 rounded-full hover:bg-gray-200 transition"><X size={20} className="text-gray-500" /></div></button> </div> <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar space-y-6 bg-gray-50/50"> <div> <label className="block text-xs font-bold text-gray-500 uppercase mb-2 px-1">👤 Cliente e Pet</label> <div className="relative"> <Search className="absolute left-4 top-3.5 text-gray-400" size={18} /> <input value={selectedClientData ? selectedClientData.name : clientSearch} onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(''); setSelectedPet(''); }} placeholder="Buscar cliente..." className="w-full pl-11 pr-10 py-3.5 border-0 bg-white shadow-sm rounded-2xl outline-none focus:ring-2 ring-brand-200 text-base font-medium" /> {selectedClientData && <button onClick={() => { setClientSearch(''); setSelectedClient(''); }} className="absolute right-3 top-3.5 text-gray-400 hover:text-red-500"><X size={18} /></button>} </div> {clientSearch.length > 0 && !selectedClient && filteredClients.length > 0 && (<div className="mt-2 bg-white rounded-2xl shadow-xl max-h-60 overflow-y-auto z-50 border border-gray-100"> {filteredClients.map(c => (<button key={c.id} onClick={() => { setSelectedClient(c.id); setClientSearch(''); }} className="w-full text-left p-4 hover:bg-gray-50 border-b border-gray-50 flex justify-between items-center last:border-0"> <div className="text-base font-bold text-gray-800">{c.name} <span className="text-xs font-normal text-gray-500 block">({c.pets.map(p => p.name).join(', ')})</span></div> <ChevronRight size={16} className="text-gray-300" /> </button>))} </div>)} </div> {selectedClient && (<div className="grid grid-cols-2 gap-3"> {pets.map(p => {
-        const pApps = appointments.filter(a => a.petId === p.id && a.rating);
-        const avg = pApps.length > 0 ? pApps.reduce((acc, c) => acc + (c.rating || 0), 0) / pApps.length : 0;
-        const allTags = pApps.flatMap(a => a.ratingTags || []);
-        const topTags = Array.from(new Set(allTags)).slice(0, 2);
-
-        return (
-            <button key={p.id} onClick={() => { setSelectedPet(p.id); setSelectedService(''); }} className={`p-3 rounded-xl border text-left text-sm transition-all relative overflow-hidden ${selectedPet === p.id ? 'bg-brand-50 border-brand-500 shadow-sm ring-1 ring-brand-200' : 'hover:bg-gray-50'}`}>
-                <div className="flex justify-between items-start">
-                    <div className="font-bold">{p.name}</div>
-                    {avg > 0 && <div className="flex items-center gap-0.5 bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded text-[10px] font-bold"><Star size={10} fill="currentColor" /> {avg.toFixed(1)}</div>}
-                </div>
-                <div className="text-gray-500 text-xs">{p.size}</div>
-                {topTags.length > 0 && <div className="flex gap-1 mt-1 opacity-80">{topTags.map(t => <span key={t} className="text-[9px] bg-gray-100 px-1 rounded border border-gray-200">{t}</span>)}</div>}
-            </button>
-        );
-    })} </div>)} {selectedPet && (<div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500 pb-20">
-
-        {/* SERVIÇOS CARD */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-brand-50 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
-            <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-4 text-sm"><Scissors size={18} className="text-blue-500" /> O que vamos fazer?</h4>
-
-            <div className="space-y-4">
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Principal</label>
-                    <div className="relative">
-                        <select value={selectedService} onChange={e => setSelectedService(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all cursor-pointer">
-                            <option value="">Selecione...</option>{getApplicableServices('principal').map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
-                    </div>
-                </div>
-
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Adicional</label>
-                    <div className="relative">
-                        <select className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all cursor-pointer" onChange={(e) => { const val = e.target.value; if (val && !selectedAddServices.includes(val)) setSelectedAddServices(prev => [...prev, val]); e.target.value = ''; }} >
-                            <option value="">+ Adicionar extra</option> {getApplicableServices('adicional').filter((service, index, self) => index === self.findIndex((t) => t.name === service.name)).map(s => <option key={s.id} value={s.id}>{s.name} - R${s.price}</option>)}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-brand-100 text-brand-600 rounded-lg p-1.5 pointer-events-none"><Plus size={14} strokeWidth={3} /></div>
-                    </div>
-                </div>
-
-                {selectedAddServices.length > 0 && <div className="flex flex-wrap gap-2 pt-2">{selectedAddServices.map(id => <span key={id} onClick={() => setSelectedAddServices(p => p.filter(x => x !== id))} className="bg-blue-50 text-blue-700 pl-3 pr-2 py-1.5 rounded-xl text-xs font-bold cursor-pointer hover:bg-red-50 hover:text-red-600 flex items-center gap-1 transition-colors select-none group border border-blue-100 shadow-sm">{services.find(s => s.id === id)?.name} <X size={14} className="group-hover:scale-110" /></span>)}</div>}
-            </div>
+                </div>,
+                document.body)}
         </div>
-
-        {/* DATA CARD */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-brand-50 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-500" />
-            <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-4 text-sm"><Calendar size={18} className="text-purple-500" /> Quando?</h4>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Dia</label>
-                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all min-w-0" />
-                </div>
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Hora</label>
-                    <div className="relative">
-                        <select value={time} onChange={e => setTime(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all cursor-pointer">
-                            {timeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
-                    </div>
-                </div>
-            </div>
-
-            <div className="space-y-1.5 mt-4">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Tempo Estimado</label>
-                <div className="relative">
-                    <select value={manualDuration} onChange={e => setManualDuration(e.target.value)} className="w-full appearance-none bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-gray-800 font-bold outline-none transition-all cursor-pointer">
-                        <option value="0">⚡ Automático (pelo serviço)</option><option value="30">30 min</option><option value="60">1 hora</option><option value="90">1h 30min</option><option value="120">2 horas</option><option value="150">2h 30min</option><option value="180">3 horas</option><option value="240">4 horas</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
-                </div>
-            </div>
-        </div>
-
-        {/* DETAILS CARD */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-brand-50 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500" />
-            <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-4 text-sm"><FileText size={18} className="text-orange-500" /> Detalhes</h4>
-
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-gray-50 hover:bg-white border border-transparent focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-2xl p-4 text-sm outline-none transition-all resize-none font-medium placeholder:text-gray-400 h-28 leading-relaxed" placeholder="Alguma observação, cuidado especial ou pedido do cliente?" />
-        </div>
-
-    </div>)} </div> <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white/80 backdrop-blur-xl flex justify-end gap-3 z-20 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.05)] md:static md:bg-transparent md:border-0 md:shadow-none"> <button onClick={resetForm} className="px-6 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-2xl text-sm transition h-14 w-full md:w-auto">Cancelar</button> <button onClick={handleSave} disabled={!selectedClient || !selectedPet || !selectedService} className="px-8 py-4 bg-brand-600 text-white font-bold rounded-2xl hover:bg-brand-700 disabled:opacity-50 text-sm shadow-xl shadow-brand-200 hover:shadow-brand-300 active:scale-95 transition-all flex items-center justify-center gap-2 h-14 w-full md:w-auto"> <Check size={20} strokeWidth={2.5} /> <span className="md:hidden">Confirmar</span><span className="hidden md:inline">Confirmar Agendamento</span></button> </div> </div> </div>, document.body)} </div>);
+    );
 };
 
 // --- MENU VIEW (Mobile Only - 4th Tab) ---
@@ -1529,8 +1717,8 @@ const App: React.FC = () => {
                 isLoading={isGlobalLoading}
                 onManualRefresh={async () => { if (accessToken) await performFullSync(accessToken); else window.location.reload(); }}
             >
-                {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="daily" />}
-                {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} defaultTab="monthly" />}
+                {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" />}
+                {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" />}
                 {currentView === 'costs' && <CostsView costs={costs} />}
                 {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services} onUpdateAppointment={handleUpdateApp} accessToken={accessToken} sheetId={SHEET_ID} />}
                 {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
