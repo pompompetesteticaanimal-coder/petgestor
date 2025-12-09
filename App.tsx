@@ -50,7 +50,10 @@ const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => 
     );
 };
 
-const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void; settings?: AppSettings; googleLoaded: boolean }> = ({ onLogin, onReset, settings, googleLoaded }) => {
+const LoginScreen: React.FC<{ onLogin: (opts?: any) => void; onReset: () => void; settings?: AppSettings; googleLoaded: boolean }> = ({ onLogin, onReset, settings, googleLoaded }) => {
+    const storedUser = localStorage.getItem('petgestor_user_profile');
+    const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+
     return (
         <div className="min-h-screen bg-brand-50 flex flex-col items-center justify-center p-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
@@ -60,7 +63,7 @@ const LoginScreen: React.FC<{ onLogin: () => void; onReset: () => void; settings
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">{settings?.appName || 'PomPomPet'}</h1>
                 <p className="text-gray-500 mb-8">Faça login para acessar sua agenda e clientes.</p>
                 <button
-                    onClick={onLogin}
+                    onClick={() => onLogin({ hint: userEmail })}
                     disabled={!googleLoaded}
                     className={`w-full bg-white border-2 border-gray-200 hover:border-brand-500 hover:bg-brand-50 text-gray-700 font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all group mb-6 ${!googleLoaded ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >

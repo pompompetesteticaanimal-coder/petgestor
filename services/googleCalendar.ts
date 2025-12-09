@@ -7,7 +7,7 @@ export const DEFAULT_CLIENT_ID = '283638384975-nt1pilc761qt69otu2dapf8ek0n6hvac.
 
 export const googleService = {
   tokenClient: null as any,
-  
+
   init: (callback: (tokenResponse: any) => void) => {
     if (typeof google !== 'undefined' && google.accounts) {
       const clientId = localStorage.getItem('petgestor_client_id') || DEFAULT_CLIENT_ID;
@@ -25,15 +25,19 @@ export const googleService = {
     }
   },
 
-  login: () => {
+  login: (options?: { hint?: string, prompt?: string }) => {
     if (googleService.tokenClient) {
-      // Força o consentimento para garantir que o usuário aceite as novas permissões de escrita
-      googleService.tokenClient.requestAccessToken({ prompt: 'consent' });
+      // Use options or defaults. avoid 'consent' to prevent re-approval every time.
+      const requestConfig: any = {};
+      if (options?.hint) requestConfig.login_hint = options.hint;
+      if (options?.prompt) requestConfig.prompt = options.prompt;
+
+      googleService.tokenClient.requestAccessToken(requestConfig);
     } else {
       const clientId = localStorage.getItem('petgestor_client_id') || DEFAULT_CLIENT_ID;
       if (!clientId) {
-          alert('ID do cliente não encontrado. Reinicie a configuração.');
-          return;
+        alert('ID do cliente não encontrado. Reinicie a configuração.');
+        return;
       }
       alert('Sistema de login carregando... tente novamente em 2 segundos.');
     }
@@ -168,7 +172,7 @@ export const googleService = {
       const body = {
         values: [values]
       };
-      
+
       const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`, {
         method: 'POST',
         headers: {
@@ -177,7 +181,7 @@ export const googleService = {
         },
         body: JSON.stringify(body),
       });
-      
+
       return await response.json();
     } catch (error) {
       console.error('Error appending sheet data', error);
