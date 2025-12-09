@@ -167,6 +167,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const touchStart = useRef<number | null>(null);
 
     const handleTouchStart = (e: React.TouchEvent) => touchStart.current = e.touches[0].clientX;
@@ -176,7 +177,9 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         if (activeTab === 'daily' && Math.abs(diff) > 50) {
             const [y, m, d] = selectedDate.split('-').map(Number);
             const date = new Date(y, m - 1, d);
-            date.setDate(date.getDate() + (diff > 0 ? 1 : -1));
+            const isNext = diff > 0;
+            date.setDate(date.getDate() + (isNext ? 1 : -1));
+            setSlideDirection(isNext ? 'right' : 'left'); // Next day comes from right, Prev day comes from left
             setSelectedDate(date.toISOString().split('T')[0]);
         }
         touchStart.current = null;
@@ -203,6 +206,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         let totalPets = 0; let totalTosas = 0; let paidRevenue = 0; let pendingRevenue = 0;
         apps.forEach(app => {
             if (app.status === 'cancelado') return;
+            // ... (rest of logic same)
             totalPets++;
             const isTargetTosa = (name?: string) => { if (!name) return false; const n = name.toLowerCase(); return n.includes('tosa normal') || n.includes('tosa tesoura'); };
             const mainSvc = services.find(s => s.id === app.serviceId);
@@ -219,6 +223,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     };
 
     const getWeeklyChartData = () => {
+        // ... (rest of logic same)
         const [y, m, d] = selectedDate.split('-').map(Number);
         const date = new Date(y, m - 1, d);
         const day = date.getDay();
@@ -232,7 +237,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const dailyApps = appointments.filter(a => { if (a.status === 'cancelado') return false; const aDate = new Date(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
             const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateGrossRevenue(app), 0);
             const formattedDate = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'short' });
-            let growth = 0; if (data.length > 0) { const prev = data[data.length - 1]; if (prev.faturamento > 0) growth = ((totalRevenue - prev.faturamento) / prev.faturamento) * 100; }
+            let growth = 0; if (data.length > 0) { const prev = data[data.length - 1] as any; if (prev.faturamento > 0) growth = ((totalRevenue - prev.faturamento) / prev.faturamento) * 100; }
             data.push({ name: formattedDate, fullDate: targetDateStr, faturamento: totalRevenue, rawRevenue: totalRevenue, pets: dailyApps.length, growth });
         });
         return data;
@@ -255,7 +260,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         for (let d = 1; d <= daysInMonth; d++) weeksInMonth.add(getISOWeek(new Date(year, month, d)));
         const sortedWeeks = Array.from(weeksInMonth).sort((a, b) => a - b);
-        const chartData = [];
+        const chartData: any[] = [];
         sortedWeeks.forEach((weekNum, index) => {
             const { revenue, pets } = getWeekData(year, weekNum);
             let growth = 0; if (index > 0) { const prevRev = chartData[index - 1].faturamento; if (prevRev > 0) growth = ((revenue - prevRev) / prevRev) * 100; }
@@ -327,6 +332,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
     const TabButton = ({ id, label, icon: Icon }: any) => (<button onClick={() => setActiveTab(id)} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === id ? 'bg-white text-brand-600 shadow-md transform scale-100' : 'text-gray-400 hover:bg-white/50 hover:text-gray-600'}`}><Icon size={16} /><span className="hidden sm:inline">{label}</span></button>);
 
+    const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
+
     return (
         <div className="space-y-6 animate-fade-in pb-10" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
             {defaultTab === 'daily' ? null : (
@@ -337,7 +344,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             )}
 
             {activeTab === 'daily' && (
-                <section>
+                <section key={selectedDate} className={animationClass}>
                     <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800">Diário</h2><div className="text-sm font-bold text-gray-600 px-3">{formatDateWithWeek(selectedDate)}</div></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" /><StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Normal e Tesoura" /><StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" /><StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" /></div>
                     <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6"><h3 className="p-5 text-sm font-bold text-gray-500 border-b border-gray-100/50 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento do Dia</h3><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-gray-50/50 text-gray-400 font-bold text-[10px] uppercase tracking-wider"><tr><th className="p-4">Horário</th><th className="p-4">Cliente</th><th className="p-4">Pet</th><th className="p-4">Serviços</th><th className="p-4 text-right">Valor</th></tr></thead><tbody className="divide-y divide-gray-100/50">{dailyApps.length === 0 ? (<tr><td colSpan={5} className="p-8 text-center text-gray-400 font-medium">Nenhum agendamento neste dia.</td></tr>) : (dailyApps.sort((a, b) => a.date.localeCompare(b.date)).map(app => { const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(s => s.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x); const val = calculateGrossRevenue(app); return (<tr key={app.id} className="hover:bg-blue-50/30 transition-colors"><td className="p-4 font-mono text-xs text-brand-600 font-bold bg-gray-50/30 rounded-r-xl">{new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td><td className="p-4 font-bold text-gray-800">{client?.name}</td><td className="p-4 text-gray-600">{pet?.name}</td><td className="p-4 text-xs text-gray-500"><span className="font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{mainSvc?.name}</span>{addSvcs && addSvcs.length > 0 && (<span className="text-gray-400 ml-1"> + {addSvcs.map(s => s?.name).join(', ')}</span>)}</td><td className="p-4 text-right font-bold text-green-600">R$ {val.toFixed(2)}</td></tr>); }))}</tbody></table></div></div>
@@ -393,11 +400,25 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
 
 const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; accessToken: string | null; sheetId: string; }> = ({ appointments, clients, services, onUpdateAppointment, accessToken, sheetId }) => {
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
-    const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid'>('toReceive'); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: Appointment } | null>(null); const touchStart = useRef<number | null>(null);
+    const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid'>('toReceive'); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: Appointment } | null>(null);
+    const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+    const touchStart = useRef<number | null>(null);
     const getAppLocalDateStr = (dateStr: string) => { const d = new Date(dateStr); return getLocalISODate(d); };
     const pendingApps = appointments.filter(a => { const appDate = getAppLocalDateStr(a.date); const isPast = appDate < getLocalISODate(); const isUnpaid = !a.paymentMethod || a.paymentMethod.trim() === ''; return isPast && isUnpaid; }).sort((a, b) => b.date.localeCompare(a.date));
     const dailyApps = appointments.filter(a => getAppLocalDateStr(a.date) === selectedDate); const toReceiveApps = dailyApps.filter(a => !a.paymentMethod || a.paymentMethod.trim() === ''); const paidApps = dailyApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== '');
-    const navigateDate = (days: number) => { const [year, month, day] = selectedDate.split('-').map(Number); const date = new Date(year, month - 1, day); date.setDate(date.getDate() + days); setSelectedDate(getLocalISODate(date)); }; const goToToday = () => setSelectedDate(getLocalISODate());
+
+    const navigateDate = (days: number) => {
+        setSlideDirection(days > 0 ? 'right' : 'left');
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        date.setDate(date.getDate() + days);
+        setSelectedDate(getLocalISODate(date));
+    };
+    const goToToday = () => {
+        setSlideDirection(null);
+        setSelectedDate(getLocalISODate());
+    };
+
     const calculateExpected = (app: Appointment) => { const main = services.find(s => s.id === app.serviceId); let total = main?.price || 0; app.additionalServiceIds?.forEach(id => { const s = services.find(srv => srv.id === id); if (s) total += s.price; }); return total; };
     const handleStartEdit = (app: Appointment) => { setEditingId(app.id); const expected = calculateExpected(app); setAmount(app.paidAmount ? app.paidAmount.toString() : expected.toString()); setMethod(app.paymentMethod || 'Credito'); setContextMenu(null); };
     const handleSave = async (app: Appointment) => {
@@ -428,6 +449,8 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         if (Math.abs(diff) > 50) navigateDate(diff > 0 ? 1 : -1);
         touchStart.current = null;
     };
+
+    const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
 
     const renderPaymentRow = (app: Appointment, statusColor: string) => {
         const client = clients.find(c => c.id === app.clientId);
@@ -487,7 +510,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         );
     };
 
-    return (<div className="space-y-4 h-full flex flex-col pt-2" onClick={() => setContextMenu(null)} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}> <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-4 rounded-3xl border border-white/40 shadow-sm"> <h2 className="text-2xl font-bold text-gray-900 tracking-tight self-start md:self-center">Pagamentos</h2> <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 flex-shrink-0"> <button onClick={() => navigateDate(-1)} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronLeft size={18} /></button> <button onClick={goToToday} className="flex-1 px-4 py-2 bg-white text-brand-600 font-bold rounded-xl text-xs shadow-sm border border-gray-100 hover:bg-gray-50 transition-all">Hoje</button> <button onClick={() => navigateDate(1)} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronRight size={18} /></button> <div className="text-xs font-bold text-gray-700 px-3 min-w-[110px] text-center uppercase tracking-wide">{formatDateWithWeek(selectedDate)}</div> </div> </div> <div className="flex p-1.5 bg-gray-200/50 rounded-2xl overflow-x-auto gap-1"> <button onClick={() => setActiveTab('toReceive')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'toReceive' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">A Receber</span> <span className="text-lg">{toReceiveApps.length}</span> </button> <button onClick={() => setActiveTab('pending')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'pending' ? 'bg-white shadow-md text-red-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pendentes</span> <span className="text-lg">{pendingApps.length}</span> </button> <button onClick={() => setActiveTab('paid')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'paid' ? 'bg-white shadow-md text-green-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pagos</span> <span className="text-lg">{paidApps.length}</span> </button> </div> <div className="flex-1 overflow-y-auto min-h-0 bg-transparent p-1"> {activeTab === 'toReceive' && toReceiveApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white"))} {activeTab === 'pending' && pendingApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white"))} {activeTab === 'paid' && paidApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100"))} </div> {contextMenu && (<div className="fixed bg-white/90 backdrop-blur-xl shadow-2xl border border-white/20 rounded-2xl z-[100] py-2 min-w-[180px] animate-scale-up glass-card" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(contextMenu.app)} className="w-full text-left px-5 py-3 hover:bg-brand-50 text-gray-700 text-sm flex items-center gap-3 font-medium transition-colors"><Edit2 size={16} className="text-gray-400" /> Editar Valor</button> </div>)} </div>)
+    return (<div className="space-y-4 h-full flex flex-col pt-2" onClick={() => setContextMenu(null)} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}> <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-4 rounded-3xl border border-white/40 shadow-sm"> <h2 className="text-2xl font-bold text-gray-900 tracking-tight self-start md:self-center">Pagamentos</h2> <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 flex-shrink-0"> <button onClick={() => navigateDate(-1)} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronLeft size={18} /></button> <button onClick={goToToday} className="flex-1 px-4 py-2 bg-white text-brand-600 font-bold rounded-xl text-xs shadow-sm border border-gray-100 hover:bg-gray-50 transition-all">Hoje</button> <button onClick={() => navigateDate(1)} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronRight size={18} /></button> <div className="text-xs font-bold text-gray-700 px-3 min-w-[110px] text-center uppercase tracking-wide">{formatDateWithWeek(selectedDate)}</div> </div> </div> <div className="flex p-1.5 bg-gray-200/50 rounded-2xl overflow-x-auto gap-1"> <button onClick={() => setActiveTab('toReceive')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'toReceive' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">A Receber</span> <span className="text-lg">{toReceiveApps.length}</span> </button> <button onClick={() => setActiveTab('pending')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'pending' ? 'bg-white shadow-md text-red-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pendentes</span> <span className="text-lg">{pendingApps.length}</span> </button> <button onClick={() => setActiveTab('paid')} className={`flex-1 min-w-[100px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'paid' ? 'bg-white shadow-md text-green-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pagos</span> <span className="text-lg">{paidApps.length}</span> </button> </div> <div key={selectedDate} className={`flex-1 overflow-y-auto min-h-0 bg-transparent p-1 ${animationClass}`}> {activeTab === 'toReceive' && toReceiveApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white"))} {activeTab === 'pending' && pendingApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white"))} {activeTab === 'paid' && paidApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100"))} </div> {contextMenu && (<div className="fixed bg-white/90 backdrop-blur-xl shadow-2xl border border-white/20 rounded-2xl z-[100] py-2 min-w-[180px] animate-scale-up glass-card" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(contextMenu.app)} className="w-full text-left px-5 py-3 hover:bg-brand-50 text-gray-700 text-sm flex items-center gap-3 font-medium transition-colors"><Edit2 size={16} className="text-gray-400" /> Editar Valor</button> </div>)} </div>)
 
 };
 
@@ -613,6 +636,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
 const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; googleUser: GoogleUser | null; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete }) => {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day'); const [currentDate, setCurrentDate] = useState(new Date()); const [isModalOpen, setIsModalOpen] = useState(false); const [detailsApp, setDetailsApp] = useState<Appointment | null>(null); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, appId: string } | null>(null); const [editingAppId, setEditingAppId] = useState<string | null>(null);
     const [clientSearch, setClientSearch] = useState(''); const [selectedClient, setSelectedClient] = useState(''); const [selectedPet, setSelectedPet] = useState(''); const [selectedService, setSelectedService] = useState(''); const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]); const [date, setDate] = useState(new Date().toISOString().split('T')[0]); const [time, setTime] = useState('09:00'); const [notes, setNotes] = useState(''); const [manualDuration, setManualDuration] = useState('0');
+    const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const touchStart = useRef<number | null>(null);
 
     const resetForm = () => { setClientSearch(''); setSelectedClient(''); setSelectedPet(''); setSelectedService(''); setSelectedAddServices([]); setTime('09:00'); setNotes(''); setManualDuration('0'); setEditingAppId(null); setIsModalOpen(false); };
@@ -621,7 +645,14 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const handleDeleteFromContext = () => { if (contextMenu && confirm('Excluir?')) onDelete(contextMenu.appId); setContextMenu(null); }
     const filteredClients = clientSearch.length > 0 ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch) || c.pets.some(p => p.name.toLowerCase().includes(clientSearch.toLowerCase()))).slice(0, 5) : []; const selectedClientData = clients.find(c => c.id === selectedClient); const pets = selectedClientData?.pets || []; const selectedPetData = pets.find(p => p.id === selectedPet);
     const getApplicableServices = (category: 'principal' | 'adicional') => { if (!selectedPetData) return []; return services.filter(s => { const matchesCategory = s.category === category; const matchesSize = s.targetSize === 'Todos' || !s.targetSize || (selectedPetData.size && s.targetSize.toLowerCase().includes(selectedPetData.size.toLowerCase())); const matchesCoat = s.targetCoat === 'Todos' || !s.targetCoat || (selectedPetData.coat && s.targetCoat.toLowerCase().includes(selectedPetData.coat.toLowerCase())); return matchesCategory && matchesSize && matchesCoat; }); };
-    const navigate = (direction: 'prev' | 'next') => { const newDate = new Date(currentDate); if (viewMode === 'day') newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1)); if (viewMode === 'week') newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7)); if (viewMode === 'month') newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1)); setCurrentDate(newDate); };
+    const navigate = (direction: 'prev' | 'next') => {
+        setSlideDirection(direction === 'next' ? 'right' : 'left');
+        const newDate = new Date(currentDate);
+        if (viewMode === 'day') newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
+        if (viewMode === 'week') newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+        if (viewMode === 'month') newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+        setCurrentDate(newDate);
+    };
     const timeOptions = []; for (let h = 9; h <= 18; h++) { ['00', '10', '20', '30', '40', '50'].forEach(m => { if (h === 18 && m !== '00') return; timeOptions.push(`${String(h).padStart(2, '0')}:${m}`); }); }
 
     const handleTouchStart = (e: React.TouchEvent) => touchStart.current = e.touches[0].clientX;
@@ -696,9 +727,10 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     };
 
     const renderDayView = () => {
+        const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
         const dateStr = currentDate.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps);
         return (
-            <div className="relative h-[1200px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+            <div key={dateStr} className={`relative h-[1200px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
                 <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 9) * 60 + d.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />); })}
                     {/* Current Time Indicator (Visual Mockup) */}
