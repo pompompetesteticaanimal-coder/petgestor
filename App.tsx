@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { db } from './services/db';
