@@ -358,41 +358,54 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 <section key={selectedDate} className={animationClass}>
                     <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800">Diário</h2><div className="text-sm font-bold text-gray-600 px-3">{formatDateWithWeek(selectedDate)}</div></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" /><StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Normal e Tesoura" /><StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" /><StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" /></div>
-                    <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 dark:border-gray-700 overflow-hidden mt-6 transition-colors">
+                    <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
                         <h3 className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 border-b border-gray-100/50 dark:border-gray-700/50 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento do Dia</h3>
                         <div className="p-4 space-y-3">
                             {dailyApps.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400 dark:text-gray-500 font-medium">Nenhum agendamento neste dia.</div>
-                            ) : (dailyApps.sort((a, b) => a.date.localeCompare(b.date)).map(app => {
-                                const client = clients.find(c => c.id === app.clientId);
-                                const pet = client?.pets.find(p => p.id === app.petId);
-                                const mainSvc = services.find(s => s.id === app.serviceId);
-                                const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x);
-                                const val = calculateGrossRevenue(app);
-                                const isPaid = (!!app.paidAmount && !!app.paymentMethod) || app.status === 'concluido';
+                                <div className="p-8 text-center text-gray-400 font-medium">Nenhum agendamento neste dia.</div>
+                            ) : (
+                                dailyApps.sort((a, b) => a.date.localeCompare(b.date)).map(app => {
+                                    const client = clients.find(c => c.id === app.clientId);
+                                    const pet = client?.pets.find(p => p.id === app.petId);
+                                    const mainSvc = services.find(s => s.id === app.serviceId);
+                                    const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x);
+                                    const val = calculateGrossRevenue(app);
+                                    const isPaid = (!!app.paidAmount && !!app.paymentMethod) || app.status === 'concluido';
 
-                                return (
-                                    <div key={app.id} className={`flex items-center p-3 rounded-2xl border transition-all ${isPaid ? 'bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800/30' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm'}`}>
-                                        <div className="flex flex-col items-center justify-center p-2 bg-gray-50 dark:bg-gray-700 rounded-xl min-w-[60px]">
-                                            <span className="text-xs font-bold text-gray-400 dark:text-gray-300">{new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                        <div className="flex-1 ml-4 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <h4 className="font-bold text-gray-800 dark:text-gray-100 truncate text-sm">{pet?.name}</h4>
-                                                <span className="text-xs text-gray-400 dark:text-gray-500 truncate">- {client?.name}</span>
+                                    return (
+                                        <div key={app.id} className={`bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
+                                            <div className="flex flex-col justify-center items-center px-2 border-r border-gray-100 dark:border-gray-700 min-w-[70px]">
+                                                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Horário</span>
                                             </div>
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                <span className="text-[10px] bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded font-bold">{mainSvc?.name}</span>
-                                                {addSvcs?.map(s => <span key={s?.id} className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600">{s?.name}</span>)}
+                                            <div className="flex-1 py-1 min-w-0">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h4 className="font-bold text-gray-900 dark:text-white truncate">{pet?.name}</h4>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client?.name}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>
+                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                                            {isPaid ? 'Pago' : 'Pendente'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap gap-1">
+                                                    <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-600 truncate max-w-full">
+                                                        {mainSvc?.name}
+                                                    </span>
+                                                    {addSvcs && addSvcs.length > 0 && addSvcs.map((s, i) => (
+                                                        <span key={i} className="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-gray-100 dark:border-gray-700 truncate">
+                                                            + {s?.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="text-right ml-2">
-                                            <span className={`block font-bold text-sm ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-gray-200'}`}>R$ {val.toFixed(2)}</span>
-                                            {isPaid && <span className="text-[9px] font-bold uppercase text-green-500 bg-green-100 dark:bg-green-900/50 px-1.5 py-0.5 rounded-full inline-block mt-1">Pago</span>}
-                                        </div>
-                                    </div>
-                                );
-                            }))}
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
                 </section>

@@ -69,6 +69,7 @@ export interface AppSettings {
   appName: string;
   logoUrl: string;
   theme: string;
+  darkMode?: boolean;
   sidebarOrder: string[];
 }
 
