@@ -364,7 +364,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                             {dailyApps.length === 0 ? (
                                 <div className="p-8 text-center text-gray-400 font-medium">Nenhum agendamento neste dia.</div>
                             ) : (
-                                dailyApps.sort((a, b) => a.date.localeCompare(b.date)).map(app => {
+                                dailyApps.sort((a, b) => a.date.localeCompare(b.date)).map((app, index) => {
                                     const client = clients.find(c => c.id === app.clientId);
                                     const pet = client?.pets.find(p => p.id === app.petId);
                                     const mainSvc = services.find(s => s.id === app.serviceId);
@@ -373,7 +373,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                     const isPaid = (!!app.paidAmount && !!app.paymentMethod) || app.status === 'concluido';
 
                                     return (
-                                        <div key={app.id} className={`bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
+                                        <div key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className={`animate-slide-up bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
                                             <div className="flex flex-col justify-center items-center px-2 border-r border-gray-100 dark:border-gray-700 min-w-[70px]">
                                                 <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                                                 <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Horário</span>
@@ -565,7 +565,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
 
     const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
 
-    const renderPaymentRow = (app: Appointment, statusColor: string) => {
+    const renderPaymentRow = (app: Appointment, statusColor: string, index: number) => {
         const client = clients.find(c => c.id === app.clientId);
         const pet = client?.pets.find(p => p.id === app.petId);
         const mainSvc = services.find(s => s.id === app.serviceId);
@@ -582,7 +582,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
 
 
         return (
-            <div key={app.id} className={`p-5 rounded-3xl shadow-sm hover:shadow-glass hover:-translate-y-0.5 transition-all duration-300 border border-white/60 bg-white/60 backdrop-blur-md mb-3 relative overflow-hidden group ${statusColor}`}>
+            <div key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className={`animate-slide-up p-5 rounded-3xl shadow-sm hover:shadow-glass hover:-translate-y-0.5 transition-all duration-300 border border-white/60 bg-white/60 backdrop-blur-md mb-3 relative overflow-hidden group ${statusColor}`}>
                 <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${serviceBorderColor.replace('border-l-', 'bg-')} opacity-80 rounded-l-3xl`} />
                 <div className="flex justify-between items-start mb-3 pl-3">
                     <div className="min-w-0 flex-1 pr-2">
@@ -631,10 +631,10 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         </div>
 
         <div key={selectedDate} className={`flex-1 overflow-y-auto min-h-0 bg-transparent p-1 ${animationClass}`}>
-            {activeTab === 'toReceive' && toReceiveApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white"))}
-            {activeTab === 'pending' && pendingApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white"))}
-            {activeTab === 'paid' && paidApps.map(app => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100"))}
-            {activeTab === 'noShow' && noShowApps.map(app => renderPaymentRow(app, "bg-gray-100 opacity-75"))}
+            {activeTab === 'toReceive' && toReceiveApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white", i))}
+            {activeTab === 'pending' && pendingApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white", i))}
+            {activeTab === 'paid' && paidApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100", i))}
+            {activeTab === 'noShow' && noShowApps.map((app, i) => renderPaymentRow(app, "bg-gray-100 opacity-75", i))}
         </div>
 
         {contextMenu && (<div className="fixed bg-white/90 backdrop-blur-xl shadow-2xl border border-white/20 rounded-2xl z-[100] py-2 min-w-[180px] animate-scale-up glass-card" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(contextMenu.app)} className="w-full text-left px-5 py-3 hover:bg-brand-50 text-gray-700 text-sm flex items-center gap-3 font-medium transition-colors"><Edit2 size={16} className="text-gray-400" /> Editar Valor</button> </div>)}
@@ -692,8 +692,8 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
 
             <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0 px-1" onScroll={handleScroll}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {visibleClients.map(client => (
-                        <div key={client.id} className="bg-white/70 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-white/50 hover:shadow-glass hover:-translate-y-1 transition-all group relative overflow-hidden">
+                    {visibleClients.map((client, index) => (
+                        <div key={client.id} style={{ animationDelay: `${index * 0.05}s` }} className="animate-slide-up bg-white/70 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-white/50 hover:shadow-glass hover:-translate-y-1 transition-all group relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-8 bg-brand-50/50 rounded-bl-[40px] -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform duration-500" />
                             <div className="flex justify-between items-start mb-4 relative z-10">
                                 <div className="min-w-0 pr-2">
@@ -781,8 +781,8 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
 
             <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0 px-1">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {services.map(service => (
-                        <div key={service.id} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, service }); }} className="bg-white/80 backdrop-blur p-5 rounded-3xl shadow-sm border border-white/50 flex flex-col justify-between cursor-pointer hover:shadow-glass hover:scale-[1.02] transition-all duration-300 select-none group relative">
+                    {services.map((service, index) => (
+                        <div key={service.id} style={{ animationDelay: `${index * 0.05}s` }} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, service }); }} className="animate-slide-up bg-white/80 backdrop-blur p-5 rounded-3xl shadow-sm border border-white/50 flex flex-col justify-between cursor-pointer hover:shadow-glass hover:scale-[1.02] transition-all duration-300 select-none group relative">
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <div className="p-1.5 bg-gray-50 rounded-lg text-gray-400 hover:text-brand-500"><Edit2 size={12} /></div>
                             </div>
@@ -931,7 +931,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const avgRating = starsValues.length > 0 ? starsValues.reduce((a, b) => a + b, 0) / starsValues.length : 0;
 
         return (
-            <div style={style} className={`absolute rounded-xl p-2 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:brightness-105 transition-all overflow-hidden flex flex-col leading-tight group hover:z-[100]`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
+            <div style={style} className={`animate-pop absolute rounded-xl p-2 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:brightness-105 transition-all overflow-hidden flex flex-col leading-tight group hover:z-[100]`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
                 <div className="flex justify-between items-start">
                     <div className="font-bold truncate text-[11px] mb-0.5">{client?.name.split(' ')[0]} <span className="opacity-70 font-normal">- {pet?.name}</span></div>
                     {avgRating > 0 && <div className="flex text-yellow-500 bg-white/50 px-1 rounded-md shadow-sm items-center gap-0.5"><Star size={8} fill="currentColor" /><span className="text-[9px] font-bold">{avgRating.toFixed(1)}</span></div>}
@@ -948,7 +948,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div key={dateStr} className={`relative h-[1200px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
-                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 9) * 60 + d.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />); })}
+                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 9) * 60 + d.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />); })}
                     {/* Current Time Indicator (Visual Mockup) */}
                     <div className="absolute w-full border-t-2 border-red-400 border-dashed opacity-50 pointer-events-none" style={{ top: '400px' }}><span className="bg-red-400 text-white text-[9px] px-1 rounded-r absolute -top-2 left-0">Now</span></div>
                 </div>
@@ -961,7 +961,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div className="flex h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex-col mx-1">
                 <div className="flex border-b border-gray-100 bg-gray-50/50 backdrop-blur-sm"> <div className="w-10 bg-transparent border-r border-gray-100"></div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]; return (<div key={dIdx} className={`flex-1 text-center py-3 text-xs font-bold border-r border-gray-100 ${isToday ? 'bg-brand-50/50 text-brand-600' : 'text-gray-500'}`}> {d.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()} <div className={`text-sm mt-0.5 ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{d.getDate()}</div> </div>) })} </div>
-                <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 9) * 60 + ad.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />) })} </div>) })} </div>
+                <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 9) * 60 + ad.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />) })} </div>) })} </div>
             </div>
         )
     }
@@ -1062,7 +1062,7 @@ const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () =
             <h1 className="text-3xl font-bold text-gray-800 text-center mb-8">Menu</h1>
 
             <div className="space-y-4 flex-1 flex flex-col justify-center">
-                <button onClick={() => setView('services')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md group">
+                <button onClick={() => setView('services')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
                     <div className="w-16 h-16 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><Scissors size={32} /></div>
                     <div className="text-left">
                         <span className="block text-xl font-bold text-gray-800">Serviços</span>
@@ -1071,7 +1071,7 @@ const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () =
                     <ChevronRight className="ml-auto text-gray-300" />
                 </button>
 
-                <button onClick={() => setView('revenue')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md group">
+                <button onClick={() => setView('revenue')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
                     <div className="w-16 h-16 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><TrendingUp size={32} /></div>
                     <div className="text-left">
                         <span className="block text-xl font-bold text-gray-800">Faturamento</span>
@@ -1080,7 +1080,7 @@ const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () =
                     <ChevronRight className="ml-auto text-gray-300" />
                 </button>
 
-                <button onClick={() => setView('costs')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md group">
+                <button onClick={() => setView('costs')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
                     <div className="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><TrendingDown size={32} /></div>
                     <div className="text-left">
                         <span className="block text-xl font-bold text-gray-800">Custo Mensal</span>
@@ -1091,7 +1091,7 @@ const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () =
 
 
 
-                <button onClick={onOpenSettings} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md group">
+                <button onClick={onOpenSettings} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
                     <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><Settings size={32} /></div>
                     <div className="text-left">
                         <span className="block text-xl font-bold text-gray-800">Configurações</span>
