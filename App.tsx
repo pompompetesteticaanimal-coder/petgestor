@@ -30,7 +30,10 @@ const DEFAULT_LOGO_URL = 'https://photos.app.goo.gl/xs394sFQNYBBocea8';
 const formatDateWithWeek = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
     const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    // Custom format to avoid ".,"
+    const w = date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+    const dStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    return `${w.charAt(0).toUpperCase() + w.slice(1)}, ${dStr}`;
 };
 
 // --- SUB-COMPONENTS ---
@@ -478,7 +481,19 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
             {activeTab === 'daily' && (
                 <section key={selectedDate} className={animationClass}>
-                    <div className="sticky top-0 z-30 flex justify-between items-center mb-4 bg-white/90 backdrop-blur-md p-3 rounded-xl border border-gray-200 shadow-sm transition-all"><h2 className="text-lg font-bold text-gray-800">Diário</h2><div className="text-sm font-bold text-gray-600 px-3">{formatDateWithWeek(selectedDate)}</div></div>
+                    <div className="sticky top-0 z-30 flex justify-between items-center mb-4 bg-white/90 backdrop-blur-md p-3 rounded-xl border border-gray-200 shadow-sm transition-all">
+                        <h2 className="text-lg font-bold text-gray-800">Diário</h2>
+                        <div className="relative text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 px-3 py-1 rounded-lg transition-colors cursor-pointer group flex items-center gap-1">
+                            <span>{formatDateWithWeek(selectedDate)}</span>
+                            <ChevronDown size={14} className="opacity-50" />
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                            />
+                        </div>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"><StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" /><StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Normal e Tesoura" /><StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" /><StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" /></div>
                     <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
                         <h3 className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 border-b border-gray-100/50 dark:border-gray-700/50 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento do Dia</h3>
@@ -1265,7 +1280,22 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                         <button onClick={() => navigate('prev')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronLeft size={18} /></button>
-                        <span className="text-sm font-bold text-gray-800 min-w-[90px] text-center truncate">{formatDateWithWeek(currentDate.toISOString().split('T')[0])}</span>
+                        <div className="relative min-w-[100px] text-center cursor-pointer hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors group">
+                            <span className="text-sm font-bold text-gray-800 group-hover:text-brand-600 block truncate">
+                                {formatDateWithWeek(currentDate.toISOString().split('T')[0])}
+                            </span>
+                            <input
+                                type="date"
+                                value={currentDate.toISOString().split('T')[0]}
+                                onChange={(e) => {
+                                    if (e.target.value) {
+                                        const [y, m, d] = e.target.value.split('-').map(Number);
+                                        setCurrentDate(new Date(y, m - 1, d));
+                                    }
+                                }}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                            />
+                        </div>
                         <button onClick={() => navigate('next')} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition"><ChevronRight size={18} /></button>
                     </div>
                 </div>
