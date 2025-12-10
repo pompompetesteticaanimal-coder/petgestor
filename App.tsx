@@ -228,7 +228,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             if (!hasTosa && app.additionalServiceIds) { app.additionalServiceIds.forEach(id => { const s = services.find(srv => srv.id === id); if (s && isTargetTosa(s.name)) hasTosa = true; }); }
             if (hasTosa) totalTosas++;
             const gross = calculateGrossRevenue(app);
-            const isPaid = app.paymentMethod && app.paymentMethod.trim() !== '';
+            // Strict Payment Check: Must have a method recorded
+            const isPaid = !!app.paymentMethod && app.paymentMethod.trim() !== '';
             if (isPaid) paidRevenue += gross; else pendingRevenue += gross;
         });
         const grossRevenue = paidRevenue + pendingRevenue;
@@ -1157,10 +1158,11 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
                 layoutResult.push({
                     app: node.app,
-                    left: isStack ? `${index * 8}%` : '0%',
-                    width: isStack ? `${100 - (index * 8)}%` : '100%',
+                    left: isStack ? `${index * 15}%` : '0%', // Increased shift for header visibility
+                    width: isStack ? `${90 - (index * 5)}%` : '100%', // Decreasing width to avoid full cover
                     zIndex: 10 + index,
-                    topOffset: isStack ? index * 30 : 0 // Shift down 30px per item to show headers
+                    // Reverted topOffset (User Requirement: Strict Start Time)
+                    topOffset: 0
                 });
             });
         });
@@ -1215,7 +1217,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
                     const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 8) * 60 + d.getMinutes();
                     const height = (app.durationTotal || 60) * 2;
-                    const top = (startMin * 2) + (item.topOffset || 0);
+                    const top = startMin * 2; // Strict time positioning
 
                     return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />);
                 })}
@@ -1240,7 +1242,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
                         const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 8) * 60 + ad.getMinutes();
                         const height = (app.durationTotal || 60) * 2;
-                        const top = (startMin * 2) + (item.topOffset || 0);
+                        const top = startMin * 2; // Strict time
 
                         return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />)
                     })} </div>)
