@@ -980,8 +980,6 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
     const [formData, setFormData] = useState({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' });
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, service: Service } | null>(null);
     const [viewService, setViewService] = useState<Service | null>(null);
-    const [newService, setNewService] = useState<Partial<Service>>({});
-    const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
 
     const resetForm = () => { setFormData({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' }); setEditingService(null); setIsModalOpen(false); };
     const handleEditStart = (s: Service) => { setEditingService(s); setFormData({ name: s.name, price: s.price.toString(), category: s.category, size: s.targetSize || 'Todos', coat: s.targetCoat || 'Todos' }); setIsModalOpen(true); setContextMenu(null); };
@@ -1051,8 +1049,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
                             <div className="flex gap-3">
                                 <button onClick={() => setViewService(null)} className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:scale-95 transition-transform">Fechar</button>
                                 <button onClick={() => {
-                                    setNewService({ ...viewService });
-                                    setIsNewServiceModalOpen(true);
+                                    handleEditStart(viewService);
                                     setViewService(null);
                                 }} className="flex-1 py-3 bg-brand-600 text-white font-bold rounded-xl shadow-lg shadow-brand-200 active:scale-95 transition-transform flex items-center justify-center gap-2">
                                     <Edit2 size={16} /> Editar
