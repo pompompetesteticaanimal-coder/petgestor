@@ -1139,24 +1139,30 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 if (!placed) columns.push([node]);
             });
             const count = columns.length;
-            // Always use Side-by-Side Column Layout to prevent overlapping
-            const widthPct = 100 / count;
-            columns.forEach((col, colIdx) => {
+            // Vertical Stack Layout: Calculate vertical index/total instead of horizontal
+            let flatIndex = 0;
+            columns.forEach((col) => {
                 col.forEach(node => {
                     layoutResult.push({
                         app: node.app,
-                        left: `${colIdx * widthPct}%`,
-                        width: `${widthPct}%`,
-                        zIndex: 10
+                        left: '0%',
+                        width: '100%',
+                        zIndex: 10 + flatIndex,
+                        // Custom props for vertical stacking
+                        stackIndex: flatIndex,
+                        stackTotal: count // Approximation: using column count as proxy for max parallel items
                     });
                 });
+                flatIndex++;
             });
         });
         return layoutResult;
     };
 
-    const AppointmentCard = ({ app, style, onClick, onContext }: any) => {
+    // Updated Card with full requested info
+    const AppointmentCard = ({ app, style, onClick, onContext, stackIndex, stackTotal }: any) => {
         const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x) as Service[] || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
+
         // WARNING: DO NOT CHANGE COLORS - Service Color Mapping (Fixed by User Request)
         let colorClass = 'bg-blue-100 border-blue-200 text-blue-900'; // Default / Banho
         if (allServiceNames.includes('tosa normal')) colorClass = 'bg-orange-100 border-orange-200 text-orange-900';
@@ -1172,13 +1178,22 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const avgRating = starsValues.length > 0 ? starsValues.reduce((a, b) => a + b, 0) / starsValues.length : 0;
 
         return (
-            <div style={style} className={`animate-pop absolute rounded-lg p-1 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:brightness-105 transition-all overflow-hidden flex flex-col leading-tight group hover:z-[100]`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
-                <div className="flex justify-between items-start">
-                    <div className="font-bold truncate text-[11px] mb-0.5">{client?.name.split(' ')[0]} <span className="opacity-70 font-normal">- {pet?.name}</span></div>
-                    {avgRating > 0 && <div className="flex text-yellow-500 bg-white/50 px-1 rounded-md shadow-sm items-center gap-0.5"><Star size={8} fill="currentColor" /><span className="text-[9px] font-bold">{avgRating.toFixed(1)}</span></div>}
+            <div style={style} className={`animate-pop absolute rounded-lg p-1.5 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.05] hover:z-[100] transition-all overflow-hidden flex flex-col justify-start leading-none group`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
+                {/* Header: Client & Pet */}
+                <div className="flex justify-between items-center mb-1 w-full">
+                    <span className="font-bold truncate text-[11px] flex-1">{client?.name.split(' ')[0]} - {pet?.name}</span>
+                    {avgRating > 0 && <div className="flex bg-white/60 px-1 rounded-md items-center ml-1"><Star size={8} className="fill-yellow-500 text-yellow-500" /><span className="text-[9px] font-bold ml-0.5 text-yellow-700">{avgRating.toFixed(1)}</span></div>}
                 </div>
-                <div className="flex flex-wrap gap-1 opacity-90 mt-auto"> {mainSvc && <span className="bg-white/40 px-1 rounded-[4px] text-[9px]">{mainSvc.name.substring(0, 12)}</span>} </div>
-                <div className="absolute right-1 bottom-1 bg-white/80 backdrop-blur-sm px-1.5 rounded-md text-[9px] font-bold shadow-sm">{app.durationTotal || 60}m</div>
+
+                {/* Body: Services */}
+                <div className="flex flex-col gap-0.5 opacity-90 w-full">
+                    {mainSvc && <div className="truncate font-semibold text-[10px]">{mainSvc.name}</div>}
+                    {addSvcs.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                            {addSvcs.map((s, i) => <span key={i} className="bg-white/40 px-1 rounded-[3px] text-[8px] truncate max-w-[80px]">{s.name}</span>)}
+                        </div>
+                    )}
+                </div>
             </div>
         );
     };
@@ -1189,7 +1204,17 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div key={dateStr} className={`relative h-[1200px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
-                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 9) * 60 + d.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />); })}
+                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
+                    const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 9) * 60 + d.getMinutes();
+                    const originalHeight = (app.durationTotal || 60) * 2;
+                    // Apply Vertical Stack Math
+                    const count = item.stackTotal || 1;
+                    const index = item.stackIndex || 0;
+                    const height = originalHeight / count;
+                    const top = (startMin * 2) + (height * index);
+
+                    return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} stackIndex={index} stackTotal={count} />);
+                })}
                     {/* Current Time Indicator */}
                     {nowMinutes >= 0 && nowMinutes <= 600 && (
                         <div className="absolute w-full border-t-2 border-red-500 border-dashed opacity-70 pointer-events-none z-20 flex items-center" style={{ top: `${nowMinutes * 2}px` }}>
@@ -1207,7 +1232,19 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div className="flex h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex-col mx-1">
                 <div className="flex border-b border-gray-100 bg-gray-50/50 backdrop-blur-sm"> <div className="w-10 bg-transparent border-r border-gray-100"></div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]; return (<div key={dIdx} className={`flex-1 text-center py-3 text-xs font-bold border-r border-gray-100 ${isToday ? 'bg-brand-50/50 text-brand-600' : 'text-gray-500'}`}> {d.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()} <div className={`text-sm mt-0.5 ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{d.getDate()}</div> </div>) })} </div>
-                <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item, idx) => { const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 9) * 60 + ad.getMinutes(); const duration = app.durationTotal || 60; return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${startMin * 2}px`, height: `${duration * 2}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />) })} </div>) })} </div>
+                <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 10 }, (_, i) => i + 9).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => {
+                    const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
+                        const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 9) * 60 + ad.getMinutes();
+                        const originalHeight = (app.durationTotal || 60) * 2;
+                        // Apply Vertical Stack Math
+                        const count = item.stackTotal || 1;
+                        const index = item.stackIndex || 0;
+                        const height = originalHeight / count;
+                        const top = (startMin * 2) + (height * index);
+
+                        return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} stackIndex={index} stackTotal={count} />)
+                    })} </div>)
+                })} </div>
             </div>
         )
     }
