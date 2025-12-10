@@ -1141,7 +1141,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             }
             clusters.push(currentCluster);
         }
-        const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number }[] = [];
+        const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number, index: number, totalCount: number }[] = [];
         clusters.forEach(cluster => {
             // Cascading Layout: All overlapping items form a single group
             // We shift each item slightly right and down to reveal headers
@@ -1156,7 +1156,10 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     width: isStack ? '85%' : '100%', // Fixed high width to ensure readability & force scroll if container allows
                     zIndex: 10 + index,
                     // Reverted topOffset (User Requirement: Strict Start Time)
-                    topOffset: 0
+                    topOffset: 0,
+                    // Stats for Overflow Indicator
+                    index: index,
+                    totalCount: count
                 });
             });
         });
@@ -1208,13 +1211,26 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div key={dateStr} className={`relative h-[1440px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
-                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)] overflow-x-auto"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
-                    const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 8) * 60 + d.getMinutes();
-                    const height = (app.durationTotal || 60) * 2;
-                    const top = startMin * 2; // Strict time positioning
+                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)] overflow-x-auto"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)}
+                    {/* Overflow Indicators Layer */}
+                    <div className="absolute top-0 right-0 h-full w-[60px] pointer-events-none z-50 flex flex-col items-end">
+                        {layoutItems.filter((item: any) => item.index === 0 && item.totalCount > 2).map((item: any) => {
+                            const startMin = (new Date(item.app.date).getHours() - 8) * 60 + new Date(item.app.date).getMinutes();
+                            const top = startMin * 2;
+                            return (
+                                <div key={`overflow-${item.app.id}`} className="absolute right-1 bg-red-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg flex items-center gap-0.5 animate-pulse" style={{ top: `${top + 5}px` }}>
+                                    +{item.totalCount - 2} <ChevronRight size={10} />
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {layoutItems.map((item: any, idx) => {
+                        const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 8) * 60 + d.getMinutes();
+                        const height = (app.durationTotal || 60) * 2;
+                        const top = startMin * 2; // Strict time positioning
 
-                    return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />);
-                })}
+                        return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />);
+                    })}
                     {/* Current Time Indicator */}
                     {nowMinutes >= 0 && nowMinutes <= 720 && (
                         <div className="absolute w-full border-t-2 border-red-500 border-dashed opacity-70 pointer-events-none z-20 flex items-center" style={{ top: `${nowMinutes * 2}px` }}>
