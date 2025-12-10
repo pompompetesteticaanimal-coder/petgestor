@@ -238,13 +238,13 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     };
 
     const getWeeklyChartData = () => {
-        // ... (rest of logic same)
+        // ...
         const [y, m, d] = selectedDate.split('-').map(Number);
         const date = new Date(y, m - 1, d);
         const day = date.getDay();
         const diff = date.getDate() - day;
         const startOfWeek = new Date(date); startOfWeek.setDate(diff);
-        const data = []; const businessDays = [2, 3, 4, 5, 6];
+        const data: any[] = []; const businessDays = [2, 3, 4, 5, 6];
         businessDays.forEach(dayIndex => {
             const current = new Date(startOfWeek); current.setDate(startOfWeek.getDate() + dayIndex);
             const cYear = current.getFullYear(); const cMonth = String(current.getMonth() + 1).padStart(2, '0'); const cDay = String(current.getDate()).padStart(2, '0');
@@ -252,7 +252,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const dailyApps = appointments.filter(a => { if (a.status === 'cancelado') return false; const aDate = new Date(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
             const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateGrossRevenue(app), 0);
             const formattedDate = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'short' });
-            let growth = 0; if (data.length > 0) { const prev = data[data.length - 1] as any; if (prev.faturamento > 0) growth = ((totalRevenue - prev.faturamento) / prev.faturamento) * 100; }
+            let growth = 0; if (data.length > 0) { const prev = data[data.length - 1]; if (prev.faturamento > 0) growth = ((totalRevenue - prev.faturamento) / prev.faturamento) * 100; }
             data.push({ name: formattedDate, fullDate: targetDateStr, faturamento: totalRevenue, rawRevenue: totalRevenue, pets: dailyApps.length, growth });
         });
         return data;
@@ -285,7 +285,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     };
 
     const getYearlyChartData = () => {
-        const data = []; const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const data: any[] = []; const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const startMonth = selectedYear === 2025 ? 7 : 0;
         for (let i = startMonth; i < 12; i++) {
             const monthApps = appointments.filter(a => { const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === i && a.status !== 'cancelado'; });
@@ -484,7 +484,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 <section key={selectedDate} className={animationClass}>
                     <div className="sticky top-0 z-30 flex justify-between items-center mb-4 bg-white/90 backdrop-blur-md p-3 rounded-xl border border-gray-200 shadow-sm transition-all">
                         <h2 className="text-lg font-bold text-gray-800">Diário</h2>
-                        <div className="relative text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 px-3 py-1 rounded-lg transition-colors cursor-pointer group flex items-center gap-1 z-50 select-none" onClick={() => document.getElementById('daily-date-picker')?.showPicker()}>
+                        <div className="relative text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 px-3 py-1 rounded-lg transition-colors cursor-pointer group flex items-center gap-1 z-50 select-none" onClick={() => (document.getElementById('daily-date-picker') as HTMLInputElement)?.showPicker()}>
                             <span className="pointer-events-none">{formatDateWithWeek(selectedDate)}</span>
                             <ChevronDown size={14} className="opacity-50 pointer-events-none" />
                             <input
@@ -628,7 +628,7 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     );
 };
 
-const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; accessToken: string | null; sheetId: string; }> = ({ appointments, clients, services, onUpdateAppointment, accessToken, sheetId }) => {
+const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; onRemovePayment: (app: Appointment) => void; accessToken: string | null; sheetId: string; }> = ({ appointments, clients, services, onUpdateAppointment, onRemovePayment, accessToken, sheetId }) => {
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
     const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid' | 'noShow'>('toReceive'); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: Appointment } | null>(null);
     const [showEvaluationModal, setShowEvaluationModal] = useState(false);
@@ -739,7 +739,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         const client = clients.find(c => c.id === app.clientId);
         const pet = client?.pets.find(p => p.id === app.petId);
         const mainSvc = services.find(srv => srv.id === app.serviceId);
-        const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x) as Service[] || [];
+        const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter((x): x is Service => !!x) || [];
         const expected = calculateExpected(app);
         const isPaid = !!app.paidAmount && !!app.paymentMethod;
         const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
@@ -775,7 +775,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                 <div className="flex gap-2 ml-1">
                     <button onClick={() => handleStartEdit(app)} className="flex-1 bg-white hover:bg-gray-50 text-gray-600 hover:text-brand-600 py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all border border-gray-100 shadow-sm group-hover:shadow-md active:scale-95"> <DollarSign size={14} /> {isPaid ? 'Editar Detalhes' : 'Registrar Pagamento'} </button>
                     {isPaid && (
-                        <button onClick={() => handleRemovePayment(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap" title="Desfazer Pagamento">
+                        <button onClick={() => onRemovePayment(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap" title="Desfazer Pagamento">
                             <Trash2 size={16} />
                         </button>
                     )}
@@ -794,7 +794,18 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                 <button onClick={() => navigateDate(-1)} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronLeft size={18} /></button>
                 <button onClick={goToToday} className="flex-1 px-4 py-2 bg-white text-brand-600 font-bold rounded-xl text-xs shadow-sm border border-gray-100 hover:bg-gray-50 transition-all">Hoje</button>
                 <button onClick={() => navigateDate(1)} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronRight size={18} /></button>
-                <div className="text-xs font-bold text-gray-700 px-3 min-w-[110px] text-center uppercase tracking-wide">{formatDateWithWeek(selectedDate)}</div>
+                <div className="relative text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors cursor-pointer min-w-[130px] text-center uppercase tracking-wide border border-transparent hover:border-gray-200 z-50 select-none flex items-center justify-center gap-1" onClick={() => (document.getElementById('payments-date-picker') as HTMLInputElement)?.showPicker()}>
+                    <span className="pointer-events-none">{formatDateWithWeek(selectedDate)}</span>
+                    <ChevronDown size={12} className="opacity-50 pointer-events-none" />
+                    <input
+                        id="payments-date-picker"
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-50 appearance-none"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
             </div>
         </div>
 
@@ -1222,8 +1233,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     };
 
     // Updated Card with full requested info
-    const AppointmentCard = ({ app, style, onClick, onContext, stackIndex, stackTotal }: any) => {
-        const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(x => x) as Service[] || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
+    const AppointmentCard = ({ app, style, onClick, onContext, stackIndex, stackTotal }: { app: Appointment, style: any, onClick: any, onContext: any, stackIndex?: number, stackTotal?: number }) => {
+        const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map((id: string) => services.find(s => s.id === id)).filter((x): x is Service => !!x) || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
 
         // WARNING: DO NOT CHANGE COLORS - Service Color Mapping (Fixed by User Request)
         let colorClass = 'bg-blue-100 border-blue-200 text-blue-900'; // Default / Banho
@@ -1425,7 +1436,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                 </div>
                             </div>
 
-                            <button onClick={() => handleStartEdit(detailsApp)} className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brand-700 active:scale-95 transition shadow-lg shadow-brand-200"><Edit2 size={18} /> Editar Agendamento</button>
+                            <button onClick={() => { setDetailsApp(null); handleStartEdit(detailsApp); }} className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brand-700 active:scale-95 transition shadow-lg shadow-brand-200"><Edit2 size={18} /> Editar Agendamento</button>
                         </div>
                     </div>
                 );
@@ -2000,7 +2011,12 @@ const App: React.FC = () => {
 
     const handleRemovePayment = async (app: Appointment) => {
         if (!confirm('Tem certeza que deseja remover este pagamento? O status voltará para Pendente.')) return;
-        const updatedApps = appointments.map(a => { if (a.id === app.id) { return { ...a, paidAmount: 0, paymentMethod: '' }; } return a; });
+        const updatedApps = appointments.map(a => {
+            if (a.id === app.id) {
+                return { ...a, paidAmount: 0, paymentMethod: '' as any };
+            }
+            return a;
+        });
         setAppointments(updatedApps); db.saveAppointments(updatedApps);
         if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
             try {
@@ -2051,7 +2067,7 @@ const App: React.FC = () => {
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} />}
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} />}
                 {currentView === 'costs' && <CostsView costs={costs} />}
-                {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services} onUpdateAppointment={handleUpdateApp} accessToken={accessToken} sheetId={SHEET_ID} />}
+                {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services} onUpdateAppointment={handleUpdateApp} onRemovePayment={handleRemovePayment} accessToken={accessToken} sheetId={SHEET_ID} />}
                 {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
                 {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
                 {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} />}
