@@ -1068,15 +1068,15 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
             )}
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-                    <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl space-y-6 animate-scale-up relative overflow-hidden ring-1 ring-white/50">
+                <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in" onClick={resetForm}>
+                    <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl space-y-6 animate-scale-up relative overflow-hidden ring-1 ring-white/50" onClick={e => e.stopPropagation()}>
                         <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-brand-400 to-purple-500" />
-                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Gerenciar Serviço</h3>
+                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{editingService ? 'Editar Serviço' : 'Novo Serviço'}</h3>
                         <div className="space-y-4">
-                            <div><label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-1 block">Nome do Serviço</label><input placeholder="Ex: Banho Premium" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-gray-50 border-none p-4 rounded-xl text-lg font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none transition-all placeholder:font-normal" /></div>
+                            <div><label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-1 block">Nome do Serviço</label><input placeholder="Ex: Banho Premium" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-gray-50 border-none p-4 rounded-xl text-lg font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none transition-all placeholder:font-normal" /></div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-1 block">Preço (R$)</label><input placeholder="0,00" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} className="w-full bg-gray-50 border-none p-4 rounded-xl text-lg font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none transition-all" /></div>
-                                <div><label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-1 block">Categoria</label><select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full bg-gray-50 border-none p-4 rounded-xl text-sm font-bold text-gray-700 focus:ring-2 ring-brand-200 outline-none transition-all appearance-none"><option value="principal">Principal</option><option value="adicional">Adicional</option></select></div>
+                                <div><label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-1 block">Preço (R$)</label><input placeholder="0,00" value={formData.price || ''} onChange={e => setFormData({ ...formData, price: e.target.value })} className="w-full bg-gray-50 border-none p-4 rounded-xl text-lg font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none transition-all" /></div>
+                                <div><label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-1 block">Categoria</label><select value={formData.category || 'principal'} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full bg-gray-50 border-none p-4 rounded-xl text-sm font-bold text-gray-700 focus:ring-2 ring-brand-200 outline-none transition-all appearance-none"><option value="principal">Principal</option><option value="adicional">Adicional</option></select></div>
                             </div>
                         </div>
                         <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-gray-100">
