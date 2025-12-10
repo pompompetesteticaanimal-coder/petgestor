@@ -507,7 +507,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                     const mainSvc = services.find(s => s.id === app.serviceId);
                                     const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
                                     const val = calculateGrossRevenue(app);
-                                    const isPaid = (!!app.paidAmount && !!app.paymentMethod) || app.status === 'concluido';
+                                    // Payment Fix: Must have valid payment info to be Paid
+                                    const isPaid = (!!app.paidAmount && app.paidAmount > 0) && (!!app.paymentMethod && app.paymentMethod.trim() !== '');
 
                                     return (
                                         <div key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className={`animate-slide-up bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
@@ -1145,24 +1146,21 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             }
             clusters.push(currentCluster);
         }
-        const layoutResult: { app: Appointment, left: string, width: string, zIndex: number }[] = [];
+        const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number }[] = [];
         clusters.forEach(cluster => {
-            const columns: typeof nodes[] = [];
-            cluster.forEach(node => {
-                let placed = false;
-                for (let i = 0; i < columns.length; i++) { const lastInCol = columns[i][columns[i].length - 1]; if (node.start >= lastInCol.end) { columns[i].push(node); placed = true; break; } }
-                if (!placed) columns.push([node]);
-            });
-            const count = columns.length;
-            const widthPct = 100 / count;
-            columns.forEach((col, colIdx) => {
-                col.forEach(node => {
-                    layoutResult.push({
-                        app: node.app,
-                        left: `${colIdx * widthPct}%`,
-                        width: `${widthPct}%`,
-                        zIndex: 10
-                    });
+            // Cascading Layout: All overlapping items form a single group
+            // We shift each item slightly right and down to reveal headers
+            cluster.forEach((node, index) => {
+                const count = cluster.length;
+                // If it's a cluster, we cascade. If single, full width.
+                const isStack = count > 1;
+
+                layoutResult.push({
+                    app: node.app,
+                    left: isStack ? `${index * 8}%` : '0%',
+                    width: isStack ? `${100 - (index * 8)}%` : '100%',
+                    zIndex: 10 + index,
+                    topOffset: isStack ? index * 30 : 0 // Shift down 30px per item to show headers
                 });
             });
         });
@@ -1217,7 +1215,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
                     const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 8) * 60 + d.getMinutes();
                     const height = (app.durationTotal || 60) * 2;
-                    const top = startMin * 2;
+                    const top = (startMin * 2) + (item.topOffset || 0);
 
                     return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />);
                 })}
@@ -1242,7 +1240,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
                         const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 8) * 60 + ad.getMinutes();
                         const height = (app.durationTotal || 60) * 2;
-                        const top = startMin * 2;
+                        const top = (startMin * 2) + (item.topOffset || 0);
 
                         return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />)
                     })} </div>)
