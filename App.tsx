@@ -1998,6 +1998,21 @@ const App: React.FC = () => {
         }
     };
 
+    const handleRemovePayment = async (app: Appointment) => {
+        if (!confirm('Tem certeza que deseja remover este pagamento? O status voltará para Pendente.')) return;
+        const updatedApps = appointments.map(a => { if (a.id === app.id) { return { ...a, paidAmount: 0, paymentMethod: '' }; } return a; });
+        setAppointments(updatedApps); db.saveAppointments(updatedApps);
+        if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
+            try {
+                const idx = parseInt(app.id.split('_')[1]);
+                if (!isNaN(idx)) {
+                    const row = idx + 1;
+                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!Q${row}:R${row}`, [['', '']]);
+                }
+            } catch (e) { console.error("Erro ao limpar pagamento:", e); alert("Erro ao sincronizar cancelamento de pagamento."); }
+        }
+    };
+
     const handleUpdateStatus = (id: string, status: Appointment['status']) => {
         const updated = appointments.map(a => a.id === id ? { ...a, status } : a);
         setAppointments(updated);
