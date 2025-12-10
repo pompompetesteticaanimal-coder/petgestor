@@ -1154,21 +1154,16 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 if (!placed) columns.push([node]);
             });
             const count = columns.length;
-            // Vertical Stack Layout: Calculate vertical index/total instead of horizontal
-            let flatIndex = 0;
-            columns.forEach((col) => {
+            const widthPct = 100 / count;
+            columns.forEach((col, colIdx) => {
                 col.forEach(node => {
                     layoutResult.push({
                         app: node.app,
-                        left: '0%',
-                        width: '100%',
-                        zIndex: 10 + flatIndex,
-                        // Custom props for vertical stacking
-                        stackIndex: flatIndex,
-                        stackTotal: count // Approximation: using column count as proxy for max parallel items
+                        left: `${colIdx * widthPct}%`,
+                        width: `${widthPct}%`,
+                        zIndex: 10
                     });
                 });
-                flatIndex++;
             });
         });
         return layoutResult;
@@ -1221,14 +1216,10 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
                 <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
                     const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 8) * 60 + d.getMinutes();
-                    const originalHeight = (app.durationTotal || 60) * 2;
-                    // Apply Vertical Stack Math
-                    const count = item.stackTotal || 1;
-                    const index = item.stackIndex || 0;
-                    const height = originalHeight / count;
-                    const top = (startMin * 2) + (height * index);
+                    const height = (app.durationTotal || 60) * 2;
+                    const top = startMin * 2;
 
-                    return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} stackIndex={index} stackTotal={count} />);
+                    return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />);
                 })}
                     {/* Current Time Indicator */}
                     {nowMinutes >= 0 && nowMinutes <= 720 && (
@@ -1250,14 +1241,10 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => {
                     const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
                         const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 8) * 60 + ad.getMinutes();
-                        const originalHeight = (app.durationTotal || 60) * 2;
-                        // Apply Vertical Stack Math
-                        const count = item.stackTotal || 1;
-                        const index = item.stackIndex || 0;
-                        const height = originalHeight / count;
-                        const top = (startMin * 2) + (height * index);
+                        const height = (app.durationTotal || 60) * 2;
+                        const top = startMin * 2;
 
-                        return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} stackIndex={index} stackTotal={count} />)
+                        return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />)
                     })} </div>)
                 })} </div>
             </div>
