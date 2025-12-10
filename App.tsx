@@ -1352,7 +1352,48 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
     const renderMonthView = () => {
         const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const firstDay = new Date(year, month, 1); const startDay = firstDay.getDay(); const daysInMonth = new Date(year, month + 1, 0).getDate(); const slots = []; for (let i = 0; i < startDay; i++) slots.push(null); for (let i = 1; i <= daysInMonth; i++) slots.push(new Date(year, month, i));
-        return (<div className="h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col mx-1"> <div className="grid grid-cols-7 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200"> {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>)} </div> <div className="flex-1 grid grid-cols-7 auto-rows-fr"> {slots.map((date, idx) => { if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/30 border-b border-r border-gray-100" />; const dateStr = date.toISOString().split('T')[0]; const isToday = dateStr === new Date().toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado').sort((a, b) => a.date.localeCompare(b.date)); return (<div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col transition-colors cursor-pointer hover:bg-brand-50/30 ${isToday ? 'bg-orange-50/30' : ''}`} onClick={() => { setDate(dateStr); setViewMode('day'); }}> <span className={`text-[10px] font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full transition-all ${isToday ? 'bg-brand-600 text-white shadow-md scale-110' : 'text-gray-500'}`}>{date.getDate()}</span> <div className="flex-1 overflow-hidden space-y-1"> {dayApps.slice(0, 3).map(app => (<div key={app.id} className="text-[9px] bg-white border border-gray-200 text-gray-700 rounded-md px-1.5 py-0.5 truncate font-medium shadow-sm"> {clients.find(c => c.id === app.clientId)?.pets.find(p => p.id === app.petId)?.name} </div>))} {dayApps.length > 3 && <div className="text-[8px] text-gray-400 pl-1 font-medium">+ {dayApps.length - 3} mais</div>} </div> </div>) })} </div> </div>)
+        return (
+            <div className="h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col mx-1">
+                <div className="grid grid-cols-7 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200">
+                    {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>)}
+                </div>
+                <div className="flex-1 grid grid-cols-7 auto-rows-fr overflow-hidden">
+                    {slots.map((date, idx) => {
+                        if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/30 border-b border-r border-gray-100" />;
+                        const dateStr = date.toISOString().split('T')[0];
+                        const isToday = dateStr === new Date().toISOString().split('T')[0];
+                        const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado').sort((a, b) => a.date.localeCompare(b.date));
+
+                        return (
+                            <div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col transition-colors cursor-pointer hover:bg-brand-50/30 ${isToday ? 'bg-orange-50/30' : ''}`} onClick={(e) => {
+                                // Prevent navigating to day view if clicking on scrollbar/content, only on header or empty space if desired? 
+                                // Actually user might want to click to go to day view still. But clicking on an item might need to do something else?
+                                // For now, let's keep the behavior: click anywhere goes to Day view. 
+                                // But scrolling requires interacting with the container. 
+                                // If I click to scroll, it might trigger onClick. 
+                                // However, usually drag to scroll doesn't trigger click. 
+                                setDate(dateStr); setViewMode('day');
+                            }}>
+                                <span className={`text-[10px] font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 transition-all ${isToday ? 'bg-brand-600 text-white shadow-md scale-110' : 'text-gray-500'}`}>{date.getDate()}</span>
+                                <div className="flex-1 overflow-y-auto space-y-1 min-h-0 custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+                                    {dayApps.map(app => (
+                                        <div key={app.id} className="text-[9px] bg-white border border-gray-200 text-gray-700 rounded-md px-1.5 py-0.5 truncate font-medium shadow-sm transition-transform hover:scale-[1.02]" onClick={(e) => {
+                                            e.stopPropagation(); // Don't switch to day view just by clicking an app? Or maybe yes?
+                                            // Ideally clicking an app opens details. 
+                                            // But in month view, usually it's just a summary. 
+                                            // Let's make it so clicking an app opens details, clicking empty space goes to Day View.
+                                            setDetailsApp(app);
+                                        }}>
+                                            {clients.find(c => c.id === app.clientId)?.pets.find(p => p.id === app.petId)?.name}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        )
     };
 
     return (
