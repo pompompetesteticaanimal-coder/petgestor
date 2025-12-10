@@ -484,14 +484,14 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 <section key={selectedDate} className={animationClass}>
                     <div className="sticky top-0 z-30 flex justify-between items-center mb-4 bg-white/90 backdrop-blur-md p-3 rounded-xl border border-gray-200 shadow-sm transition-all">
                         <h2 className="text-lg font-bold text-gray-800">Diário</h2>
-                        <div className="relative text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 px-3 py-1 rounded-lg transition-colors cursor-pointer group flex items-center gap-1">
+                        <div className="relative text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 px-3 py-1 rounded-lg transition-colors cursor-pointer group flex items-center gap-1 z-50">
                             <span>{formatDateWithWeek(selectedDate)}</span>
                             <ChevronDown size={14} className="opacity-50" />
                             <input
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }}
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-50"
                             />
                         </div>
                     </div>
@@ -1158,8 +1158,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
                 layoutResult.push({
                     app: node.app,
-                    left: isStack ? `${index * 15}%` : '0%', // Increased shift for header visibility
-                    width: isStack ? `${90 - (index * 5)}%` : '100%', // Decreasing width to avoid full cover
+                    left: isStack ? `${index * 15}%` : '0%', // Shift right for fan effect
+                    width: isStack ? '85%' : '100%', // Fixed high width to ensure readability & force scroll if container allows
                     zIndex: 10 + index,
                     // Reverted topOffset (User Requirement: Strict Start Time)
                     topOffset: 0
@@ -1188,7 +1188,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const avgRating = starsValues.length > 0 ? starsValues.reduce((a, b) => a + b, 0) / starsValues.length : 0;
 
         return (
-            <div style={style} className={`animate-pop absolute rounded-lg p-1.5 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.05] hover:z-[100] transition-all overflow-hidden flex flex-col justify-start leading-none group`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
+            <div style={style} className={`animate-pop absolute rounded-lg p-1.5 border shadow-sm ${colorClass} text-xs cursor-pointer hover:shadow-md hover:scale-[1.05] hover:z-[100] transition-all overflow-hidden flex flex-col justify-start leading-none group min-w-[200px]`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
                 {/* Header: Client & Pet */}
                 <div className="flex justify-between items-center mb-1 w-full">
                     <span className="font-bold truncate text-[11px] flex-1">{client?.name.split(' ')[0]} - {pet?.name}</span>
@@ -1214,7 +1214,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div key={dateStr} className={`relative h-[1440px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
-                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
+                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)] overflow-x-auto"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
                     const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 8) * 60 + d.getMinutes();
                     const height = (app.durationTotal || 60) * 2;
                     const top = startMin * 2; // Strict time positioning
