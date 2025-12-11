@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Client, Appointment, Service } from '../types';
+import { Client, Appointment, Service, Pet } from '../types';
 import { Phone, CheckCircle, MessageCircle, Calendar as CalendarIcon, ArrowLeft, MapPin, Dog, Clock, AlertCircle, Search, Filter, ArrowUpDown, ArrowDownUp } from 'lucide-react';
 
 interface InactiveClientsViewProps {
@@ -9,9 +9,10 @@ interface InactiveClientsViewProps {
     contactLogs: { clientId: string, date: string }[];
     onMarkContacted: (client: Client, daysInactive: number) => void;
     onBack: () => void;
+    onViewPet?: (pet: Pet, client: Client) => void;
 }
 
-export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ clients, appointments, services, contactLogs, onMarkContacted, onBack }) => {
+export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ clients, appointments, services, contactLogs, onMarkContacted, onBack, onViewPet }) => {
     // State for Search, Filter, Sort
     const [searchTerm, setSearchTerm] = useState('');
     const [minDays, setMinDays] = useState(15);
@@ -180,32 +181,37 @@ export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ client
                                     </span>
                                 </div>
 
-                                <div className="flex items-start gap-4 mb-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-100 to-brand-50 flex items-center justify-center text-brand-600 shadow-inner shrink-0">
-                                        <Dog size={28} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-gray-900 text-lg leading-tight">{pet?.name || 'Pet'}</h3>
-                                        <p className="text-sm text-gray-500 font-medium">{pet?.breed || 'Raça não inf.'}</p>
-                                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-lg w-fit">
-                                            <CalendarIcon size={10} />
-                                            Última vez: {dateObj.toLocaleDateString('pt-BR')}
+                                <div
+                                    className="cursor-pointer hover:bg-gray-50 -mx-5 px-5 pt-5 pb-2 transition-colors"
+                                    onClick={() => onViewPet?.(pet, client)}
+                                >
+                                    <div className="flex items-start gap-4 mb-4">
+                                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-100 to-brand-50 flex items-center justify-center text-brand-600 shadow-inner shrink-0">
+                                            <Dog size={28} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-900 text-lg leading-tight group-hover:text-brand-600 transition-colors">{pet?.name || 'Pet'}</h3>
+                                            <p className="text-sm text-gray-500 font-medium">{pet?.breed || 'Raça não inf.'}</p>
+                                            <div className="flex items-center gap-1 mt-1 text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-lg w-fit">
+                                                <CalendarIcon size={10} />
+                                                Última vez: {dateObj.toLocaleDateString('pt-BR')}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="space-y-2 mb-6">
-                                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                                    <div className="space-y-2 mb-4">
+                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                                                <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                                            </div>
+                                            <span className="font-bold">{client.name}</span>
                                         </div>
-                                        <span className="font-bold">{client.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <div className="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                                            <Phone size={12} />
+                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                            <div className="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+                                                <Phone size={12} />
+                                            </div>
+                                            <span className="font-mono">{client.phone}</span>
                                         </div>
-                                        <span className="font-mono">{client.phone}</span>
                                     </div>
                                 </div>
 
