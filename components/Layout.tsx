@@ -78,6 +78,20 @@ const BottomNavItem = ({
   );
 };
 
+const GreetingBar = () => {
+  const hour = new Date().getHours();
+  // "Destoante" style: Darker background, smaller text, but elegant
+  let greeting = 'Bom dia';
+  if (hour >= 12 && hour < 18) greeting = 'Boa tarde';
+  if (hour >= 18) greeting = 'Boa noite';
+
+  return (
+    <div className="bg-gray-800 text-white py-1.5 px-4 text-[10px] font-medium tracking-wide flex justify-center items-center shadow-sm z-30 relative">
+      <span>{greeting}, <span className="font-bold text-brand-200">Deise</span>! ✨ Tenha um excelente trabalho.</span>
+    </div>
+  );
+};
+
 export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout, settings, onOpenSettings, isLoading, onManualRefresh }) => {
   const menuGroups = {
     operacional: (
@@ -190,6 +204,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
+        <GreetingBar />
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/50 pointer-events-none" />
         <PullToRefresh onRefresh={handleRefresh} className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8 scroll-smooth">
           <div key={currentView} className="max-w-7xl mx-auto w-full animate-slide-in-right">
