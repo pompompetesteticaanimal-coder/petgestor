@@ -74,7 +74,10 @@ const LoginScreen: React.FC<{ onLogin: (opts?: any) => void; onReset: () => void
                 <div className="w-full flex justify-center mb-6">
                     <img src={settings?.logoUrl || DEFAULT_LOGO_URL} alt="PomPomPet" className="w-48 h-auto object-contain rounded-lg" />
                 </div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">{settings?.appName || 'PomPomPet'}</h1>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2 z-20 relative">{settings?.appName || 'PomPomPet'}</h1>
+                <div className="absolute top-[80px] left-1/2 -translate-x-1/2 -z-10 opacity-100 pointer-events-none w-48 h-48 animate-float">
+                    <img src="/pets/welcome_dog.png" alt="Welcome Dog" className="w-full h-full object-contain" />
+                </div>
                 <p className="text-gray-500 mb-8">Faça login para acessar sua agenda e clientes.</p>
                 <button
                     onClick={() => onLogin({ hint: userEmail })}
@@ -485,7 +488,10 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         <div className="space-y-6 animate-fade-in pb-10" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
             {defaultTab === 'daily' ? null : (
                 <>
-                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Faturamento</h1></div>
+                    <div className="flex justify-between items-center mb-6 relative">
+                        <h1 className="text-3xl font-bold text-gray-900 tracking-tight z-10">Faturamento</h1>
+                        <img src="/pets/grooming_scene.png" className="absolute top-[-20px] right-0 w-32 opacity-20 pointer-events-none animate-pulse-soft z-0" alt="Decoration" />
+                    </div>
                     <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner"><TabButton id="daily" label="Diário" icon={CalendarIcon} /><TabButton id="weekly" label="Semanal" icon={BarChart2} /><TabButton id="monthly" label="Mensal" icon={TrendingUp} /><TabButton id="yearly" label="Anual" icon={PieChartIcon} /></div>
                 </>
             )}
@@ -512,7 +518,10 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                         <h3 className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 border-b border-gray-100/50 dark:border-gray-700/50 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento do Dia</h3>
                         <div className="p-4 space-y-3">
                             {dailyApps.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400 font-medium">Nenhum agendamento neste dia.</div>
+                                <div className="p-8 text-center text-gray-400 font-medium flex flex-col items-center">
+                                    <img src="/pets/sleeping_pet.png" className="w-32 h-32 mb-4 opacity-50 grayscale animate-pulse-soft" alt="Sleeping" />
+                                    <p>Nenhum agendamento neste dia.</p>
+                                </div>
                             ) : (
                                 dailyApps.sort((a, b) => a.date.localeCompare(b.date)).map((app, index) => {
                                     const client = clients.find(c => c.id === app.clientId);
@@ -909,6 +918,12 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
 
             <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0 px-1" onScroll={handleScroll}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {visibleClients.length === 0 && (
+                        <div className="col-span-full py-12 flex flex-col items-center justify-center text-center opacity-60">
+                            <img src="/pets/sleeping_pet.png" className="w-32 h-32 mb-4 grayscale opacity-50 animate-pulse-soft" alt="Zzz" />
+                            <p className="text-gray-400 font-bold">Nenhum cliente encontrado.</p>
+                        </div>
+                    )}
                     {visibleClients.map((client, index) => (
                         <div key={client.id} style={{ animationDelay: `${index * 0.05}s` }} className="animate-slide-up bg-white/70 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-white/50 hover:shadow-glass hover:-translate-y-1 transition-all group relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-8 bg-brand-50/50 rounded-bl-[40px] -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform duration-500" />
@@ -1314,7 +1329,14 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return (
             <div key={dateStr} className={`relative h-[1440px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
-                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)] overflow-x-auto"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)}
+                <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)] overflow-x-auto">
+                    {dayApps.length === 0 && (
+                        <div className="absolute inset-x-0 top-32 flex flex-col items-center justify-center pointer-events-none opacity-50 z-0">
+                            <img src="/pets/sleeping_pet.png" className="w-48 h-48 mb-4 grayscale opacity-60 animate-pulse-soft" alt="Empty" />
+                            <p className="text-gray-400 font-bold bg-white/50 px-4 py-2 rounded-full backdrop-blur-sm">Nenhum agendamento para este dia</p>
+                        </div>
+                    )}
+                    {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)}
                     {/* Overflow Indicators Layer */}
                     <div className="absolute top-0 right-0 h-full w-[60px] pointer-events-none z-50 flex flex-col items-end">
                         {layoutItems.filter((item: any) => item.index === 0 && item.totalCount > 2).map((item: any) => {
