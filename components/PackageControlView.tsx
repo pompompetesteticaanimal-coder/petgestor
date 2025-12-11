@@ -1,16 +1,16 @@
 
 import React, { useMemo, useState } from 'react';
 import { User, Calendar, AlertCircle, CheckCircle, Package, Search, Phone, MapPin, ChevronRight, Filter } from 'lucide-react';
-import { Client, Appointment, Service } from '../types';
+import { Client, Appointment, Service, Pet } from '../types';
 
 interface PackageControlViewProps {
     clients: Client[];
     appointments: Appointment[];
     services: Service[];
-    onViewClient?: (client: Client) => void;
+    onViewPet?: (pet: Pet, client: Client) => void;
 }
 
-const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appointments, services, onViewClient }) => {
+const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appointments, services, onViewPet }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'monthly' | 'fortnightly' | 'renewal'>('all');
 
@@ -67,8 +67,10 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                         nextApp,
                         serviceName,
                         isRenewal: isRenewal(serviceName),
+                        isRenewal: isRenewal(serviceName),
                         type: getPackageType(serviceName),
                         petName: nextApp.petId ? client.pets.find(p => p.id === nextApp.petId)?.name : 'Pet',
+                        pet: nextApp.petId ? client.pets.find(p => p.id === nextApp.petId) : null,
                         status: 'active'
                     });
                     processedClients.add(client.id);
@@ -158,23 +160,6 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                     </div>
                     <p className={`text-xs font-bold uppercase tracking-wider ${filterType === 'renewal' ? 'text-orange-100' : 'text-gray-400'}`}>Para Renovar</p>
                 </div>
-
-
-                <div onClick={() => setFilterType('monthly')} className={`p-4 rounded-2xl border cursor-pointer transition-all ${filterType === 'monthly' ? 'bg-blue-500 text-white border-blue-500 shadow-lg scale-[1.02]' : 'bg-white border-gray-100 hover:border-blue-200'}`}>
-                    <div className="flex justify-between items-start mb-2">
-                        <Calendar size={20} className={filterType === 'monthly' ? 'text-white' : 'text-blue-500'} />
-                        <span className="text-2xl font-bold">{stats.monthly}</span>
-                    </div>
-                    <p className={`text-xs font-bold uppercase tracking-wider ${filterType === 'monthly' ? 'text-blue-100' : 'text-gray-400'}`}>Mensais</p>
-                </div>
-
-                <div onClick={() => setFilterType('fortnightly')} className={`p-4 rounded-2xl border cursor-pointer transition-all ${filterType === 'fortnightly' ? 'bg-purple-500 text-white border-purple-500 shadow-lg scale-[1.02]' : 'bg-white border-gray-100 hover:border-purple-200'}`}>
-                    <div className="flex justify-between items-start mb-2">
-                        <Calendar size={20} className={filterType === 'fortnightly' ? 'text-white' : 'text-purple-500'} />
-                        <span className="text-2xl font-bold">{stats.fortnightly}</span>
-                    </div>
-                    <p className={`text-xs font-bold uppercase tracking-wider ${filterType === 'fortnightly' ? 'text-purple-100' : 'text-gray-400'}`}>Quinzenais</p>
-                </div>
             </div>
 
             {/* Search */}
@@ -195,7 +180,12 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                     <div className="text-center py-10 text-gray-400">Nenhum pacote encontrado.</div>
                 ) : (
                     filteredData.map((item, index) => (
-                        <div key={item.nextApp.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4 animate-slide-up" style={{ animationDelay: `${index * 0.05}s` }}>
+                        <div
+                            key={item.nextApp.id}
+                            onClick={() => item.pet && onViewPet?.(item.pet, item.client)}
+                            className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4 animate-slide-up cursor-pointer hover:shadow-md hover:border-brand-200 transition-all active:scale-[0.99]"
+                            style={{ animationDelay: `${index * 0.05}s` }}
+                        >
 
                             {/* Header: Name & Alert */}
                             <div className="flex justify-between items-start">

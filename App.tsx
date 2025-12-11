@@ -2407,7 +2407,7 @@ const App: React.FC = () => {
                 {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} />}
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} />}
-                {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} />}
+                {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }} />
             <PetDetailsModal
