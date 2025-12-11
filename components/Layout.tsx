@@ -129,7 +129,7 @@ const GreetingBar = () => {
   );
 };
 
-export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout, settings, onOpenSettings, isLoading, onManualRefresh }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout, settings, onOpenSettings, isLoading, onManualRefresh, onAddAppointment }) => {
   const menuGroups = {
     operacional: (
       <div className="pb-4" key="operacional">
