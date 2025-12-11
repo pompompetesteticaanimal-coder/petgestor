@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { HashRouter } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { EvaluationModal } from './components/EvaluationModal';
+import { InactiveClientsView } from './components/InactiveClientsView';
 import { Layout } from './components/Layout';
 import { db } from './services/db';
 import { googleService, DEFAULT_CLIENT_ID } from './services/googleCalendar';
@@ -1959,6 +1960,15 @@ const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () =
                     <ChevronRight className="ml-auto text-gray-300" />
                 </button>
 
+                <button onClick={() => setView('inactive')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
+                    <div className="w-16 h-16 rounded-2xl bg-yellow-100 text-yellow-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><AlertTriangle size={32} /></div>
+                    <div className="text-left">
+                        <span className="block text-xl font-bold text-gray-800">Clientes Inativos</span>
+                        <span className="text-sm text-gray-400 font-medium">Recuperar clientes sumidos</span>
+                    </div>
+                    <ChevronRight className="ml-auto text-gray-300" />
+                </button>
+
 
 
                 <button onClick={onOpenSettings} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
@@ -2286,6 +2296,7 @@ const App: React.FC = () => {
                 {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
                 {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
                 {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} />}
+                {currentView === 'inactive' && <InactiveClientsView clients={clients} appointments={appointments} onBack={() => setCurrentView('menu')} />}
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }} />

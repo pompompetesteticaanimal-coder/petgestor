@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { ViewState, GoogleUser, AppSettings } from '../types';
-import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronLeft, TrendingUp, TrendingDown, Lock, Settings, Home, Menu, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronLeft, TrendingUp, TrendingDown, Lock, Settings, Home, Menu, BarChart2, AlertTriangle } from 'lucide-react';
 import { PullToRefresh } from './PullToRefresh';
 
 interface LayoutProps {
@@ -94,6 +94,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Cadastros</p>
         <div className="space-y-1">
           <NavItem view="clients" current={currentView} icon={Users} label="Clientes" onClick={setView} />
+          <NavItem view="inactive" current={currentView} icon={AlertTriangle} label="Inativos" onClick={setView} />
           <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={setView} />
         </div>
       </div>
