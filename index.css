@@ -143,3 +143,5 @@ body {
 .animate-slide-right {
   animation: slideInFromRight 0.3s ease-out forwards;
 }
+.animate-shake { animation: shake 0.25s infinite ease-in-out; }
+@keyframes shake { 0% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } 100% { transform: rotate(-1.5deg); } }

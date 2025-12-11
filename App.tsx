@@ -9,6 +9,7 @@ import { db } from './services/db';
 import { googleService, DEFAULT_CLIENT_ID } from './services/googleCalendar';
 import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem, AppSettings } from './types';
 import PackageControlView from './components/PackageControlView';
+import { MenuView } from './components/MenuView';
 import {
     Plus, Trash2, Check, X,
     Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
@@ -2041,82 +2042,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     );
 };
 
-// --- MENU VIEW (Mobile Only - 4th Tab) ---
-// --- MENU VIEW (Mobile Only - 4th Tab) ---
-const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () => void }> = ({ setView, onOpenSettings }) => {
-    const MenuCard = ({ icon: Icon, title, onClick, colorClass }: any) => (
-        <button onClick={onClick} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-3 aspect-square active:scale-95 transition">
-            <div className={`w-12 h-12 rounded-full ${colorClass} flex items-center justify-center text-white`}><Icon size={24} /></div>
-            <span className="font-bold text-gray-700 text-sm">{title}</span>
-        </button>
-    );
 
-    return (
-        <div className="space-y-6 animate-fade-in p-4 max-w-md mx-auto h-full flex flex-col justify-center">
-            <h1 className="text-3xl font-bold text-gray-800 text-center mb-8">Menu</h1>
-
-            <div className="space-y-4 flex-1 flex flex-col justify-center">
-                <button onClick={() => setView('services')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
-                    <div className="w-16 h-16 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><Scissors size={32} /></div>
-                    <div className="text-left">
-                        <span className="block text-xl font-bold text-gray-800">Serviços</span>
-                        <span className="text-sm text-gray-400 font-medium">Gerenciar catálogo de preços</span>
-                    </div>
-                    <ChevronRight className="ml-auto text-gray-300" />
-                </button>
-
-                <button onClick={() => setView('revenue')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
-                    <div className="w-16 h-16 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><TrendingUp size={32} /></div>
-                    <div className="text-left">
-                        <span className="block text-xl font-bold text-gray-800">Faturamento</span>
-                        <span className="text-sm text-gray-400 font-medium">Relatórios de ganhos</span>
-                    </div>
-                    <ChevronRight className="ml-auto text-gray-300" />
-                </button>
-
-                <button onClick={() => setView('costs')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
-                    <div className="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><TrendingDown size={32} /></div>
-                    <div className="text-left">
-                        <span className="block text-xl font-bold text-gray-800">Custo Mensal</span>
-                        <span className="text-sm text-gray-400 font-medium">Despesas e saídas</span>
-                    </div>
-                    <ChevronRight className="ml-auto text-gray-300" />
-                </button>
-
-
-
-                <button onClick={onOpenSettings} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
-                    <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><Settings size={32} /></div>
-                    <div className="text-left">
-                        <span className="block text-xl font-bold text-gray-800">Configurações</span>
-                        <span className="text-sm text-gray-400 font-medium">Tema e preferências</span>
-                    </div>
-                    <ChevronRight className="ml-auto text-gray-300" />
-                </button>                <button onClick={() => setView('clients')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
-                    <div className="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><Users size={32} /></div>
-                    <div className="text-left">
-                        <span className="block text-xl font-bold text-gray-800">Clientes</span>
-                        <span className="text-sm text-gray-400 font-medium">Gerenciar cadastros</span>
-                    </div>
-                    <ChevronRight className="ml-auto text-gray-300" />
-                </button>
-
-                <button onClick={() => setView('inactive_clients')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
-                    <div className="w-16 h-16 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><UserX size={32} /></div>
-                    <div className="text-left">
-                        <span className="block text-xl font-bold text-gray-800">Painel de Inativos</span>
-                        <span className="text-sm text-gray-400 font-medium">Clientes ausentes &gt; 15 dias</span>
-                    </div>
-                    <ChevronRight className="ml-auto text-gray-300" />
-                </button>
-
-
-            </div>
-
-            <p className="text-center text-xs text-gray-300 font-medium mt-auto">Versão 1.2.0 • PetGestor AI</p>
-        </div>
-    );
-};
 
 // --- APP COMPONENT ---
 const App: React.FC = () => {
