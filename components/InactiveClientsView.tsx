@@ -91,7 +91,7 @@ export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ client
 
     const getWhatsAppLink = (client: Client, petName: string, days: number) => {
         const phone = client.phone.replace(/\D/g, '');
-        const message = `Olá *${client.name.split(' ')[0]}*, o *${petName}* está com saudades! 🐶\n\nJá faz *${days} dias* que não o vemos aqui na PomPomPet.\nVamos agendar um banho para deixá-lo lindo e cheiroso? 🛁✂️`;
+        const message = `Boa tarde *${client.name.split(' ')[0]}*! ☀️\nJá faz muito tempo que não os vemos aqui no PomPomPet. 🐶💔\nVamos agendar um banho para deixá-lo lindo e cheiroso? 🛁✂️✨`;
         return `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
     };
 

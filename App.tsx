@@ -2084,6 +2084,34 @@ const App: React.FC = () => {
 
     }, [settings.theme, settings.darkMode]);
 
+    const handleSyncContactLogs = async (token: string, silent = false) => {
+        if (!token || !SHEET_ID) return;
+        try {
+            const rows = await googleService.getSheetValues(token, SHEET_ID, 'Painel de inativos!A:D');
+            if (!rows || rows.length < 2) return;
+            const newLogs: { clientId: string, date: string }[] = [];
+            rows.slice(1).forEach((row: string[]) => {
+                // A: DATA/hora, D: TELEFONE
+                const dateStr = row[0];
+                const phone = row[3];
+                if (!dateStr || !phone) return;
+
+                let isoDate = new Date().toISOString();
+                try {
+                    // Extract date part dd/mm/yyyy
+                    const [datePart, timePart] = dateStr.split(' ');
+                    const [d, m, y] = datePart.split('/');
+                    if (d && m && y) {
+                        isoDate = new Date(`${y}-${m}-${d}T${timePart || '00:00:00'}`).toISOString();
+                        newLogs.push({ clientId: phone.replace(/\D/g, ''), date: isoDate });
+                    }
+                } catch (e) { console.log('Error parsing date', dateStr); }
+            });
+            setContactLogs(newLogs);
+            if (!silent && newLogs.length > 0) console.log(`${newLogs.length} contact logs synced.`);
+        } catch (e) { console.error("Sync Logs Error", e); }
+    };
+
     const performFullSync = async (token: string) => { if (!SHEET_ID) return; setIsGlobalLoading(true); try { await handleSyncServices(token, true); await handleSyncClients(token, true); await handleSyncAppointments(token, true); await handleSyncCosts(token, true); await handleSyncContactLogs(token, true); } catch (e) { console.error("Auto Sync Failed", e); } finally { setIsGlobalLoading(false); } }
 
     const initAuthLogic = () => { if ((window as any).google) { googleService.init(async (tokenResponse) => { if (tokenResponse && tokenResponse.access_token) { const token = tokenResponse.access_token; const expiresIn = tokenResponse.expires_in || 3599; localStorage.setItem(STORAGE_KEY_TOKEN, token); localStorage.setItem(STORAGE_KEY_EXPIRY, (Date.now() + (expiresIn * 1000)).toString()); setAccessToken(token); const profile = await googleService.getUserProfile(token); if (profile) { const user = { id: profile.id, name: profile.name, email: profile.email, picture: profile.picture }; setGoogleUser(user); localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user)); } performFullSync(token); } }); } };
