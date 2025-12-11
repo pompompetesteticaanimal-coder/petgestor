@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { HashRouter } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { EvaluationModal } from './components/EvaluationModal';
-import { InactiveClientsView } from './components/InactiveClientsView';
 import { Layout } from './components/Layout';
 import { db } from './services/db';
 import { googleService, DEFAULT_CLIENT_ID } from './services/googleCalendar';
@@ -298,7 +297,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const calculateStats = (apps: Appointment[]) => {
         let totalPets = 0; let totalTosas = 0; let paidRevenue = 0; let pendingRevenue = 0;
         apps.forEach(app => {
-            if (app.status === 'cancelado' || app.status === 'nao_veio' || app.status === 'contato') return;
+            if (app.status === 'cancelado' || app.status === 'nao_veio') return;
             // ... (rest of logic same)
             totalPets++;
             const isTargetTosa = (name?: string) => { if (!name) return false; const n = name.toLowerCase(); return n.includes('tosa normal') || n.includes('tosa tesoura'); };
@@ -375,7 +374,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         return data;
     }, [selectedYear, appointments, services]);
 
-    const dailyApps = useMemo(() => appointments.filter(a => a.date.startsWith(selectedDate) && a.status !== 'contato'), [appointments, selectedDate]);
+    const dailyApps = useMemo(() => appointments.filter(a => a.date.startsWith(selectedDate)), [appointments, selectedDate]);
     const dailyStats = useMemo(() => calculateStats(dailyApps), [dailyApps, services]);
     const weeklyChartData = useMemo(() => getWeeklyChartData(), [getWeeklyChartData]);
 
@@ -387,7 +386,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const diff = date.getDate() - day;
         const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
         const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
-        const wApps = appointments.filter(a => { if (a.status === 'cancelado' || a.status === 'contato') return false; const ad = new Date(a.date); return ad >= startOfWeek && ad <= endOfWeek; });
+        const wApps = appointments.filter(a => { if (a.status === 'cancelado') return false; const ad = new Date(a.date); return ad >= startOfWeek && ad <= endOfWeek; });
         return calculateStats(wApps);
     };
     // eslint-disable-next-line
@@ -396,9 +395,9 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const monthlyChartData = useMemo(() => getMonthlyChartData(), [getMonthlyChartData]);
     const yearlyChartData = useMemo(() => getYearlyChartData(), [getYearlyChartData]);
 
-    const monthlyApps = appointments.filter(a => a.date.startsWith(selectedMonth) && a.status !== 'contato');
+    const monthlyApps = appointments.filter(a => a.date.startsWith(selectedMonth));
     const monthlyStats = calculateStats(monthlyApps);
-    const yearlyApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear && a.status !== 'contato');
+    const yearlyApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
     const yearlyStats = calculateStats(yearlyApps);
 
     // --- NEW STATS LOGIC ---
@@ -483,8 +482,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
             const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
 
-            const currApps = appointments.filter(a => { const d = new Date(a.date); return d >= currStart && d <= currEnd && a.status !== 'contato'; });
-            const prevApps = appointments.filter(a => { const d = new Date(a.date); return d >= prevStart && d <= prevEnd && a.status !== 'contato'; });
+            const currApps = appointments.filter(a => { const d = new Date(a.date); return d >= currStart && d <= currEnd; });
+            const prevApps = appointments.filter(a => { const d = new Date(a.date); return d >= prevStart && d <= prevEnd; });
 
             const cDays = countBusinessDays(currStart, currEnd);
             const pDays = countBusinessDays(prevStart, prevEnd);
@@ -498,8 +497,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
         }
         else if (activeTab === 'yearly') {
-            const currApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear && a.status !== 'contato');
-            const prevApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear - 1 && a.status !== 'contato');
+            const currApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
+            const prevApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear - 1);
 
             // Yearly Cost
             const getYearCost = (year: number) => costs.filter(c => new Date(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
@@ -576,6 +575,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                 value={selectedDate}
                                 onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }}
                                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-50 appearance-none"
+                                onClick={(e) => e.stopPropagation()}
                             />
                         </div>
                     </div>
@@ -637,65 +637,58 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                         </div>
                     </div>
                 </section>
-            )
-            }
-            {
-                activeTab === 'weekly' && metricData && (
-                    <section className="animate-fade-in text-left">
-                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
+            )}
+            {activeTab === 'weekly' && metricData && (
+                <section className="animate-fade-in text-left">
+                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
-                            <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                            <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
-                            <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                            <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
-                            <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                            <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
-                        </div>
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+                        <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                        <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                        <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
+                        <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                        <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
+                    </div>
 
-                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Diária</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={weeklyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} dy={10} /><YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Bar yAxisId="right" dataKey="pets" fill="#c7d2fe" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#4f46e5" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
-                    </section>
-                )
-            }
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Diária</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={weeklyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} dy={10} /><YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Bar yAxisId="right" dataKey="pets" fill="#c7d2fe" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#4f46e5" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
+                </section>
+            )}
 
-            {
-                activeTab === 'monthly' && metricData && (
-                    <section className="animate-fade-in text-left">
-                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
+            {activeTab === 'monthly' && metricData && (
+                <section className="animate-fade-in text-left">
+                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
-                            <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                            <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
-                            <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                            <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
-                            <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                            <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
-                        </div>
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+                        <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                        <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                        <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
+                        <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                        <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
+                    </div>
 
-                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas do Mês</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={30} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{ r: 4 }} /></ComposedChart></ResponsiveContainer></div>
-                    </section>
-                )
-            }
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas do Mês</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={30} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{ r: 4 }} /></ComposedChart></ResponsiveContainer></div>
+                </section>
+            )}
 
-            {
-                activeTab === 'yearly' && metricData && (
-                    <section className="animate-fade-in text-left">
-                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
+            {activeTab === 'yearly' && metricData && (
+                <section className="animate-fade-in text-left">
+                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
-                            <StatCard title="Faturamento Total" value={`R$ ${(metricData.current.grossRevenue / 1000).toFixed(1)}k`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                            <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
-                            <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                            <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
-                            <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                            <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
-                        </div>
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+                        <StatCard title="Faturamento Total" value={`R$ ${(metricData.current.grossRevenue / 1000).toFixed(1)}k`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                        <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                        <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                        <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
+                        <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                        <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
+                    </div>
 
-                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
-                    </section>
-                )
-            }
-        </div >
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
+                </section>
+            )}
+        </div>
     );
 };
 
@@ -1400,7 +1393,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
     const renderDayView = () => {
         const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
-        const dateStr = currentDate.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado' && a.status !== 'contato'); const layoutItems = getLayout(dayApps);
+        const dateStr = currentDate.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps);
         return (
             <div key={dateStr} className={`relative h-[1440px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
@@ -1443,7 +1436,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 <div className="flex border-b border-gray-100 bg-gray-50/50 backdrop-blur-sm"> <div className="w-10 bg-transparent border-r border-gray-100"></div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const isToday = dateStr === new Date().toISOString().split('T')[0]; return (<div key={dIdx} onClick={() => setSelectedDayForDetails(dateStr)} className={`flex-1 text-center py-3 text-xs font-bold border-r border-gray-100 cursor-pointer hover:bg-brand-50/30 transition-colors ${isToday ? 'bg-brand-50/50 text-brand-600' : 'text-gray-500'}`}> {d.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()} <div className={`text-sm mt-0.5 ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{d.getDate()}</div> </div>) })} </div>
                 <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => {
                     const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0];
-                    const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado' && a.status !== 'contato');
+                    const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado');
 
                     // Clustering Logic for Week View
                     const clusters: { start: number, end: number, apps: Appointment[] }[] = [];
@@ -1966,15 +1959,6 @@ const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () =
                     <ChevronRight className="ml-auto text-gray-300" />
                 </button>
 
-                <button onClick={() => setView('inactive')} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
-                    <div className="w-16 h-16 rounded-2xl bg-yellow-100 text-yellow-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><AlertTriangle size={32} /></div>
-                    <div className="text-left">
-                        <span className="block text-xl font-bold text-gray-800">Clientes Inativos</span>
-                        <span className="text-sm text-gray-400 font-medium">Recuperar clientes sumidos</span>
-                    </div>
-                    <ChevronRight className="ml-auto text-gray-300" />
-                </button>
-
 
 
                 <button onClick={onOpenSettings} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 active:scale-95 transition-all hover:shadow-md hover:-translate-y-1 group">
@@ -2117,87 +2101,29 @@ const App: React.FC = () => {
     const handleSyncAppointments = async (token: string, silent = false) => {
         // ... [Sync Appointments Logic same as before] ...
         if (!token || !SHEET_ID) return; try {
-            const [scheduleRows, contactRows] = await Promise.all([
-                googleService.getSheetValues(token, SHEET_ID, 'Agendamento!A:T'),
-                googleService.getSheetValues(token, SHEET_ID, 'Painel de inativos!A:E').catch(() => []) // Optional tab
-            ]);
+            const rows = await googleService.getSheetValues(token, SHEET_ID, 'Agendamento!A:T'); if (!rows || rows.length < 5) { if (!silent) alert('Aba Agendamento vazia (Linhas 1-4 ignoradas).'); return; } const loadedApps: Appointment[] = []; const newTempClients: Client[] = []; const currentClients = db.getClients(); const existingClientIds = new Set(currentClients.map(c => c.id)); rows.forEach((row: string[], idx: number) => {
+                if (idx < 4) return; const petName = row[0]; const clientName = row[1]; const clientPhone = row[2] || ''; const clientAddr = row[3] || ''; const petBreed = row[4]; const datePart = row[11]; const timePart = row[12]; const serviceName = row[7]; const paidAmountStr = row[16]; const paymentMethod = row[17]; const googleEventId = row[19]; if (!clientName || !datePart) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = datePart.split('/'); if (day && month && year) isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`; } catch (e) { } const cleanPhone = clientPhone.replace(/\D/g, '') || `temp_${idx}`; let client = currentClients.find(c => c.id === cleanPhone) || currentClients.find(c => c.name.toLowerCase() === clientName.toLowerCase()) || newTempClients.find(c => c.id === cleanPhone); if (!client) { client = { id: cleanPhone, name: clientName, phone: clientPhone, address: clientAddr, pets: [] }; newTempClients.push(client); } let pet = client.pets.find(p => p.name.toLowerCase() === petName?.toLowerCase()); if (!pet && petName) { pet = { id: `${client.id}_p_${idx}`, name: petName, breed: petBreed || 'SRD', age: '', gender: '', size: row[5] || '', coat: row[6] || '', notes: row[13] || '' }; client.pets.push(pet); } const currentServices = db.getServices(); const service = currentServices.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || currentServices[0]; const addServiceIds: string[] = [];[row[8], row[9], row[10]].forEach(name => { if (name) { const foundSvc = currentServices.find(s => s.name.toLowerCase() === name.toLowerCase().trim()); if (foundSvc) addServiceIds.push(foundSvc.id); } }); let paidAmount = 0;
+                if (paidAmountStr) { paidAmount = parseFloat(paidAmountStr.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')); if (isNaN(paidAmount)) paidAmount = 0; }
 
-            const loadedApps: Appointment[] = [];
-            const newTempClients: Client[] = [];
-            const currentClients = db.getClients();
-            const existingClientIds = new Set(currentClients.map(c => c.id));
+                // Parse Rating logic
+                let rating = 0;
+                let ratingTags: string[] = [];
+                const notes = row[13] || '';
+                const ratingMatch = notes.match(/\[Avaliação: (\d+)\/5\]/);
+                if (ratingMatch && ratingMatch[1]) rating = parseInt(ratingMatch[1]);
+                const tagsMatch = notes.match(/\[Tags: (.*?)\]/);
+                if (tagsMatch && tagsMatch[1]) { ratingTags = tagsMatch[1].split(',').map(t => t.trim()); }
 
-            // Process Standard Schedule
-            if (scheduleRows && scheduleRows.length >= 5) {
-                scheduleRows.forEach((row: string[], idx: number) => {
-                    if (idx < 4) return; const petName = row[0]; const clientName = row[1]; const clientPhone = row[2] || ''; const clientAddr = row[3] || ''; const petBreed = row[4]; const datePart = row[11]; const timePart = row[12]; const serviceName = row[7]; const paidAmountStr = row[16]; const paymentMethod = row[17]; const googleEventId = row[19]; if (!clientName || !datePart) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = datePart.split('/'); if (day && month && year) isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`; } catch (e) { } const cleanPhone = clientPhone.replace(/\D/g, '') || `temp_${idx}`; let client = currentClients.find(c => c.id === cleanPhone) || currentClients.find(c => c.name.toLowerCase() === clientName.toLowerCase()) || newTempClients.find(c => c.id === cleanPhone); if (!client) { client = { id: cleanPhone, name: clientName, phone: clientPhone, address: clientAddr, pets: [] }; newTempClients.push(client); } let pet = client.pets.find(p => p.name.toLowerCase() === petName?.toLowerCase()); if (!pet && petName) { pet = { id: `${client.id}_p_${idx}`, name: petName, breed: petBreed || 'SRD', age: '', gender: '', size: row[5] || '', coat: row[6] || '', notes: row[13] || '' }; client.pets.push(pet); } const currentServices = db.getServices(); const service = currentServices.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || currentServices[0]; const addServiceIds: string[] = [];[row[8], row[9], row[10]].forEach(name => { if (name) { const foundSvc = currentServices.find(s => s.name.toLowerCase() === name.toLowerCase().trim()); if (foundSvc) addServiceIds.push(foundSvc.id); } }); let paidAmount = 0;
-                    if (paidAmountStr) { paidAmount = parseFloat(paidAmountStr.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')); if (isNaN(paidAmount)) paidAmount = 0; }
+                let status: Appointment['status'] = 'agendado';
+                const statusRaw = row[15]?.toLowerCase().trim() || '';
+                if (statusRaw === 'não veio' || statusRaw === 'nao_veio') {
+                    status = 'nao_veio';
+                } else if (statusRaw === 'pago') {
+                    status = 'agendado'; // App considers paid via paidAmount, but let's keep status simple
+                }
 
-                    // Parse Rating logic
-                    let rating = 0;
-                    let ratingTags: string[] = [];
-                    const notes = row[13] || '';
-                    const ratingMatch = notes.match(/\[Avaliação: (\d+)\/5\]/);
-                    if (ratingMatch && ratingMatch[1]) rating = parseInt(ratingMatch[1]);
-                    const tagsMatch = notes.match(/\[Tags: (.*?)\]/);
-                    if (tagsMatch && tagsMatch[1]) { ratingTags = tagsMatch[1].split(',').map(t => t.trim()); }
-
-                    let status: Appointment['status'] = 'agendado';
-                    const statusRaw = row[15]?.toLowerCase().trim() || '';
-                    if (statusRaw === 'não veio' || statusRaw === 'nao_veio') {
-                        status = 'nao_veio';
-                    } else if (statusRaw === 'pago') {
-                        status = 'agendado'; // App considers paid via paidAmount, but let's keep status simple
-                    } else if (statusRaw === 'cancelado') {
-                        status = 'cancelado';
-                    }
-
-                    if (client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: status, notes: row[13], durationTotal: parseInt(row[14] || '60'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: googleEventId, rating: rating > 0 ? rating : undefined, ratingTags: ratingTags.length > 0 ? ratingTags : undefined }); }
-                });
-            }
-
-            // Process Inactive Panel Contacts
-            if (contactRows && contactRows.length > 1) {
-                contactRows.slice(1).forEach((row: string[], idx: number) => {
-                    // Expected Format: [Data/Hora, Cliente, Telefone, Pet, Notas]
-                    const dateTime = row[0];
-                    const clientName = row[1];
-                    const clientPhone = row[2];
-                    const petName = row[3];
-                    const notes = row[4];
-
-                    if (!clientName || !dateTime) return;
-
-                    let isoDate = new Date().toISOString();
-                    try {
-                        const [datePart, timePart] = dateTime.split(' ');
-                        const [day, month, year] = datePart.split('/');
-                        if (day && month && year) isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`;
-                    } catch (e) { }
-
-                    const cleanPhone = clientPhone?.replace(/\D/g, '') || `contact_${idx}`;
-                    let client = currentClients.find(c => c.id === cleanPhone) || currentClients.find(c => c.name.toLowerCase() === clientName.toLowerCase()) || newTempClients.find(c => c.id === cleanPhone);
-
-                    // We assume client exists for contacts, but handling gracefully
-                    if (client) {
-                        const pet = client.pets.find(p => p.name.toLowerCase() === petName?.toLowerCase()) || client.pets[0] || { id: 'unknown', name: petName || 'Pet' };
-
-                        loadedApps.push({
-                            id: `contact_sheet_${idx}`,
-                            clientId: client.id,
-                            petId: pet.id as any,
-                            serviceId: 'contact_svc',
-                            date: isoDate,
-                            status: 'contato',
-                            notes: notes,
-                            durationTotal: 15
-                        });
-                    }
-                });
-            }
-
-
-            if (newTempClients.length > 0) { const updatedClients = [...currentClients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))]; setClients(updatedClients); db.saveClients(updatedClients); } if (loadedApps.length > 0) { setAppointments(loadedApps); db.saveAppointments(loadedApps); if (!silent) alert(`${loadedApps.length} eventos carregados!`); } else { if (!silent) alert('Nenhum agendamento encontrado.'); }
+                if (client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: status, notes: row[13], durationTotal: parseInt(row[14] || '60'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: googleEventId, rating: rating > 0 ? rating : undefined, ratingTags: ratingTags.length > 0 ? ratingTags : undefined }); }
+            }); if (newTempClients.length > 0) { const updatedClients = [...currentClients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))]; setClients(updatedClients); db.saveClients(updatedClients); } if (loadedApps.length > 0) { setAppointments(loadedApps); db.saveAppointments(loadedApps); if (!silent) alert(`${loadedApps.length} agendamentos carregados!`); } else { if (!silent) alert('Nenhum agendamento encontrado.'); }
         } catch (error) { console.error(error); if (!silent) alert('Erro ao sincronizar agendamentos.'); }
     };
     const handleAddAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
@@ -2211,30 +2137,14 @@ const App: React.FC = () => {
         if (accessToken && SHEET_ID) {
             try {
                 const d = new Date(app.date); const dateStr = d.toLocaleDateString('pt-BR'); const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-                if (app.status === 'contato') {
-                    // Save to 'Painel de inativos'
-                    // Headers assumed: Data/Hora, Cliente, Telefone, Pet, Notas
-                    const rowData = [
-                        `${dateStr} ${timeStr}`,
-                        client.name,
-                        client.phone,
-                        pet.name,
-                        app.notes || 'Contato registrado'
-                    ];
-                    await googleService.appendSheetValues(accessToken, SHEET_ID, 'Painel de inativos!A:E', rowData);
-                } else {
-                    // Save to Standard 'Agendamento'
-                    const mainSvc = appServices[0];
-                    const rowData = [
-                        pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
-                        appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
-                        dateStr, timeStr, app.notes || '', totalDuration.toString(), 'Pendente', '', '', '', googleEventId
-                    ];
-                    await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData);
-                }
-
-                // Silent Sync to update
+                const mainSvc = appServices[0];
+                const rowData = [
+                    pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
+                    appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
+                    dateStr, timeStr, app.notes || '', totalDuration.toString(), 'Pendente', '', '', '', googleEventId
+                ];
+                await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData);
+                // Silent Sync to update IDs
                 handleSyncAppointments(accessToken, true);
             } catch (e) { console.error(e); alert("Salvo no app, mas erro na planilha."); }
         }
@@ -2243,28 +2153,23 @@ const App: React.FC = () => {
     const handleEditAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
         const googleEventId = app.googleEventId; const totalDuration = manualDuration > 0 ? manualDuration : (appServices[0] ? appServices[0].durationMin : 60) + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
         const updatedApp = { ...app, durationTotal: totalDuration };
-        if (accessToken && googleEventId && app.status !== 'contato') {
+        if (accessToken && googleEventId) {
             const description = appServices.map(s => s.name).join(' + ');
             await googleService.updateEvent(accessToken, googleEventId, { summary: `Banho/Tosa: ${pet.name}`, description: `${description}\nCliente: ${client.name}\nTel: ${client.phone}\nObs: ${app.notes}`, startTime: app.date, durationMin: totalDuration });
         }
         const updatedList = appointments.map(a => a.id === app.id ? updatedApp : a);
         setAppointments(updatedList); db.saveAppointments(updatedList);
-        // Robust sync: Only sync to Agendamento if specifically an Agendamento item (starts with sheet_)
-        // Ignored for 'contato' items to prevent overwriting Agendamento with Painel data
-        if (app.id.startsWith('sheet_') && accessToken && SHEET_ID && app.status !== 'contato') {
+        if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
             try {
-                const parts = app.id.split('_'); const index = parseInt(parts[1]);
-                if (!isNaN(index)) {
-                    const rowNumber = index + 1; // Correct row mapping
-                    const d = new Date(app.date); const dateStr = d.toLocaleDateString('pt-BR'); const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                    const mainSvc = appServices[0];
-                    const rowData = [
-                        pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
-                        appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
-                        dateStr, timeStr, app.notes || '', totalDuration.toString(), (app.status === 'nao_veio' ? 'Não Veio' : (app.paidAmount ? 'Pago' : 'Pendente')), '', app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '', app.paymentMethod || '', googleEventId
-                    ];
-                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`, rowData);
-                }
+                const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1;
+                const d = new Date(app.date); const dateStr = d.toLocaleDateString('pt-BR'); const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const mainSvc = appServices[0];
+                const rowData = [
+                    pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
+                    appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
+                    dateStr, timeStr, app.notes || '', totalDuration.toString(), (app.status === 'nao_veio' ? 'Não Veio' : (app.paidAmount ? 'Pago' : 'Pendente')), '', app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '', app.paymentMethod || '', googleEventId
+                ];
+                await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`, rowData);
             } catch (e) { console.error(e); alert("Erro ao atualizar planilha."); }
         }
     };
@@ -2381,7 +2286,6 @@ const App: React.FC = () => {
                 {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
                 {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
                 {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} />}
-                {currentView === 'inactive' && <InactiveClientsView clients={clients} appointments={appointments} onBack={() => setCurrentView('menu')} onAddAppointment={handleAddAppointment} />}
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }} />

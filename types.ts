@@ -38,7 +38,7 @@ export interface Appointment {
   serviceId: string; // Serviço Principal
   additionalServiceIds?: string[]; // Serviços Adicionais (até 3)
   date: string; // ISO String
-  status: 'agendado' | 'concluido' | 'cancelado' | 'nao_veio' | 'contato';
+  status: 'agendado' | 'concluido' | 'cancelado' | 'nao_veio';
   notes?: string;
   durationTotal?: number;
   googleEventId?: string; // ID para exclusão no Google Calendar
@@ -73,4 +73,4 @@ export interface AppSettings {
   sidebarOrder: string[];
 }
 
-export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'inactive' | 'menu';
+export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu';
