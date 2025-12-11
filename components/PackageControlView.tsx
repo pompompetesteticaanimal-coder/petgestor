@@ -40,59 +40,43 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
         today.setHours(0, 0, 0, 0);
 
         const data: any[] = [];
-        const processedClients = new Set<string>();
-
-        // We need to identify "Package Clients". 
-        // Strategy: Clients who have FUTURE appointments that are packages.
-        // OR Clients who have had a package appointment recently (last 30 days) even if no future one (maybe expired/forgot to schedule).
-        // For simplicity and "Control", let's focus on Next Appointment.
+        const processedPets = new Set<string>();
 
         clients.forEach(client => {
-            // Find next appointment
-            const clientApps = appointments
-                .filter(a => a.clientId === client.id && a.status !== 'cancelado')
-                .sort((a, b) => a.date.localeCompare(b.date));
+            // Iterate through each PET of the client
+            client.pets.forEach(pet => {
+                const petId = pet.id;
 
-            const futureApps = clientApps.filter(a => new Date(a.date) >= today);
+                // Find next appointment FOR THIS PET
+                const petApps = appointments
+                    .filter(a => a.clientId === client.id && a.petId === petId && a.status !== 'cancelado')
+                    .sort((a, b) => a.date.localeCompare(b.date));
 
-            // If has future apps, check if the NEXT one is a package
-            if (futureApps.length > 0) {
-                const nextApp = futureApps[0];
-                const service = services.find(s => s.id === nextApp.serviceId);
-                const serviceName = service ? service.name : 'Unknown';
+                const futureApps = petApps.filter(a => new Date(a.date) >= today);
 
-                if (isPackageService(serviceName)) {
-                    data.push({
-                        client,
-                        nextApp,
-                        serviceName,
-                        isRenewal: isRenewal(serviceName),
-                        type: getPackageType(serviceName),
-                        petName: nextApp.petId ? client.pets.find(p => p.id === nextApp.petId)?.name : 'Pet',
-                        pet: nextApp.petId ? client.pets.find(p => p.id === nextApp.petId) : null,
-                        status: 'active'
-                    });
-                    processedClients.add(client.id);
-                }
-            } else {
-                // If no future appointment, check last appointment within 30 days to see if they ARE a package client who just needs scheduling
-                const pastApps = clientApps.filter(a => new Date(a.date) < today);
-                if (pastApps.length > 0) {
-                    const lastApp = pastApps[pastApps.length - 1]; // Last one
-                    const service = services.find(s => s.id === lastApp.serviceId);
-                    const serviceName = service ? service.name : '';
-                    // Check if last was a package and it wasn't the last of the set (e.g. 4/4). 
-                    // Hard to know if 4/4 is end without assumpution.
-                    // But if they used a package recently, list them as "Sem Agendamento" maybe?
-                    // The prompt asks for "next bath". If none, maybe skip or show warning.
-                    // Let's stick to Active Future Packages first as priority.
+                // If has future apps, check if the NEXT one is a package
+                if (futureApps.length > 0) {
+                    const nextApp = futureApps[0];
+                    const service = services.find(s => s.id === nextApp.serviceId);
+                    const serviceName = service ? service.name : 'Unknown';
+
                     if (isPackageService(serviceName)) {
-                        // Optional: Include them with a "Needs Scheduling" status?
-                        // User asked for "next bath".
-                        // adding matches for robustness
+                        data.push({
+                            client,
+                            pet,
+                            nextApp,
+                            serviceName,
+                            isRenewal: isRenewal(serviceName),
+                            type: getPackageType(serviceName),
+                            petName: pet.name,
+                            status: 'active'
+                        });
+                        processedPets.add(petId);
                     }
                 }
-            }
+                // Logic for past apps (expired/needs renewal) could go here if requested, 
+                // but sticking to active future packages for now as per previous logic.
+            });
         });
 
         return data.sort((a, b) => a.nextApp.date.localeCompare(b.nextApp.date));
@@ -206,12 +190,13 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-3">
                                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${item.isRenewal ? 'bg-orange-100 text-orange-600' : 'bg-brand-50 text-brand-600'}`}>
-                                        {item.client.name.charAt(0)}
+                                        <Package size={24} />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-gray-900">{item.client.name}</h3>
+                                        <h3 className="font-bold text-gray-900 text-lg">{item.petName}</h3>
                                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                                            <span className="font-medium text-gray-700">{item.petName}</span>
+                                            <User size={12} />
+                                            <span className="font-medium text-gray-600">{item.client.name}</span>
                                             {item.isRenewal && (
                                                 <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] uppercase font-bold rounded-full flex items-center gap-1">
                                                     <AlertCircle size={10} /> Renovação
