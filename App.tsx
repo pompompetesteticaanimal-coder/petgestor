@@ -923,8 +923,8 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                 <div className="flex gap-2 ml-1">
                     <button onClick={() => handleStartEdit(app)} className="flex-1 bg-white hover:bg-gray-50 text-gray-600 hover:text-brand-600 py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all border border-gray-100 shadow-sm group-hover:shadow-md active:scale-95"> <DollarSign size={14} /> {isPaid ? 'Editar Detalhes' : 'Registrar Pagamento'} </button>
                     {isPaid && (
-                        <button onClick={() => onRemovePayment(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap" title="Desfazer Pagamento">
-                            <Trash2 size={16} />
+                        <button onClick={() => onRemovePayment(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap gap-2" title="Desfazer Pagamento">
+                            <Trash2 size={16} /> Desfazer
                         </button>
                     )}
                     {!isPaid && statusColor !== 'bg-gray-100 opacity-75' && (
