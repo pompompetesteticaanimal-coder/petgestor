@@ -1721,7 +1721,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             {isOpen && createPortal(
                 <div className="fixed inset-0 bg-black/60 z-[60] flex items-end md:items-center justify-center md:p-6 backdrop-blur-sm animate-fade-in">
                     <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={() => { resetForm(); onClose(); }} />
-                    <div className="bg-[#ffffff] md:rounded-3xl rounded-none w-full max-w-6xl h-[100dvh] md:h-[90vh] md:max-h-[800px] shadow-2xl flex flex-col overflow-hidden animate-scale-up ring-1 ring-black/5 font-sans">
+                    <div className="bg-white relative z-10 md:rounded-3xl rounded-none w-full max-w-6xl h-[100dvh] md:h-[90vh] md:max-h-[800px] shadow-2xl flex flex-col overflow-hidden animate-scale-up ring-1 ring-black/5 font-sans">
                         {/* Header */}
                         <div className="px-5 py-4 md:px-8 md:py-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20">
                             <div>
