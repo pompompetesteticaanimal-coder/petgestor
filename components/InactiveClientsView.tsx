@@ -1,16 +1,19 @@
 
 import React, { useMemo } from 'react';
-import { Client, Appointment } from '../types';
-import { ArrowLeft, MessageCircle, Calendar, AlertTriangle, Search } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Calendar, AlertTriangle, Search, Filter, Phone, Check } from 'lucide-react';
+import { Client, Appointment, Service, Pet } from '../types';
 
 interface InactiveClientsViewProps {
     clients: Client[];
     appointments: Appointment[];
     onBack: () => void;
+    onAddAppointment: (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => Promise<void>;
 }
 
-export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ clients, appointments, onBack }) => {
+export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ clients, appointments, onBack, onAddAppointment }) => {
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [minDays, setMinDays] = React.useState(15);
+
 
     const inactiveClients = useMemo(() => {
         const today = new Date();
@@ -45,10 +48,10 @@ export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ client
             };
         })
             .filter((c): c is NonNullable<typeof c> => c !== null)
-            .filter(c => c.daysAbsent >= 15) // Filter > 15 days
+            .filter(c => c.daysAbsent >= minDays) // Filter > minDays
             .sort((a, b) => b.daysAbsent - a.daysAbsent); // Sort mostly absent first
 
-    }, [clients, appointments]);
+    }, [clients, appointments, minDays]);
 
     const filteredList = inactiveClients.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -62,10 +65,38 @@ export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ client
 
     const handleWhatsApp = (client: typeof inactiveClients[0]) => {
         const phone = client.phone.replace(/\D/g, ''); // Remove non-digits
-        // "Olá [Nome], o [Nome do Pet] está com saudades! Já faz [Dias] dias que não o vemos. Vamos agendar um banho?"
         const message = `Olá ${client.name.split(' ')[0]}, o ${client.lastPetName} está com saudades! Já faz ${client.daysAbsent} dias que não o vemos. Vamos agendar um banho? 🐶💙`;
         const url = `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
+    };
+
+    const handleMarkContacted = async (client: typeof inactiveClients[0]) => {
+        if (!confirm(`Marcar que entrou em contato com ${client.name}? Isso resetará a contagem de dias.`)) return;
+
+        const dummyService: Service = {
+            id: 'contact_svc',
+            name: 'Contato Realizado',
+            price: 0,
+            durationMin: 15,
+            description: 'Registro de contato',
+            category: 'principal'
+        };
+
+        const newApp: Appointment = {
+            id: `contact_${Date.now()}`,
+            clientId: client.id,
+            petId: client.pets[0]?.id || 'unknown',
+            serviceId: dummyService.id,
+            date: new Date().toISOString(),
+            status: 'contato',
+            notes: 'Contato registrado via painel de inativos',
+            durationTotal: 15
+        };
+
+        const pet = client.pets[0] || { id: 'unknown', name: 'Pet', breed: 'SRD', size: 'Pequeno', coat: 'Curto' };
+
+        await onAddAppointment(newApp, client, pet as Pet, [dummyService], 15);
+        alert('Contato registrado! O cliente sairá da lista em instantes.');
     };
 
     return (
@@ -79,14 +110,30 @@ export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ client
                     <h1 className="text-2xl font-bold text-gray-800">Clientes Inativos</h1>
                 </div>
 
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Buscar por nome ou pet..."
-                        className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl font-medium outline-none focus:ring-2 ring-brand-500 transition text-sm"
-                    />
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Buscar por nome ou pet..."
+                            className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl font-medium outline-none focus:ring-2 ring-brand-500 transition text-sm"
+                        />
+                    </div>
+                    <div className="relative">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <select
+                            value={minDays}
+                            onChange={(e) => setMinDays(Number(e.target.value))}
+                            className="pl-10 pr-8 py-3 bg-white border border-gray-200 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 ring-brand-500 appearance-none shadow-sm text-sm"
+                        >
+                            <option value={15}>15+ dias</option>
+                            <option value={30}>30+ dias</option>
+                            <option value={45}>45+ dias</option>
+                            <option value={60}>60+ dias</option>
+                            <option value={90}>90+ dias</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -122,6 +169,13 @@ export const InactiveClientsView: React.FC<InactiveClientsViewProps> = ({ client
                             >
                                 <MessageCircle size={18} />
                                 Chamar no WhatsApp
+                            </button>
+                            <button
+                                onClick={() => handleMarkContacted(client)}
+                                className="w-full bg-white border border-gray-200 text-gray-600 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition active:scale-95 hover:bg-gray-50"
+                            >
+                                <Check size={18} />
+                                Já entrei em contato
                             </button>
                         </div>
                     ))

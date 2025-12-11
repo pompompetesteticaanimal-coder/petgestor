@@ -38,7 +38,7 @@ export interface Appointment {
   serviceId: string; // Serviço Principal
   additionalServiceIds?: string[]; // Serviços Adicionais (até 3)
   date: string; // ISO String
-  status: 'agendado' | 'concluido' | 'cancelado' | 'nao_veio';
+  status: 'agendado' | 'concluido' | 'cancelado' | 'nao_veio' | 'contato';
   notes?: string;
   durationTotal?: number;
   googleEventId?: string; // ID para exclusão no Google Calendar
