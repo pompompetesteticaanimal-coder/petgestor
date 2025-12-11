@@ -229,7 +229,12 @@ const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: st
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-start">
-                                            <h4 className="font-bold text-gray-800 truncate">{pet?.name} <span className="text-gray-400 font-normal text-xs">({client?.name.split(' ')[0]})</span></h4>
+                                            <h4 className="font-bold text-gray-800 truncate">
+                                                {pet?.name}
+                                                <span className="text-gray-500 font-normal text-xs ml-1">
+                                                    ({pet?.breed || 'Raça não inf.'} - {client?.name.split(' ')[0]})
+                                                </span>
+                                            </h4>
                                             <div className={`w-2 h-2 rounded-full ${app.status === 'concluido' ? 'bg-green-500' : app.status === 'cancelado' ? 'bg-red-500' : 'bg-yellow-500'}`} />
                                         </div>
                                         <p className="text-sm text-brand-600 font-medium truncate mt-0.5">{mainSvc?.name}</p>
