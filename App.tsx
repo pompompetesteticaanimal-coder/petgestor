@@ -1363,13 +1363,52 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             <div className="flex h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex-col mx-1">
                 <div className="flex border-b border-gray-100 bg-gray-50/50 backdrop-blur-sm"> <div className="w-10 bg-transparent border-r border-gray-100"></div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]; return (<div key={dIdx} className={`flex-1 text-center py-3 text-xs font-bold border-r border-gray-100 ${isToday ? 'bg-brand-50/50 text-brand-600' : 'text-gray-500'}`}> {d.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()} <div className={`text-sm mt-0.5 ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{d.getDate()}</div> </div>) })} </div>
                 <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => {
-                    const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps); return (<div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]"> {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)} {layoutItems.map((item: any, idx) => {
-                        const app = item.app; const ad = new Date(app.date); const startMin = (ad.getHours() - 8) * 60 + ad.getMinutes();
-                        const height = (app.durationTotal || 60) * 2;
-                        const top = startMin * 2; // Strict time
+                    const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0];
+                    const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado');
 
-                        return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />)
-                    })} </div>)
+                    // Clustering Logic for Week View
+                    const clusters: { start: number, end: number, apps: Appointment[] }[] = [];
+                    dayApps.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(app => {
+                        const appStart = (new Date(app.date).getHours() - 8) * 60 + new Date(app.date).getMinutes();
+                        const appEnd = appStart + (app.durationTotal || 60);
+
+                        // Try to find an existing cluster this overlaps with
+                        const existing = clusters.find(c => (appStart >= c.start && appStart < c.end) || (appStart <= c.start && appEnd > c.start));
+                        if (existing) {
+                            existing.apps.push(app);
+                            existing.end = Math.max(existing.end, appEnd);
+                        } else {
+                            clusters.push({ start: appStart, end: appEnd, apps: [app] });
+                        }
+                    });
+
+                    return (
+                        <div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]">
+                            {Array.from({ length: 60 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)}
+                            {clusters.map((cluster, idx) => {
+                                const mainApp = cluster.apps[0];
+                                const count = cluster.apps.length;
+                                const top = cluster.start * 2;
+                                const height = (cluster.end - cluster.start) * 2;
+
+                                return (
+                                    <div key={mainApp.id} style={{ top: `${top}px`, height: `${height}px`, width: '95%', left: '2.5%' }} className="absolute z-10 transition-all hover:z-20">
+                                        <AppointmentCard
+                                            app={mainApp}
+                                            style={{ width: '100%', height: '100%' }}
+                                            onClick={setDetailsApp}
+                                            onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })}
+                                        />
+                                        {count > 1 && (
+                                            <div className="absolute -top-2 -right-2 bg-brand-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md animate-pop z-50 border-2 border-white" title={`${count} agendamentos neste horário`}>
+                                                +{count - 1}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
                 })} </div>
             </div>
         )
