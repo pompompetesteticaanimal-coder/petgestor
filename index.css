@@ -21,14 +21,12 @@ body {
 }
 
 body {
-  /* Soap Bubbles Pattern */
-  background-color: #f0fdfa;
-  background-image:
-    radial-gradient(circle at 10% 20%, rgba(20, 184, 166, 0.05) 0%, transparent 20%),
-    radial-gradient(circle at 90% 80%, rgba(20, 184, 166, 0.05) 0%, transparent 20%),
-    radial-gradient(circle at 50% 50%, rgba(20, 184, 166, 0.03) 0%, transparent 30%),
-    radial-gradient(rgba(20, 184, 166, 0.1) 2px, transparent 2px);
-  background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px;
+  background-color: #f8fafc;
+  background-image: radial-gradient(#e11d48 0.5px, transparent 0.5px), radial-gradient(#e11d48 0.5px, #f8fafc 0.5px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  background-opacity: 0.05;
+  /* Dotted Pattern */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding-top: var(--safe-area-top);

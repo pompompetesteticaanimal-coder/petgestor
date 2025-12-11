@@ -14,8 +14,7 @@ import {
     ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
     Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
     Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon,
-    ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft, Star, Moon,
-    Droplets
+    ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft, Star, Moon
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -49,21 +48,6 @@ const calculateTotal = (app: Appointment, services: Service[]) => {
 };
 
 // --- SUB-COMPONENTS ---
-
-// --- DECORATIVE COMPONENTS ---
-const Bubble: React.FC<{ size?: number, delay?: number, top?: string, left?: string, right?: string, bottom?: string }> = ({ size = 20, delay = 0, top, left, right, bottom }) => (
-    <div
-        className="absolute rounded-full bg-white/30 backdrop-blur-sm border border-white/40 shadow-sm animate-float pointer-events-none"
-        style={{
-            width: size,
-            height: size,
-            animationDelay: `${delay}s`,
-            top, left, right, bottom
-        }}
-    />
-);
-
-
 
 const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => {
     const [clientId, setClientId] = useState(DEFAULT_CLIENT_ID);
@@ -545,10 +529,6 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     interface StatCardProps { title: string; value: string | number; icon: any; colorClass: string; growth?: number; subValue?: string; }
     const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: StatCardProps) => (
         <div className="bg-white p-5 rounded-[2rem] shadow-soft border border-gray-100/50 btn-spring hover:shadow-lg hover:-translate-y-2 flex flex-col justify-between group h-full relative overflow-hidden">
-            {/* Bubbles */}
-            <Bubble size={40} top="-10%" right="-10%" delay={0} />
-            <Bubble size={20} bottom="10%" left="10%" delay={1} />
-
             <div className={`absolute -right-6 -top-6 w-24 h-24 bg-${colorClass.split('-')[1]}-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-700`} />
             <div className="flex justify-between items-start mb-4 relative z-10">
                 <div className={`p-3 rounded-2xl ${colorClass} bg-opacity-10 text-${colorClass.split('-')[1]}-600 group-hover:scale-110 transition-transform duration-300`}>
@@ -1941,13 +1921,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 // --- MENU VIEW (Mobile Only - 4th Tab) ---
 const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () => void }> = ({ setView, onOpenSettings }) => {
     const MenuCard = ({ icon: Icon, title, onClick, colorClass }: any) => (
-        <button onClick={onClick} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-3 aspect-square active:scale-95 transition relative overflow-hidden group">
-            {/* Bubbles */}
-            <Bubble size={30} top="-10%" right="-10%" delay={0} />
-            <Bubble size={15} bottom="10%" left="5%" delay={1} />
-
-            <div className={`w-12 h-12 rounded-full ${colorClass} flex items-center justify-center text-white relative z-10 group-hover:scale-110 transition-transform`}><Icon size={24} /></div>
-            <span className="font-bold text-gray-700 text-sm relative z-10">{title}</span>
+        <button onClick={onClick} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-3 aspect-square active:scale-95 transition">
+            <div className={`w-12 h-12 rounded-full ${colorClass} flex items-center justify-center text-white`}><Icon size={24} /></div>
+            <span className="font-bold text-gray-700 text-sm">{title}</span>
         </button>
     );
 
