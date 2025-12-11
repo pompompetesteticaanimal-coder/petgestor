@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { EvaluationModal } from './components/EvaluationModal';
@@ -34,6 +34,17 @@ const formatDateWithWeek = (dateStr: string) => {
     const w = date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
     const dStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     return `${w.charAt(0).toUpperCase() + w.slice(1)}, ${dStr}`;
+};
+
+const calculateTotal = (app: Appointment, services: Service[]) => {
+    if (app.status === 'cancelado' || app.status === 'nao_veio') return 0;
+    const mainSvc = services.find(s => s.id === app.serviceId);
+    let total = mainSvc?.price || 0;
+    app.additionalServiceIds?.forEach(id => {
+        const s = services.find(srv => srv.id === id);
+        if (s) total += s.price;
+    });
+    return total;
 };
 
 // --- SUB-COMPONENTS ---
@@ -212,15 +223,6 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         return cat !== 'sócio' && cat !== 'socio' && !cat.includes('extraordinário') && !cat.includes('extraordinario');
     };
 
-    const calculateGrossRevenue = (app: Appointment) => {
-        if (app.status === 'cancelado' || app.status === 'nao_veio') return 0;
-        if (app.paidAmount && app.paidAmount > 0) return app.paidAmount;
-        const mainSvc = services.find(s => s.id === app.serviceId);
-        let total = mainSvc?.price || 0;
-        app.additionalServiceIds?.forEach(id => { const s = services.find(srv => srv.id === id); if (s) total += s.price; });
-        return total;
-    };
-
     const calculateStats = (apps: Appointment[]) => {
         let totalPets = 0; let totalTosas = 0; let paidRevenue = 0; let pendingRevenue = 0;
         apps.forEach(app => {
@@ -232,7 +234,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             let hasTosa = isTargetTosa(mainSvc?.name);
             if (!hasTosa && app.additionalServiceIds) { app.additionalServiceIds.forEach(id => { const s = services.find(srv => srv.id === id); if (s && isTargetTosa(s.name)) hasTosa = true; }); }
             if (hasTosa) totalTosas++;
-            const gross = calculateGrossRevenue(app);
+            const gross = calculateTotal(app, services);
             // Strict Payment Check: Must have a method recorded
             const isPaid = !!app.paymentMethod && app.paymentMethod.trim() !== '';
             if (isPaid) paidRevenue += gross; else pendingRevenue += gross;
@@ -242,7 +244,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         return { totalPets, totalTosas, paidRevenue, pendingRevenue, grossRevenue, averageTicket };
     };
 
-    const getWeeklyChartData = () => {
+    const getWeeklyChartData = useCallback(() => {
         // ...
         const [y, m, d] = selectedDate.split('-').map(Number);
         const date = new Date(y, m - 1, d);
@@ -255,15 +257,15 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const cYear = current.getFullYear(); const cMonth = String(current.getMonth() + 1).padStart(2, '0'); const cDay = String(current.getDate()).padStart(2, '0');
             const targetDateStr = `${cYear}-${cMonth}-${cDay}`;
             const dailyApps = appointments.filter(a => { if (a.status === 'cancelado') return false; const aDate = new Date(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
-            const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateGrossRevenue(app), 0);
+            const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateTotal(app, services), 0);
             const formattedDate = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'short' });
             let growth = 0; if (data.length > 0) { const prev = data[data.length - 1]; if (prev.faturamento > 0) growth = ((totalRevenue - prev.faturamento) / prev.faturamento) * 100; }
             data.push({ name: formattedDate, fullDate: targetDateStr, faturamento: totalRevenue, rawRevenue: totalRevenue, pets: dailyApps.length, growth });
         });
         return data;
-    };
+    }, [selectedDate, appointments, services]);
 
-    const getMonthlyChartData = () => {
+    const getMonthlyChartData = useCallback(() => {
         const [yearStr, monthStr] = selectedMonth.split('-');
         const year = parseInt(yearStr);
         const month = parseInt(monthStr) - 1;
@@ -273,7 +275,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 const d = new Date(app.date);
                 return getISOWeek(d) === targetWeek && d.getFullYear() === targetYear;
             });
-            const rev = apps.reduce((acc, app) => acc + calculateGrossRevenue(app), 0);
+            const rev = apps.reduce((acc, app) => acc + calculateTotal(app, services), 0);
             return { revenue: rev, pets: apps.length };
         };
         const weeksInMonth = new Set<number>();
@@ -287,9 +289,9 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             chartData.push({ name: `S${index + 1}`, faturamento: revenue, rawRevenue: revenue, pets: pets, growth });
         });
         return chartData;
-    };
+    }, [selectedMonth, appointments, services]);
 
-    const getYearlyChartData = () => {
+    const getYearlyChartData = useCallback(() => {
         const data: any[] = []; const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const startMonth = selectedYear === 2025 ? 7 : 0;
         for (let i = startMonth; i < 12; i++) {
@@ -299,11 +301,11 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             data.push({ name: monthNames[i], faturamento: stats.grossRevenue, rawRevenue: stats.grossRevenue, pets: stats.totalPets, revGrowth, });
         }
         return data;
-    };
+    }, [selectedYear, appointments, services]);
 
-    const dailyApps = appointments.filter(a => a.date.startsWith(selectedDate));
-    const dailyStats = calculateStats(dailyApps);
-    const weeklyChartData = getWeeklyChartData();
+    const dailyApps = useMemo(() => appointments.filter(a => a.date.startsWith(selectedDate)), [appointments, selectedDate]);
+    const dailyStats = useMemo(() => calculateStats(dailyApps), [dailyApps, services]);
+    const weeklyChartData = useMemo(() => getWeeklyChartData(), [getWeeklyChartData]);
 
     // Calculate weeklyStats
     const calculateWeeklyStats = () => {
@@ -316,10 +318,12 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const wApps = appointments.filter(a => { if (a.status === 'cancelado') return false; const ad = new Date(a.date); return ad >= startOfWeek && ad <= endOfWeek; });
         return calculateStats(wApps);
     };
-    const weeklyStats = calculateWeeklyStats();
+    // eslint-disable-next-line
+    const weeklyStats = useMemo(() => calculateWeeklyStats(), [selectedDate, appointments, services]);
 
-    const monthlyChartData = getMonthlyChartData();
-    const yearlyChartData = getYearlyChartData();
+    const monthlyChartData = useMemo(() => getMonthlyChartData(), [getMonthlyChartData]);
+    const yearlyChartData = useMemo(() => getYearlyChartData(), [getYearlyChartData]);
+
     const monthlyApps = appointments.filter(a => a.date.startsWith(selectedMonth));
     const monthlyStats = calculateStats(monthlyApps);
     const yearlyApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
@@ -451,7 +455,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         return null;
     }, [activeTab, appointments, selectedDate, selectedMonth, selectedYear, costs]);
 
-    const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: any) => (
+    interface StatCardProps { title: string; value: string | number; icon: any; colorClass: string; growth?: number; subValue?: string; }
+    const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: StatCardProps) => (
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100/80 hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group h-full">
             <div className="flex justify-between items-start mb-4">
                 <div className={`p-2.5 rounded-2xl ${colorClass} bg-opacity-10 text-${colorClass.split('-')[1]}-600`}>
@@ -514,7 +519,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                     const pet = client?.pets.find(p => p.id === app.petId);
                                     const mainSvc = services.find(s => s.id === app.serviceId);
                                     const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
-                                    const val = calculateGrossRevenue(app);
+                                    const val = calculateTotal(app, services);
                                     // Payment Fix: Must have valid payment info to be Paid
                                     const isPaid = (!!app.paidAmount && app.paidAmount > 0) && (!!app.paymentMethod && app.paymentMethod.trim() !== '');
 
@@ -696,7 +701,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         setSelectedDate(getLocalISODate());
     };
 
-    const calculateExpected = (app: Appointment) => { const main = services.find(s => s.id === app.serviceId); let total = main?.price || 0; app.additionalServiceIds?.forEach(id => { const s = services.find(srv => srv.id === id); if (s) total += s.price; }); return total; };
+    const calculateExpected = (app: Appointment) => calculateTotal(app, services);
     const handleStartEdit = (app: Appointment) => { setEditingId(app.id); const expected = calculateExpected(app); setAmount(app.paidAmount ? app.paidAmount.toString() : expected.toString()); setMethod(app.paymentMethod || 'Credito'); setContextMenu(null); };
     const handleSave = async (app: Appointment) => {
         setIsSaving(true);
@@ -913,7 +918,7 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
 
                                     <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-1 font-medium bg-white/50 px-2 py-1 rounded-lg w-fit shadow-sm border border-gray-100/50"><Phone size={12} className="text-brand-400" /> {client.phone}</p>
                                 </div>
-                                <button onClick={() => { if (confirm('Excluir?')) onDeleteClient(client.id); }} className="text-gray-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition shadow-sm bg-white border border-gray-100"><Trash2 size={16} /></button>
+                                <button onClick={() => { if (confirm('Excluir?')) onDeleteClient(client.id); }} className="text-gray-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition shadow-sm bg-white border border-gray-100" title="Excluir Cliente"><Trash2 size={16} /></button>
                             </div>
                             <div className="space-y-2 relative z-10">
                                 {client.pets.map(pet => (
@@ -1003,7 +1008,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
                     {services.map((service, index) => (
                         <div key={service.id} onClick={() => setViewService(service)} style={{ animationDelay: `${index * 0.05}s` }} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, service }); }} className="animate-slide-up bg-white/80 backdrop-blur p-5 rounded-3xl shadow-sm border border-white/50 flex flex-col justify-between cursor-pointer hover:shadow-glass hover:scale-[1.02] transition-all duration-300 select-none group relative">
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <div className="p-1.5 bg-gray-50 rounded-lg text-gray-400 hover:text-brand-500"><Edit2 size={12} /></div>
+                                <div className="p-1.5 bg-gray-50 rounded-lg text-gray-400 hover:text-brand-500" title="Editar Rápido"><Edit2 size={12} /></div>
                             </div>
                             <div>
                                 <div className="flex justify-between items-start mb-2">
@@ -1226,7 +1231,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
 
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
-    const getLayout = (dayApps: Appointment[]) => {
+    // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
+    const getLayout = useCallback((dayApps: Appointment[]) => {
         const sorted = [...dayApps].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         const nodes = sorted.map(app => { const start = new Date(app.date).getTime(); const end = start + (app.durationTotal || 60) * 60000; return { app, start, end }; });
         const clusters: typeof nodes[] = [];
@@ -1261,7 +1267,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             });
         });
         return layoutResult;
-    };
+    }, []);
 
     // Updated Card with full requested info
     const AppointmentCard = ({ app, style, onClick, onContext, stackIndex, stackTotal }: { app: Appointment, style: any, onClick: any, onContext: any, stackIndex?: number, stackTotal?: number }) => {
