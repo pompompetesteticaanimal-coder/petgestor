@@ -1223,10 +1223,10 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
     );
 };
 
-const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; googleUser: GoogleUser | null; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete }) => {
+const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; googleUser: GoogleUser | null; isOpen: boolean; onClose: () => void; onOpen: () => void; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete, isOpen, onClose, onOpen }) => {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    // const [isModalOpen, setIsModalOpen] = useState(false); // LIFTED UP
     const [detailsApp, setDetailsApp] = useState<Appointment | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, appId: string } | null>(null);
 
@@ -1266,7 +1266,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         setDate(new Date().toISOString().split('T')[0]); setTime('09:00');
         setManualDuration(0); setNotes('');
         setClientSearch('');
-        setIsModalOpen(false);
+        setManualDuration(0); setNotes('');
+        setClientSearch('');
+        onClose(); // Use prop
     };
 
     const handleStartEdit = (app: Appointment) => {
@@ -1277,7 +1279,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         setSelectedService(app.serviceId); setSelectedAddServices(app.additionalServiceIds || []);
         setDate(app.date.split('T')[0]); setTime(app.date.split('T')[1].substring(0, 5));
         setManualDuration(app.durationTotal || 0); setNotes(app.notes || '');
-        setIsModalOpen(true); setDetailsApp(null); setContextMenu(null);
+        setManualDuration(app.durationTotal || 0); setNotes(app.notes || '');
+        onOpen(); // Use prop
+        setDetailsApp(null); setContextMenu(null);
     };
 
     const handleSave = () => {
@@ -1715,9 +1719,10 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     </div>
                 );
             })(), document.body)}
-
-            {isModalOpen && createPortal(
+            {/* NEW/EDIT MODAL - Controlled by Props */}
+            {isOpen && createPortal(
                 <div className="fixed inset-0 bg-black/60 z-[60] flex items-end md:items-center justify-center md:p-6 backdrop-blur-sm animate-fade-in">
+                    <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={() => { resetForm(); onClose(); }} />
                     <div className="bg-[#ffffff] md:rounded-3xl rounded-none w-full max-w-6xl h-[100dvh] md:h-[90vh] md:max-h-[800px] shadow-2xl flex flex-col overflow-hidden animate-scale-up ring-1 ring-black/5 font-sans">
                         {/* Header */}
                         <div className="px-5 py-4 md:px-8 md:py-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20">
@@ -1725,7 +1730,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                 <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">{editingAppId ? 'Editar Agendamento' : 'Novo Agendamento'}</h2>
                                 <p className="text-xs md:text-sm text-gray-400 font-medium mt-0.5">Preencha os detalhes do serviço abaixo</p>
                             </div>
-                            <button onClick={resetForm} className="p-2.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-all duration-300"><X size={24} /></button>
+                            <button onClick={() => { resetForm(); onClose(); }} className="p-2.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-all duration-300"><X size={24} /></button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 bg-gray-50/50">
@@ -2008,7 +2013,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                 )}
                             </div>
                             <div className="flex gap-4 w-full md:w-auto">
-                                <button onClick={resetForm} className="flex-1 md:flex-none px-8 py-4 rounded-xl text-gray-500 font-bold hover:bg-gray-100 transition-colors text-sm">Cancelar</button>
+                                <button onClick={() => { resetForm(); onClose(); }} className="flex-1 md:flex-none px-8 py-4 rounded-xl text-gray-500 font-bold hover:bg-gray-100 transition-colors text-sm">Cancelar</button>
                                 <button
                                     onClick={handleSave}
                                     disabled={!selectedClient || selectedPetIds.length === 0 || !selectedService}
@@ -2117,9 +2122,10 @@ const MenuView: React.FC<{ setView: (v: ViewState) => void, onOpenSettings: () =
 
 // --- APP COMPONENT ---
 const App: React.FC = () => {
-    // home is now used as a redirect or default view, but bottom nav handles specific views
-    // Actually, let's keep 'home' as the default landing view which shows the Daily Revenue
+    // home is now used as a redirect or default view, but bimport { RevenueView } from './components/RevenueView'; // Assuming this is extracted or defined elsewhere if not in snippet
+    // ... (App state)
     const [currentView, setCurrentView] = useState<ViewState>('home');
+    const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false); // NEW STATE
     const [clients, setClients] = useState<Client[]>([]);
     const [services, setServices] = useState<Service[]>([]);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -2492,6 +2498,7 @@ const App: React.FC = () => {
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 isLoading={isGlobalLoading}
                 onManualRefresh={async () => { if (accessToken) await performFullSync(accessToken); else window.location.reload(); }}
+                onAddAppointment={() => setIsScheduleModalOpen(true)} // PASS HANDLER
             >
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
@@ -2506,7 +2513,7 @@ const App: React.FC = () => {
                 />}
                 {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} googleUser={googleUser} accessToken={accessToken} />}
                 {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
-                {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} />}
+                {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} onOpen={() => setIsScheduleModalOpen(true)} />}
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}

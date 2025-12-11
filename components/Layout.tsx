@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { ViewState, GoogleUser, AppSettings } from '../types';
-import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronLeft, TrendingUp, TrendingDown, Lock, Settings, Home, Menu, BarChart2, Package } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronLeft, TrendingUp, TrendingDown, Lock, Settings, Home, Menu, BarChart2, Package, CalendarPlus } from 'lucide-react';
 import { PullToRefresh } from './PullToRefresh';
 
 interface LayoutProps {
@@ -15,6 +15,7 @@ interface LayoutProps {
   onOpenSettings: () => void;
   isLoading?: boolean;
   onManualRefresh?: () => Promise<void>;
+  onAddAppointment?: () => void;
 }
 
 const DEFAULT_LOGO_URL = 'https://photos.app.goo.gl/xs394sFQNYBBocea8';
@@ -255,10 +256,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         <BottomNavItem view="payments" current={currentView} icon={Wallet} label="Pagto" onClick={setView} />
         <div className="relative -top-6">
           <button
-            onClick={() => setView('schedule')}
+            onClick={() => currentView === 'schedule' && onAddAppointment ? onAddAppointment() : setView('schedule')}
             className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl shadow-brand-200 transition-all active:scale-95 ${currentView === 'schedule' ? 'bg-brand-600 text-white ring-4 ring-white' : 'bg-gray-900 text-white'}`}
           >
-            <Calendar size={28} />
+            {currentView === 'schedule' ? <CalendarPlus size={28} /> : <Calendar size={28} />}
           </button>
         </div>
         {/* REPLACED Clients with Packages */}
