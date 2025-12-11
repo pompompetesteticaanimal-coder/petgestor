@@ -187,6 +187,67 @@ const CustomXAxisTick = ({ x, y, payload, data }: any) => {
     );
 };
 
+const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: string; appointments: Appointment[]; clients: Client[]; services: Service[] }> = ({ isOpen, onClose, date, appointments, clients, services }) => {
+    if (!isOpen) return null;
+    const [y, m, d] = date.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const sortedApps = [...appointments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+            <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-up" onClick={e => e.stopPropagation()}>
+                <div className="bg-brand-50 p-6 border-b border-brand-100 flex justify-between items-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 text-brand-500 transform rotate-12 pointer-events-none">
+                        <CalendarIcon size={100} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-2xl text-brand-900 tracking-tight">{dateObj.toLocaleDateString('pt-BR', { weekday: 'long' })}</h3>
+                        <p className="text-brand-700 font-medium">{dateObj.toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    <button onClick={onClose} className="bg-white/50 hover:bg-white text-brand-700 p-2 rounded-full transition-all btn-spring z-10"><X size={20} /></button>
+                </div>
+
+                <div className="p-4 overflow-y-auto flex-1 space-y-3 bg-gray-50/50">
+                    {sortedApps.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                            <CalendarIcon size={48} className="mb-2 opacity-50" />
+                            <p>Nenhum agendamento para este dia.</p>
+                        </div>
+                    ) : (
+                        sortedApps.map((app, idx) => {
+                            const client = clients.find(c => c.id === app.clientId);
+                            const pet = client?.pets.find(p => p.id === app.petId);
+                            const time = app.date.split('T')[1].slice(0, 5);
+                            const endTime = new Date(new Date(app.date).getTime() + (app.durationTotal || 60) * 60000).toISOString().split('T')[1].slice(0, 5);
+                            const mainSvc = services.find(s => s.id === app.serviceId);
+
+                            return (
+                                <div key={app.id} style={{ animationDelay: `${idx * 0.05}s` }} className="animate-slide-up bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col items-center justify-center min-w-[60px] border-r border-gray-100 pr-4">
+                                        <span className="text-lg font-bold text-gray-800">{time}</span>
+                                        <span className="text-xs text-gray-400 font-medium text-center">- {endTime}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start">
+                                            <h4 className="font-bold text-gray-800 truncate">{pet?.name} <span className="text-gray-400 font-normal text-xs">({client?.name.split(' ')[0]})</span></h4>
+                                            <div className={`w-2 h-2 rounded-full ${app.status === 'concluido' ? 'bg-green-500' : app.status === 'cancelado' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                                        </div>
+                                        <p className="text-sm text-brand-600 font-medium truncate mt-0.5">{mainSvc?.name}</p>
+                                        {app.notes && <p className="text-xs text-gray-400 mt-1 truncate bg-gray-50 p-1 rounded">Nota: {app.notes}</p>}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+                <div className="p-4 border-t border-gray-100 bg-white text-center text-xs text-gray-400">
+                    {sortedApps.length} agendamento(s)
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; clients: Client[]; costs: CostItem[]; defaultTab?: 'daily' | 'weekly' | 'monthly' | 'yearly'; onRemovePayment: (app: Appointment) => void; onNoShow?: (app: Appointment) => void }> = ({ appointments, services, clients, costs, defaultTab = 'daily', onRemovePayment, onNoShow }) => {
     const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>(defaultTab);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -1129,6 +1190,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const [selectedPet, setSelectedPet] = useState<string | null>(null); // Pet ID
     const [selectedService, setSelectedService] = useState<string>(''); // Service ID
     const [selectedAddServices, setSelectedAddServices] = useState<string[]>([]); // Array of Service IDs
+    const [selectedDayForDetails, setSelectedDayForDetails] = useState<string | null>(null);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [time, setTime] = useState('09:00');
     const [manualDuration, setManualDuration] = useState<number | string>(0);
@@ -1361,7 +1423,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const start = new Date(currentDate); start.setDate(start.getDate() - start.getDay()); const days = [2, 3, 4, 5, 6];
         return (
             <div className="flex h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex-col mx-1">
-                <div className="flex border-b border-gray-100 bg-gray-50/50 backdrop-blur-sm"> <div className="w-10 bg-transparent border-r border-gray-100"></div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]; return (<div key={dIdx} className={`flex-1 text-center py-3 text-xs font-bold border-r border-gray-100 ${isToday ? 'bg-brand-50/50 text-brand-600' : 'text-gray-500'}`}> {d.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()} <div className={`text-sm mt-0.5 ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{d.getDate()}</div> </div>) })} </div>
+                <div className="flex border-b border-gray-100 bg-gray-50/50 backdrop-blur-sm"> <div className="w-10 bg-transparent border-r border-gray-100"></div> {days.map(dIdx => { const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0]; const isToday = dateStr === new Date().toISOString().split('T')[0]; return (<div key={dIdx} onClick={() => setSelectedDayForDetails(dateStr)} className={`flex-1 text-center py-3 text-xs font-bold border-r border-gray-100 cursor-pointer hover:bg-brand-50/30 transition-colors ${isToday ? 'bg-brand-50/50 text-brand-600' : 'text-gray-500'}`}> {d.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase()} <div className={`text-sm mt-0.5 ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{d.getDate()}</div> </div>) })} </div>
                 <div className="flex-1 overflow-y-auto relative flex"> <div className="w-10 bg-gray-50/30 border-r border-gray-100 flex-shrink-0 sticky left-0 z-10"> {Array.from({ length: 12 }, (_, i) => i + 8).map(h => (<div key={h} className="h-[120px] border-b border-gray-100 text-[9px] text-gray-400 font-bold p-1 text-right relative bg-gray-50/30"> <span className="-top-2 relative">{h}</span> </div>))} </div> {days.map(dIdx => {
                     const d = new Date(start); d.setDate(d.getDate() + dIdx); const dateStr = d.toISOString().split('T')[0];
                     const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado');
@@ -1416,7 +1478,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
     const renderMonthView = () => {
         const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const firstDay = new Date(year, month, 1); const startDay = firstDay.getDay(); const daysInMonth = new Date(year, month + 1, 0).getDate(); const slots = []; for (let i = 0; i < startDay; i++) slots.push(null); for (let i = 1; i <= daysInMonth; i++) slots.push(new Date(year, month, i));
-        return (<div className="h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col mx-1"> <div className="grid grid-cols-7 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200"> {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>)} </div> <div className="flex-1 grid grid-cols-7 auto-rows-fr"> {slots.map((date, idx) => { if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/30 border-b border-r border-gray-100" />; const dateStr = date.toISOString().split('T')[0]; const isToday = dateStr === new Date().toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado').sort((a, b) => a.date.localeCompare(b.date)); return (<div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col transition-colors cursor-pointer hover:bg-brand-50/30 ${isToday ? 'bg-orange-50/30' : ''}`} onClick={() => { setDate(dateStr); setViewMode('day'); }}> <span className={`text-[10px] font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full transition-all ${isToday ? 'bg-brand-600 text-white shadow-md scale-110' : 'text-gray-500'}`}>{date.getDate()}</span> <div className="flex-1 overflow-hidden space-y-1"> {dayApps.slice(0, 3).map(app => (<div key={app.id} className="text-[9px] bg-white border border-gray-200 text-gray-700 rounded-md px-1.5 py-0.5 truncate font-medium shadow-sm"> {clients.find(c => c.id === app.clientId)?.pets.find(p => p.id === app.petId)?.name} </div>))} {dayApps.length > 3 && <div className="text-[8px] text-gray-400 pl-1 font-medium">+ {dayApps.length - 3} mais</div>} </div> </div>) })} </div> </div>)
+        return (<div className="h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col mx-1"> <div className="grid grid-cols-7 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200"> {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>)} </div> <div className="flex-1 grid grid-cols-7 auto-rows-fr"> {slots.map((date, idx) => { if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/30 border-b border-r border-gray-100" />; const dateStr = date.toISOString().split('T')[0]; const isToday = dateStr === new Date().toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado').sort((a, b) => a.date.localeCompare(b.date)); return (<div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col transition-colors cursor-pointer hover:bg-brand-50/30 ${isToday ? 'bg-orange-50/30' : ''}`} onClick={() => setSelectedDayForDetails(dateStr)}> <span className={`text-[10px] font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full transition-all ${isToday ? 'bg-brand-600 text-white shadow-md scale-110' : 'text-gray-500'}`}>{date.getDate()}</span> <div className="flex-1 overflow-hidden space-y-1"> {dayApps.slice(0, 3).map(app => (<div key={app.id} className="text-[9px] bg-white border border-gray-200 text-gray-700 rounded-md px-1.5 py-0.5 truncate font-medium shadow-sm"> {clients.find(c => c.id === app.clientId)?.pets.find(p => p.id === app.petId)?.name} </div>))} {dayApps.length > 3 && <div className="text-[8px] text-gray-400 pl-1 font-medium">+ {dayApps.length - 3} mais</div>} </div> </div>) })} </div> </div>)
     };
 
     return (
@@ -1829,6 +1891,15 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     </div>
                 </div>,
                 document.body)}
+            {/* Day Details Modal */}
+            <DayDetailsModal
+                isOpen={!!selectedDayForDetails}
+                onClose={() => setSelectedDayForDetails(null)}
+                date={selectedDayForDetails || ''}
+                appointments={appointments.filter(a => a.date.startsWith(selectedDayForDetails || '') && a.status !== 'cancelado')}
+                clients={clients}
+                services={services}
+            />
         </div>
     );
 };
