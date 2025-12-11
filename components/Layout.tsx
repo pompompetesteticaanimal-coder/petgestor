@@ -112,18 +112,18 @@ const GreetingBar = () => {
 
       {/* Logo Bar (Slides Down to appear) */}
       <div
-        className={`bg-white/95 backdrop-blur-md border-b border-pink-100 w-full py-2 px-4 flex justify-start pl-6 items-center gap-2 shadow-sm absolute top-0 transition-all duration-700 ease-out z-20 ${phase === 'logo' ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
+        className={`bg-gradient-to-r from-pink-50/95 to-rose-50/95 backdrop-blur-md border-b border-pink-100 rounded-b-[2rem] w-full py-3 px-4 flex justify-start pl-6 items-center gap-2 shadow-sm absolute top-0 transition-all duration-700 ease-out z-20 ${phase === 'logo' ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
           }`}
       >
         <div className="flex items-center -space-x-1">
-          <span className="text-lg animate-bounce-slow" style={{ animationDelay: '0.1s' }}>🐶</span>
-          <span className="text-lg animate-bounce-slow" style={{ animationDelay: '0.3s' }}>🐱</span>
+          <span className="text-xl animate-bounce-slow" style={{ animationDelay: '0.1s' }}>🐶</span>
+          <span className="text-xl animate-bounce-slow" style={{ animationDelay: '0.3s' }}>🐱</span>
         </div>
-        <span className="font-extrabold text-xl text-pink-500 tracking-tight" style={{ fontFamily: '"Varela Round", "Nunito", "Segoe UI", sans-serif' }}>PomPomPet</span>
+        <span className="font-black text-2xl text-pink-500 tracking-tight drop-shadow-sm" style={{ fontFamily: '"Varela Round", "Nunito", "Segoe UI", sans-serif' }}>PomPomPet</span>
       </div>
 
-      {/* Spacer to push content down depending on what's visible. */}
-      <div className={`transition-all duration-700 w-full ${phase === 'greeting' ? 'h-[28px]' : phase === 'logo' ? 'h-[48px]' : 'h-0'}`} />
+      {/* Spacer */}
+      <div className={`transition-all duration-700 w-full ${phase === 'greeting' ? 'h-[28px]' : phase === 'logo' ? 'h-[60px]' : 'h-0'}`} />
     </div>
   );
 };
