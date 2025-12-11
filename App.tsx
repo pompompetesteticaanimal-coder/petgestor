@@ -1354,11 +1354,18 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const firstDay = new Date(year, month, 1); const startDay = firstDay.getDay(); const daysInMonth = new Date(year, month + 1, 0).getDate(); const slots = []; for (let i = 0; i < startDay; i++) slots.push(null); for (let i = 1; i <= daysInMonth; i++) slots.push(new Date(year, month, i));
         return (
             <div className="h-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex flex-col mx-1">
-                <div className="grid grid-cols-7 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200">
+                <div className="grid grid-cols-7 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200 flex-shrink-0">
                     {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>)}
                 </div>
-                <div className="flex-1 grid grid-cols-7 auto-rows-fr overflow-hidden">
+                {/* Fixed 6 rows for maximum month spread, ensuring stable cell height */}
+                <div className="flex-1 grid grid-cols-7 grid-rows-6 min-h-0 overflow-hidden">
                     {slots.map((date, idx) => {
+                        // Fill remaining slots if month has fewer than 42 days (6 weeks * 7 days)
+                        // Actually standard month view is usually 35 or 42 slots.
+                        // Our slots array logic creates empty slots at start, but might not fill end.
+                        // Grid auto-rows-fr might be better if we ensure the container is fixed height.
+                        // But user asked for fixed height cells. "grid-rows-6" enforces 1/6th height per row.
+
                         if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/30 border-b border-r border-gray-100" />;
                         const dateStr = date.toISOString().split('T')[0];
                         const isToday = dateStr === new Date().toISOString().split('T')[0];
@@ -1366,9 +1373,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                         const hasManyApps = dayApps.length > 3;
 
                         return (
-                            <div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col transition-colors cursor-pointer hover:bg-brand-50/30 ${isToday ? 'bg-orange-50/30' : ''}`} onClick={() => { setDate(dateStr); setViewMode('day'); }}>
+                            <div key={idx} className={`border-b border-r border-gray-100 p-1 flex flex-col transition-colors cursor-pointer hover:bg-brand-50/30 ${isToday ? 'bg-orange-50/30' : ''} h-full overflow-hidden`} onClick={() => { setDate(dateStr); setViewMode('day'); }}>
                                 <span className={`text-[10px] font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 transition-all ${isToday ? 'bg-brand-600 text-white shadow-md scale-110' : 'text-gray-500'}`}>{date.getDate()}</span>
-                                <div className={`flex-1 space-y-1 min-h-0 ${hasManyApps ? 'overflow-y-auto custom-scrollbar overscroll-contain' : 'overflow-hidden'}`} onClick={(e) => hasManyApps && e.stopPropagation()} onWheel={(e) => hasManyApps && e.stopPropagation()} onTouchMove={(e) => hasManyApps && e.stopPropagation()}>
+                                <div className={`flex-1 space-y-1 min-h-0 ${hasManyApps ? 'overflow-y-auto no-scrollbar overscroll-contain' : 'overflow-hidden'}`} onClick={(e) => hasManyApps && e.stopPropagation()} onWheel={(e) => hasManyApps && e.stopPropagation()} onTouchMove={(e) => hasManyApps && e.stopPropagation()}>
                                     {dayApps.map(app => (
                                         <div key={app.id} className="text-[9px] bg-white border border-gray-200 text-gray-700 rounded-md px-1.5 py-0.5 truncate font-medium shadow-sm">
                                             {clients.find(c => c.id === app.clientId)?.pets.find(p => p.id === app.petId)?.name}
@@ -1379,9 +1386,14 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                             </div>
                         )
                     })}
+                    {/* Fill remaining grid cells to keep layout stable if slots < 42 */}
+                    {Array.from({ length: 42 - slots.length }).map((_, i) => (
+                        <div key={`end-empty-${i}`} className="bg-gray-50/30 border-b border-r border-gray-100" />
+                    ))}
                 </div>
             </div>
         )
+
     };
 
     return (
