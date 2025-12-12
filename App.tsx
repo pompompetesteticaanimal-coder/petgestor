@@ -317,8 +317,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             if (hasTosa) totalTosas++;
             const gross = calculateTotal(app, services);
             // Strict Payment Check: Payment Method is MANDATORY.
-            // Then checks if amount is paid OR status is concluded.
-            const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido');
+            // Relaxed: If Payment Method exists (Col R), we consider it PAID even if Amount is 0/missing.
+            const isPaid = !!app.paymentMethod && app.paymentMethod.trim() !== '';
             if (isPaid) paidRevenue += gross; else pendingRevenue += gross;
         });
         const grossRevenue = paidRevenue + pendingRevenue;
