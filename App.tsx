@@ -338,7 +338,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const current = new Date(startOfWeek); current.setDate(startOfWeek.getDate() + dayIndex);
             const cYear = current.getFullYear(); const cMonth = String(current.getMonth() + 1).padStart(2, '0'); const cDay = String(current.getDate()).padStart(2, '0');
             const targetDateStr = `${cYear}-${cMonth}-${cDay}`;
-            const dailyApps = appointments.filter(a => { if (a.status === 'cancelado') return false; const aDate = new Date(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
+            const dailyApps = appointments.filter(a => { if (a.status === 'cancelado' || a.status === 'nao_veio') return false; const aDate = new Date(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
             const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateTotal(app, services), 0);
             const formattedDate = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'short' });
             let growth = 0; if (data.length > 0) { const prev = data[data.length - 1]; if (prev.faturamento > 0) growth = ((totalRevenue - prev.faturamento) / prev.faturamento) * 100; }
@@ -353,7 +353,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const month = parseInt(monthStr) - 1;
         const getWeekData = (targetYear: number, targetWeek: number) => {
             const apps = appointments.filter(app => {
-                if (app.status === 'cancelado') return false;
+                if (app.status === 'cancelado' || app.status === 'nao_veio') return false;
                 const d = new Date(app.date);
                 return getISOWeek(d) === targetWeek && d.getFullYear() === targetYear;
             });
@@ -377,9 +377,9 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const data: any[] = []; const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const startMonth = selectedYear === 2025 ? 7 : 0;
         for (let i = startMonth; i < 12; i++) {
-            const monthApps = appointments.filter(a => { const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === i && a.status !== 'cancelado'; });
+            const monthApps = appointments.filter(a => { const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === i && a.status !== 'cancelado' && a.status !== 'nao_veio'; });
             const stats = calculateStats(monthApps);
-            let revGrowth = 0; if (i > startMonth) { const prevApps = appointments.filter(a => { const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === (i - 1) && a.status !== 'cancelado'; }); const prevStats = calculateStats(prevApps); if (prevStats.grossRevenue > 0) revGrowth = ((stats.grossRevenue - prevStats.grossRevenue) / prevStats.grossRevenue) * 100; }
+            let revGrowth = 0; if (i > startMonth) { const prevApps = appointments.filter(a => { const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === (i - 1) && a.status !== 'cancelado' && a.status !== 'nao_veio'; }); const prevStats = calculateStats(prevApps); if (prevStats.grossRevenue > 0) revGrowth = ((stats.grossRevenue - prevStats.grossRevenue) / prevStats.grossRevenue) * 100; }
             data.push({ name: monthNames[i], faturamento: stats.grossRevenue, rawRevenue: stats.grossRevenue, pets: stats.totalPets, revGrowth, });
         }
         return data;
@@ -397,7 +397,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const diff = date.getDate() - day;
         const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
         const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
-        const wApps = appointments.filter(a => { if (a.status === 'cancelado') return false; const ad = new Date(a.date); return ad >= startOfWeek && ad <= endOfWeek; });
+        const wApps = appointments.filter(a => { if (a.status === 'cancelado' || a.status === 'nao_veio') return false; const ad = new Date(a.date); return ad >= startOfWeek && ad <= endOfWeek; });
         return calculateStats(wApps);
     };
     // eslint-disable-next-line
