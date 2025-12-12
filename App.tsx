@@ -2664,7 +2664,20 @@ const App: React.FC = () => {
     const handleDeleteService = (id: string) => { const updated = services.filter(s => s.id !== id); setServices(updated); db.saveServices(updated); }
     const handleSyncServices = async (token: string, silent = false) => {
         // ... [Sync Services Logic same as before] ...
-        if (!token || !SHEET_ID) { if (!silent) alert("Erro: Login ou ID da Planilha faltando."); return; } try { const rows = await googleService.getSheetValues(token, SHEET_ID, 'Serviço!A:E'); if (!rows || rows.length < 2) { if (!silent) alert("Aba 'Serviço' vazia ou não encontrada."); return; } const newServices: Service[] = []; rows.slice(1).forEach((row: string[], idx: number) => { const sName = row[0]; const sCat = (row[1] || 'principal').toLowerCase().includes('adicional') ? 'adicional' : 'principal'; const sSize = row[2] && row[2].trim() !== '' ? row[2] : 'Todos'; const sCoat = row[3] && row[3].trim() !== '' ? row[3] : 'Todos'; let rawPrice = row[4] || '0'; rawPrice = rawPrice.replace(/[^\d,.-]/g, '').trim(); if (rawPrice.includes(',')) rawPrice = rawPrice.replace(/\./g, '').replace(',', '.'); const sPrice = parseFloat(rawPrice); if (sName) { newServices.push({ id: `sheet_svc_${idx}_${Date.now()}`, name: sName, category: sCat as any, targetSize: sSize, targetCoat: sCoat, price: isNaN(sPrice) ? 0 : sPrice, description: `Importado`, durationMin: 60 }); } }); if (newServices.length > 0) { setServices(newServices); db.saveServices(newServices); if (!silent) alert(`${newServices.length} serviços importados!`); } } catch (e) { console.error(e); if (!silent) alert("Erro ao sincronizar serviços."); }
+        if (!token || !SHEET_ID) { if (!silent) alert("Erro: Login ou ID da Planilha faltando."); return; } try {
+            const rows = await googleService.getSheetValues(token, SHEET_ID, 'Serviço!A:E'); if (!rows || rows.length < 2) { if (!silent) alert("Aba 'Serviço' vazia ou não encontrada."); return; } const newServices: Service[] = []; rows.slice(1).forEach((row: string[], idx: number) => {
+                const sName = row[0]; const sCat = (row[1] || 'principal').toLowerCase().includes('adicional') ? 'adicional' : 'principal'; const sSize = row[2] && row[2].trim() !== '' ? row[2] : 'Todos'; const sCoat = row[3] && row[3].trim() !== '' ? row[3] : 'Todos';
+                const parseMonetary = (val: string) => {
+                    if (!val) return 0;
+                    const clean = val.replace(/[^\d,.-]/g, '').trim();
+                    if (clean.includes(',')) { return parseFloat(clean.replace(/\./g, '').replace(',', '.')); }
+                    if (/^\d{1,3}(\.\d{3})*$/.test(clean)) { return parseFloat(clean.replace(/\./g, '')); }
+                    return parseFloat(clean);
+                };
+                const sPrice = parseMonetary(row[4] || '0');
+                if (sName) { newServices.push({ id: `sheet_svc_${idx}_${Date.now()}`, name: sName, category: sCat as any, targetSize: sSize, targetCoat: sCoat, price: isNaN(sPrice) ? 0 : sPrice, description: `Importado`, durationMin: 60 }); }
+            }); if (newServices.length > 0) { setServices(newServices); db.saveServices(newServices); if (!silent) alert(`${newServices.length} serviços importados!`); }
+        } catch (e) { console.error(e); if (!silent) alert("Erro ao sincronizar serviços."); }
     }
     const handleUpdateApp = (updatedApp: Appointment) => { const updated = appointments.map(a => a.id === updatedApp.id ? updatedApp : a); setAppointments(updated); db.saveAppointments(updated); };
     const handleSyncAppointments = async (token: string, silent = false) => {
@@ -2672,7 +2685,26 @@ const App: React.FC = () => {
         if (!token || !SHEET_ID) return; try {
             const rows = await googleService.getSheetValues(token, SHEET_ID, 'Agendamento!A:T'); if (!rows || rows.length < 5) { if (!silent) alert('Aba Agendamento vazia (Linhas 1-4 ignoradas).'); return; } const loadedApps: Appointment[] = []; const newTempClients: Client[] = []; const currentClients = db.getClients(); const existingClientIds = new Set(currentClients.map(c => c.id)); rows.forEach((row: string[], idx: number) => {
                 if (idx < 4) return; const petName = row[0]; const clientName = row[1]; const clientPhone = row[2] || ''; const clientAddr = row[3] || ''; const petBreed = row[4]; const datePart = row[11]; const timePart = row[12]; const serviceName = row[7]; const paidAmountStr = row[16]; const paymentMethod = row[17]; const googleEventId = row[19]; if (!clientName || !datePart) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = datePart.split('/'); if (day && month && year) isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`; } catch (e) { } const cleanPhone = clientPhone.replace(/\D/g, '') || `temp_${idx}`; let client = currentClients.find(c => c.id === cleanPhone) || currentClients.find(c => c.name.toLowerCase() === clientName.toLowerCase()) || newTempClients.find(c => c.id === cleanPhone); if (!client) { client = { id: cleanPhone, name: clientName, phone: clientPhone, address: clientAddr, pets: [] }; newTempClients.push(client); } let pet = client.pets.find(p => p.name.toLowerCase() === petName?.toLowerCase()); if (!pet && petName) { pet = { id: `${client.id}_p_${idx}`, name: petName, breed: petBreed || 'SRD', age: '', gender: '', size: row[5] || '', coat: row[6] || '', notes: row[13] || '' }; client.pets.push(pet); } const currentServices = db.getServices(); const service = currentServices.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || currentServices[0]; const addServiceIds: string[] = [];[row[8], row[9], row[10]].forEach(name => { if (name) { const foundSvc = currentServices.find(s => s.name.toLowerCase() === name.toLowerCase().trim()); if (foundSvc) addServiceIds.push(foundSvc.id); } }); let paidAmount = 0;
-                if (paidAmountStr) { paidAmount = parseFloat(paidAmountStr.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')); if (isNaN(paidAmount)) paidAmount = 0; }
+                const parseMonetary = (val: string) => {
+                    if (!val) return 0;
+                    const clean = val.trim();
+                    if (clean.includes(',')) {
+                        // BR Format: 1.000,50 -> 1000.50
+                        return parseFloat(clean.replace(/\./g, '').replace(',', '.'));
+                    }
+                    if (/^\d{1,3}(\.\d{3})*$/.test(clean)) {
+                        // Integer with thousand separators: 1.000 -> 1000
+                        return parseFloat(clean.replace(/\./g, ''));
+                    }
+                    // US Format or Plain: 1000.50 -> 1000.50
+                    return parseFloat(clean);
+                };
+
+                let paidAmount = 0;
+                if (paidAmountStr) {
+                    paidAmount = parseMonetary(paidAmountStr.replace(/[^\d,.-]/g, ''));
+                    if (isNaN(paidAmount)) paidAmount = 0;
+                }
 
                 // Parse Rating logic
                 let rating = 0;
@@ -2688,6 +2720,10 @@ const App: React.FC = () => {
                 // Check for variations of "Não Veio" (includes handles cases with extra spaces/characters)
                 if (statusRaw.includes('nao veio') || statusRaw.includes('não veio') || statusRaw === 'nao_veio') {
                     status = 'nao_veio';
+                } else if (statusRaw.includes('cancelado')) {
+                    status = 'cancelado';
+                } else if (statusRaw.includes('concluido') || statusRaw.includes('concluído') || statusRaw.includes('realizado')) {
+                    status = 'concluido';
                 } else if (statusRaw.includes('pago')) {
                     status = 'agendado';
                 }
