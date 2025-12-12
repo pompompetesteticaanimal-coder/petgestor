@@ -4,10 +4,11 @@ import { createPortal } from 'react-dom';
 import { EvaluationModal } from './components/EvaluationModal';
 import { Layout } from './components/Layout';
 import { InactiveClientsView } from './components/InactiveClientsView';
+import { ActivityLogView } from './components/ActivityLogView';
 import { PetDetailsModal } from './components/PetDetailsModal';
 import { db } from './services/db';
 import { googleService, DEFAULT_CLIENT_ID } from './services/googleCalendar';
-import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem, AppSettings } from './types';
+import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem, AppSettings, ActivityLog } from './types';
 import PackageControlView from './components/PackageControlView';
 import { MenuView } from './components/MenuView';
 import {
@@ -776,7 +777,7 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     );
 };
 
-const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; onRemovePayment: (app: Appointment) => void; onNoShow: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void; accessToken: string | null; sheetId: string; }> = ({ appointments, clients, services, onUpdateAppointment, onRemovePayment, onNoShow, onViewPet, accessToken, sheetId }) => {
+const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; onRemovePayment: (app: Appointment) => void; onNoShow: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void; accessToken: string | null; sheetId: string; onLog: (a: string, d: string) => void; }> = ({ appointments, clients, services, onUpdateAppointment, onRemovePayment, onNoShow, onViewPet, accessToken, sheetId, onLog }) => {
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
     const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid' | 'noShow'>('toReceive'); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: Appointment } | null>(null);
     const [showEvaluationModal, setShowEvaluationModal] = useState(false);
@@ -829,6 +830,9 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         onUpdateAppointment(updatedApp);
         setEditingId(null);
         setIsSaving(false);
+        const client = clients.find(c => c.id === app.clientId);
+        const pet = client?.pets.find(p => p.id === app.petId);
+        onLog('Registrar Pagamento', `Valor: ${finalAmount}, Método: ${method}, Pet: ${pet?.name}`);
 
         // Trigger Evaluation Modal
         setEvaluatingApp(updatedApp);
@@ -994,7 +998,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
 
 };
 
-const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; onDeleteClient: (id: string) => void; onUpdateClient: (client: Client) => void; googleUser: GoogleUser | null; accessToken: string | null; sheetId: string; }> = ({ clients, appointments, onDeleteClient, onUpdateClient, googleUser, accessToken, sheetId }) => {
+const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; onDeleteClient: (id: string) => void; onUpdateClient: (client: Client) => void; googleUser: GoogleUser | null; accessToken: string | null; sheetId: string; onLog: (a: string, d: string) => void; }> = ({ clients, appointments, onDeleteClient, onUpdateClient, googleUser, accessToken, sheetId, onLog }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [visibleCount, setVisibleCount] = useState(20);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -1065,6 +1069,7 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
         setSelectedClient(updatedClient);
         onUpdateClient(updatedClient);
         setEditingPetId(null);
+        onLog('Editar Pet', `Pet: ${petEditForm.name}, Cliente: ${selectedClient.name}`);
     };
 
     const handleSaveClient = async () => {
@@ -1114,6 +1119,7 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
         onUpdateClient(updatedClient);
         setSelectedClient(updatedClient);
         setIsEditing(false);
+        onLog('Editar Cliente', `Cliente: ${updatedClient.name}`);
     };
 
     // Reset visible count when search changes
@@ -1512,7 +1518,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
             {contextMenu && (
                 <div className="fixed bg-white/90 backdrop-blur-xl shadow-2xl border border-white/20 rounded-2xl z-[100] py-2 min-w-[170px] animate-scale-up glass-card" style={{ top: contextMenu.y, left: contextMenu.x }}>
                     <button onClick={() => handleEditStart(contextMenu.service)} className="w-full text-left px-5 py-3 hover:bg-brand-50 text-gray-700 text-sm flex items-center gap-3 font-medium transition-colors"><Edit2 size={16} className="text-gray-400" /> Editar</button>
-                    <button onClick={() => handleDelete(contextMenu.service)} className="w-full text-left px-5 py-3 hover:bg-red-50 text-red-600 text-sm flex items-center gap-3 font-medium transition-colors"><Trash2 size={16} /> Excluir</button>
+                    <button onClick={() => handleDelete(contextMenu.service)} className="w-full text-left px-5 py-3 hover:bg-red-50 text-red-600 text-sm flex items-center gap-3 font-medium"><Trash2 size={16} /> Excluir</button>
                 </div>
             )}
 
@@ -1540,7 +1546,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
     );
 };
 
-const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; googleUser: GoogleUser | null; isOpen: boolean; onClose: () => void; onOpen: () => void; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete, isOpen, onClose, onOpen }) => {
+const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; googleUser: GoogleUser | null; isOpen: boolean; onClose: () => void; onOpen: () => void; onLog: (a: string, d: string) => void; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete, isOpen, onClose, onOpen, onLog }) => {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
     const [currentDate, setCurrentDate] = useState(new Date());
     // const [isModalOpen, setIsModalOpen] = useState(false); // LIFTED UP
@@ -1673,6 +1679,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 appToEdit.paymentMethod = original?.paymentMethod;
                 const pet = client.pets.find(p => p.id === appToEdit.petId)!;
                 onEdit(appToEdit, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration as string));
+                onLog('Editar Agendamento', `Pet: ${pet.name}, Cliente: ${client.name}, Data: ${appToEdit.date}`);
             } else {
                 // Batch Add / Multi-Add
                 // We pass the FIRST pet for the notification logic inside onAdd, but onAdd handles array now so it iterates.
@@ -1703,6 +1710,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     const appsForThisPet = allAppsToCreate.filter(a => a.petId === petId);
                     if (appsForThisPet.length > 0) {
                         onAdd(appsForThisPet, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration as string));
+                        onLog('Criar Agendamento', `Pet: ${pet.name}, Cliente: ${client.name}, Data: ${appsForThisPet[0].date}`);
                     }
                 });
             }
@@ -1710,7 +1718,18 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         }
     };
 
-    const handleDeleteFromContext = () => { if (contextMenu && confirm('Excluir?')) onDelete(contextMenu.appId); setContextMenu(null); }
+    const handleDeleteFromContext = () => {
+        if (contextMenu && confirm('Tem certeza que deseja excluir?')) {
+            const app = appointments.find(a => a.id === contextMenu.appId);
+            if (app) {
+                const client = clients.find(c => c.id === app.clientId);
+                const pet = client?.pets.find(p => p.id === app.petId);
+                onLog('Excluir Agendamento', `Pet: ${pet?.name}, Cliente: ${client?.name}, Data: ${app.date}`);
+            }
+            onDelete(contextMenu.appId);
+        }
+        setContextMenu(null);
+    }
     const filteredClients = useMemo(() => {
         if (!clientSearch) return [];
         const term = clientSearch.toLowerCase();
@@ -2372,7 +2391,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                         </div>
                     </div>
                 </div>,
-                document.body)}
+                document.body
+            )}
             {/* Day Details Modal */}
             {selectedDayForDetails && createPortal(
                 <DayDetailsModal
@@ -2390,7 +2410,6 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 };
 
 
-
 // --- APP COMPONENT ---
 const App: React.FC = () => {
     // home is now used as a redirect or default view, but bimport { RevenueView } from './components/RevenueView'; // Assuming this is extracted or defined elsewhere if not in snippet
@@ -2401,6 +2420,7 @@ const App: React.FC = () => {
     const [services, setServices] = useState<Service[]>([]);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [costs, setCosts] = useState<CostItem[]>([]);
+    const [logs, setLogs] = useState<ActivityLog[]>([]);
     const [contactLogs, setContactLogs] = useState<{ clientId: string, date: string }[]>([]);
     const [isConfigured, setIsConfigured] = useState(true);
     const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -2524,10 +2544,50 @@ const App: React.FC = () => {
     const handleSaveConfig = (id: string) => { localStorage.setItem('petgestor_client_id', id); setIsConfigured(true); window.location.reload(); };
     const handleResetConfig = () => { localStorage.removeItem('petgestor_client_id'); setIsConfigured(false); setGoogleUser(null); };
 
+
+
+    const logAction = async (action: string, details: string) => {
+        if (!accessToken || !SHEET_ID) return;
+        const user = googleUser?.name || 'Desconhecido';
+        const date = new Date().toISOString();
+        const device = navigator.userAgent;
+        const newLog: ActivityLog = { id: `log_${Date.now()}`, date, user, action, details, device };
+
+        // Update Local
+        setLogs(prev => [newLog, ...prev]);
+
+        // Append to Sheet
+        try {
+            await googleService.appendSheetValues(accessToken, SHEET_ID, 'Log!A:E', [
+                [date, user, action, details, device]
+            ]);
+        } catch (e) {
+            console.error("Failed to log action", e);
+        }
+    };
+
+    const handleFetchLogs = async (token: string, id: string) => {
+        try {
+            const data = await googleService.getSheetValues(token, id, 'Log!A:E');
+            if (data && data.values) {
+                const loadedLogs: ActivityLog[] = data.values.slice(1).map((row: string[], i: number) => ({
+                    id: `log_sheet_${i}`,
+                    date: row[0],
+                    user: row[1],
+                    action: row[2],
+                    details: row[3],
+                    device: row[4]
+                })).reverse(); // Newest first
+                setLogs(loadedLogs);
+            }
+        } catch (e) {
+            console.error("Failed to fetch logs", e);
+        }
+    };
+
     const handleSyncCosts = async (token: string, silent = false) => {
         // ... [Sync Costs Logic same as before] ...
-        if (!token || !SHEET_ID) return;
-        try { const rows = await googleService.getSheetValues(token, SHEET_ID, 'Custo Mensal!A:F'); if (!rows || rows.length < 2) return; const loadedCosts: CostItem[] = []; rows.slice(1).forEach((row: string[], idx: number) => { const dateStr = row[2]; const typeStr = row[3]; const costStr = row[4]; const statusStr = row[5] ? row[5].trim() : ''; if (!dateStr || !costStr) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = dateStr.split('/'); if (day && month && year) isoDate = `${year}-${month}-${day}T00:00:00`; } catch (e) { } let amount = 0; const cleanCost = costStr.replace(/[^\d,.-]/g, '').trim(); amount = parseFloat(cleanCost.includes(',') ? cleanCost.replace(/\./g, '').replace(',', '.') : cleanCost); if (isNaN(amount)) amount = 0; loadedCosts.push({ id: `cost_${idx}`, month: row[0], week: row[1], date: isoDate, category: typeStr, amount: amount, status: statusStr.toLowerCase() === 'pago' ? 'Pago' : '' }); }); setCosts(loadedCosts); if (!silent) alert("Custos atualizados."); } catch (e) { console.error(e); }
+        if (!token || !SHEET_ID) return; try { const rows = await googleService.getSheetValues(token, SHEET_ID, 'Custo Mensal!A:F'); if (!rows || rows.length < 2) return; const loadedCosts: CostItem[] = []; rows.slice(1).forEach((row: string[], idx: number) => { const dateStr = row[2]; const typeStr = row[3]; const costStr = row[4]; const statusStr = row[5] ? row[5].trim() : ''; if (!dateStr || !costStr) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = dateStr.split('/'); if (day && month && year) isoDate = `${year}-${month}-${day}T00:00:00`; } catch (e) { } let amount = 0; const cleanCost = costStr.replace(/[^\d,.-]/g, '').trim(); amount = parseFloat(cleanCost.includes(',') ? cleanCost.replace(/\./g, '').replace(',', '.') : cleanCost); if (isNaN(amount)) amount = 0; loadedCosts.push({ id: `cost_${idx}`, month: row[0], week: row[1], date: isoDate, category: typeStr, amount: amount, status: statusStr.toLowerCase() === 'pago' ? 'Pago' : '' }); }); setCosts(loadedCosts); if (!silent) alert("Custos atualizados."); } catch (e) { console.error(e); }
     };
 
     const handleSyncClients = async (token: string, silent = false) => {
@@ -2641,11 +2701,19 @@ const App: React.FC = () => {
                 await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`, rowData);
             } catch (e) { console.error(e); alert("Erro ao atualizar agendamento na planilha."); }
         }
+        logAction('Editar Agendamento', `Pet: ${pet.name}, Cliente: ${client.name}`);
     };
 
     const handleDeleteAppointment = async (id: string) => {
         if (!confirm("Tem certeza que deseja excluir?")) return;
         const app = appointments.find(a => a.id === id);
+
+        if (app) {
+            const client = clients.find(c => c.id === app.clientId);
+            const pet = client?.pets.find(p => p.id === app.petId);
+            logAction('Excluir Agendamento', `Pet: ${pet?.name}, Cliente: ${client?.name}, Data: ${app.date}`);
+        }
+
         if (app && app.googleEventId && accessToken) { await googleService.deleteEvent(accessToken, app.googleEventId); }
         const updated = appointments.filter(a => a.id !== id);
         setAppointments(updated); db.saveAppointments(updated);
@@ -2666,6 +2734,11 @@ const App: React.FC = () => {
             return a;
         });
         setAppointments(updatedApps); db.saveAppointments(updatedApps);
+
+        const client = clients.find(c => c.id === app.clientId);
+        const pet = client?.pets.find(p => p.id === app.petId);
+        logAction('Remover Pagamento', `Pet: ${pet?.name}, Data: ${app.date}`);
+
         if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
             try {
                 const idx = parseInt(app.id.split('_')[1]);
@@ -2676,6 +2749,7 @@ const App: React.FC = () => {
             } catch (e) { console.error("Erro ao limpar pagamento:", e); alert("Erro ao sincronizar cancelamento de pagamento."); }
         }
     };
+
 
     const handleNoShow = async (app: Appointment) => {
         if (!confirm('Tem certeza que deseja marcar este agendamento como "Não Compareceu"?')) return;
@@ -2780,6 +2854,7 @@ const App: React.FC = () => {
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'costs' && <CostsView costs={costs} />}
+                {currentView === 'activity_log' && <ActivityLogView logs={logs} onBack={() => setCurrentView('menu')} />}
                 {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services}
                     onUpdateAppointment={handleUpdateApp}
                     onRemovePayment={handleRemovePayment}
@@ -2787,10 +2862,11 @@ const App: React.FC = () => {
                     onViewPet={(pet, client) => setPetDetailsData({ pet, client })}
                     accessToken={accessToken}
                     sheetId={SHEET_ID}
+                    onLog={logAction}
                 />}
-                {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} googleUser={googleUser} accessToken={accessToken} sheetId={SHEET_ID} />}
+                {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} googleUser={googleUser} accessToken={accessToken} sheetId={SHEET_ID} onLog={logAction} />}
                 {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
-                {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} onOpen={() => setIsScheduleModalOpen(true)} />}
+                {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} onOpen={() => setIsScheduleModalOpen(true)} onLog={logAction} />}
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}

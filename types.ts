@@ -73,4 +73,13 @@ export interface AppSettings {
   sidebarOrder: string[];
 }
 
-export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu' | 'inactive_clients' | 'packages';
+export interface ActivityLog {
+  id: string;
+  date: string; // ISO String
+  user: string; // User Name
+  action: string;
+  details: string;
+  device?: string; // User Agent or Device ID
+}
+
+export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu' | 'inactive_clients' | 'packages' | 'activity_log';
