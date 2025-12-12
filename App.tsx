@@ -1685,12 +1685,12 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     let iterations = 0;
                     let intervalDays = 0;
 
-                    if (serviceNameLower.includes('pacote 1 mensal')) {
+                    if (serviceNameLower.includes('pacote mensal') && (serviceNameLower.includes('1°') || serviceNameLower.includes('1 '))) {
                         iterations = 3;
                         intervalDays = 7;
                     } else if (serviceNameLower.includes('pacote quinzenal 1')) {
                         iterations = 1;
-                        intervalDays = 15;
+                        intervalDays = 14;
                     }
 
                     allAppsToCreate.push(newApp);
@@ -1702,10 +1702,25 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                             nextDate.setDate(baseDate.getDate() + (i * intervalDays));
                             const isoDate = nextDate.toISOString().split('T')[0] + 'T' + time + ':00';
 
+                            // Sequential Service Logic
+                            let nextServiceId = newApp.serviceId;
+                            if (iterations === 3) {
+                                // Mensal logic: 1° -> 2°, etc.
+                                const targetName = mainSvc.name.replace('1°', `${i + 1}°`).replace('1 ', `${i + 1} `);
+                                const nextSvc = services.find(s => s.name.toLowerCase() === targetName.toLowerCase());
+                                if (nextSvc) nextServiceId = nextSvc.id;
+                            } else if (iterations === 1) {
+                                // Quinzenal logic: 1 -> 2
+                                const targetName = mainSvc.name.replace('1', '2');
+                                const nextSvc = services.find(s => s.name.toLowerCase() === targetName.toLowerCase());
+                                if (nextSvc) nextServiceId = nextSvc.id;
+                            }
+
                             allAppsToCreate.push({
                                 ...newApp,
                                 id: `local_${Date.now()}_ recur_${Math.random()}_${i}`,
                                 date: isoDate,
+                                serviceId: nextServiceId,
                                 googleEventId: undefined
                             });
                         }
