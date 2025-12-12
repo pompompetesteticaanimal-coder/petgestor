@@ -2754,6 +2754,7 @@ const App: React.FC = () => {
     const handleNoShow = async (app: Appointment) => {
         if (!confirm('Tem certeza que deseja marcar este agendamento como "Não Compareceu"?')) return;
 
+        // 1. Update Local
         const updatedApps = appointments.map((a): Appointment => {
             if (a.id === app.id) {
                 return { ...a, status: 'nao_veio' };
@@ -2763,20 +2764,28 @@ const App: React.FC = () => {
         setAppointments(updatedApps);
         db.saveAppointments(updatedApps);
 
+        // 2. Log Action
+        const client = clients.find(c => c.id === app.clientId);
+        const pet = client?.pets.find(p => p.id === app.petId);
+        logAction('Não Compareceu', `Pet: ${pet?.name}, Cliente: ${client?.name}, Data: ${app.date}`);
+
+        // 3. Sync to Sheet
         if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
             try {
                 const idx = parseInt(app.id.split('_')[1]);
                 if (!isNaN(idx)) {
-                    const row = idx + 1; // Sheet rows are 1-indexed, and we skip header rows
-                    // Assuming status is in column P (index 15)
+                    const row = idx + 1; // 1-based Row Index
+
+                    // Col P = Status (index 15) -> "Não Veio"
                     await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!P${row}:P${row}`, [['Não Veio']]);
-                    // Add Note if needed, logic copied from old handler if notes update is desired
+
+                    // Col N = Notes -> Append [NÃO VEIO] if not present
                     const note = `${app.notes || ''} [NÃO VEIO]`.trim();
-                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!N${row}`, [note]);
+                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!N${row}:N${row}`, [[note]]);
                 }
             } catch (e) {
                 console.error("Erro ao marcar como 'Não Compareceu' na planilha:", e);
-                alert("Erro ao sincronizar status 'Não Compareceu' na planilha.");
+                alert("Salvo localmente, mas erro ao sincronizar status na planilha.");
             }
         }
     };
