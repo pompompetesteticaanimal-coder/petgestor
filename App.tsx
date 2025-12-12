@@ -822,6 +822,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                 await googleService.updateSheetValues(accessToken, sheetId, range, values);
             } catch (e) {
                 console.error("Failed", e);
+                alert("Erro ao salvar pagamento na planilha. O pagamento foi salvo localmente mas pode não aparecer para outros usuários.");
             }
         }
 
@@ -851,6 +852,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                 await googleService.updateSheetValues(accessToken, sheetId, `Agendamento!N${rowNumber}`, [fullNote]);
             } catch (e) {
                 console.error("Failed to sync evaluation", e);
+                alert("Erro ao salvar avaliação na planilha.");
             }
         }
         setEvaluatingApp(null);
@@ -2608,7 +2610,7 @@ const App: React.FC = () => {
                         dateStr, timeStr, app.notes || '', (app.durationTotal || 60).toString(), 'Pendente', '', '', '', app.googleEventId
                     ];
                     await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData);
-                } catch (e) { console.error(e); }
+                } catch (e) { console.error(e); alert("Erro ao salvar agendamento na planilha (mas salvo localmente)."); }
             }
             // Silent Sync to update IDs just once after batch? Or maybe just rely on local for now.
             // Let's do a sync to be safe, but it might race if sheets API is slow. 
@@ -2637,7 +2639,7 @@ const App: React.FC = () => {
                     dateStr, timeStr, app.notes || '', totalDuration.toString(), (app.status === 'nao_veio' ? 'Não Veio' : (app.paidAmount ? 'Pago' : 'Pendente')), '', app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '', app.paymentMethod || '', googleEventId
                 ];
                 await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`, rowData);
-            } catch (e) { console.error(e); alert("Erro ao atualizar planilha."); }
+            } catch (e) { console.error(e); alert("Erro ao atualizar agendamento na planilha."); }
         }
     };
 
