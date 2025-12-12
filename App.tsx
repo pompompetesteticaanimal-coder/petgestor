@@ -2745,7 +2745,7 @@ const App: React.FC = () => {
                 const idx = parseInt(app.id.split('_')[1]);
                 if (!isNaN(idx)) {
                     const row = idx + 1;
-                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!P${row}:R${row}`, [['Pendente', '', '']]);
+                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!P${row}:R${row}`, ['Pendente', '', '']);
                 }
             } catch (e) { console.error("Erro ao limpar pagamento:", e); alert("Erro ao sincronizar cancelamento de pagamento."); }
         }
@@ -2778,11 +2778,11 @@ const App: React.FC = () => {
                     const row = idx + 1; // 1-based Row Index
 
                     // Col P = Status (index 15) -> "Não Veio"
-                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!P${row}:P${row}`, [['Não Veio']]);
+                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!P${row}:P${row}`, ['Não Veio']);
 
                     // Col N = Notes -> Append [NÃO VEIO] if not present
                     const note = `${app.notes || ''} [NÃO VEIO]`.trim();
-                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!N${row}:N${row}`, [[note]]);
+                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!N${row}:N${row}`, [note]);
                 }
             } catch (e) {
                 console.error("Erro ao marcar como 'Não Compareceu' na planilha:", e);
