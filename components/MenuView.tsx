@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Scissors, Package, TrendingUp, TrendingDown, Settings, AlertCircle, Phone, Menu } from 'lucide-react';
+import { Users, Scissors, TrendingUp, TrendingDown, Settings, AlertCircle, Phone, Menu } from 'lucide-react';
 import { ViewState } from '../types';
 
 interface MenuViewProps {
@@ -22,7 +22,7 @@ export const MenuView: React.FC<MenuViewProps> = ({ setView, onOpenSettings }) =
     const [items, setItems] = useState<MenuItem[]>([
         { id: 'clients', label: 'Clientes', icon: Users, view: 'clients', colorClass: 'bg-blue-100 text-blue-600' },
         { id: 'services', label: 'Serviços', icon: Scissors, view: 'services', colorClass: 'bg-purple-100 text-purple-600' },
-        { id: 'packages', label: 'Pacotes', icon: Package, view: 'packages', colorClass: 'bg-pink-100 text-pink-600' },
+
         { id: 'revenue', label: 'Faturamento', icon: TrendingUp, view: 'revenue', colorClass: 'bg-green-100 text-green-600' },
         { id: 'costs', label: 'Custos', icon: TrendingDown, view: 'costs', colorClass: 'bg-red-100 text-red-600' },
         { id: 'inactive', label: 'Inativos', icon: Phone, view: 'inactive_clients', colorClass: 'bg-orange-100 text-orange-600' },
