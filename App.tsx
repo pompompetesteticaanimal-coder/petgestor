@@ -777,11 +777,13 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     );
 };
 
-const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; onRemovePayment: (app: Appointment) => void; onNoShow: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void; accessToken: string | null; sheetId: string; onLog: (a: string, d: string) => void; }> = ({ appointments, clients, services, onUpdateAppointment, onRemovePayment, onNoShow, onViewPet, accessToken, sheetId, onLog }) => {
+const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; onRemovePayment: (app: Appointment) => void; onNoShow: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void; accessToken: string | null; sheetId: string; onLog: (a: string, d: string) => void; onReschedule: (app: Appointment, date: string) => void; }> = ({ appointments, clients, services, onUpdateAppointment, onRemovePayment, onNoShow, onViewPet, accessToken, sheetId, onLog, onReschedule }) => {
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
     const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid' | 'noShow'>('toReceive'); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: Appointment } | null>(null);
     const [showEvaluationModal, setShowEvaluationModal] = useState(false);
     const [evaluatingApp, setEvaluatingApp] = useState<Appointment | null>(null);
+    const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+    const [rescheduleDate, setRescheduleDate] = useState('');
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const touchStart = useRef<number | null>(null);
     const getAppLocalDateStr = (dateStr: string) => { const d = new Date(dateStr); return getLocalISODate(d); };
@@ -875,6 +877,20 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
 
     const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
 
+    const handleStartReschedule = (app: Appointment) => {
+        setReschedulingId(app.id);
+        setRescheduleDate(new Date().toISOString().substring(0, 16)); // Default to now
+    };
+
+    const confirmReschedule = () => {
+        if (!reschedulingId || !rescheduleDate) return;
+        const app = appointments.find(a => a.id === reschedulingId);
+        if (app) {
+            onReschedule(app, rescheduleDate);
+            setReschedulingId(null);
+        }
+    };
+
     const renderPaymentRow = (app: Appointment, statusColor: string, index: number) => {
         const client = clients.find(c => c.id === app.clientId);
         const pet = client?.pets.find(p => p.id === app.petId);
@@ -882,6 +898,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter((x): x is Service => !!x) || [];
         const expected = calculateExpected(app);
         const isPaid = !!app.paidAmount && !!app.paymentMethod;
+        const isNoShow = app.status === 'nao_veio';
         const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
         let serviceBorderColor = 'border-l-sky-400';
         if (allServiceNames.includes('tesoura')) serviceBorderColor = 'border-l-pink-500';
@@ -923,7 +940,9 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                     </div>
                     <div className="text-right flex-shrink-0">
                         <div className="text-xl font-black text-gray-800 tracking-tight">R$ {expected.toFixed(2)}</div>
-                        {isPaid ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-green-700 border border-green-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> {app.paymentMethod} </div>) : (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-red-500 border border-red-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Pendente </div>)}
+                        {isPaid ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-green-700 border border-green-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> {app.paymentMethod} </div>) :
+                            isNoShow ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-gray-500 border border-gray-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Não Veio </div>) :
+                                (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-red-500 border border-red-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Pendente </div>)}
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 mb-4 pl-3 opacity-80 group-hover:opacity-100 transition-opacity">
@@ -931,14 +950,20 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                     {addSvcs.map((s, idx) => (<span key={idx} className="text-[10px] bg-white border border-gray-200/60 px-2 py-1 rounded-lg text-gray-600 font-medium shadow-sm">{s.name}</span>))}
                 </div>
                 <div className="flex gap-2 ml-1">
-                    <button onClick={() => handleStartEdit(app)} className="flex-1 bg-white hover:bg-gray-50 text-gray-600 hover:text-brand-600 py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all border border-gray-100 shadow-sm group-hover:shadow-md active:scale-95"> <DollarSign size={14} /> {isPaid ? 'Editar Detalhes' : 'Registrar Pagamento'} </button>
-                    {isPaid && (
-                        <button onClick={() => onRemovePayment(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap gap-2" title="Desfazer Pagamento">
-                            <Trash2 size={16} /> Desfazer
-                        </button>
-                    )}
-                    {!isPaid && statusColor !== 'bg-gray-100 opacity-75' && (
-                        <button onClick={() => onNoShow(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap">Não Veio</button>
+                    {isNoShow ? (
+                        <button onClick={() => handleStartReschedule(app)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all shadow-md active:scale-95"> <Calendar size={14} /> Reagendar </button>
+                    ) : (
+                        <>
+                            <button onClick={() => handleStartEdit(app)} className="flex-1 bg-white hover:bg-gray-50 text-gray-600 hover:text-brand-600 py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all border border-gray-100 shadow-sm group-hover:shadow-md active:scale-95"> <DollarSign size={14} /> {isPaid ? 'Editar Detalhes' : 'Registrar Pagamento'} </button>
+                            {isPaid && (
+                                <button onClick={() => onRemovePayment(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap gap-2" title="Desfazer Pagamento">
+                                    <Trash2 size={16} /> Desfazer
+                                </button>
+                            )}
+                            {!isPaid && statusColor !== 'bg-gray-100 opacity-75' && (
+                                <button onClick={() => onNoShow(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap">Não Veio</button>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
@@ -993,6 +1018,25 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                 clientName={clients.find(c => c.id === evaluatingApp.clientId)?.name}
                 petName={clients.find(c => c.id === evaluatingApp.clientId)?.pets.find(p => p.id === evaluatingApp.petId)?.name}
             />
+        )}
+
+        {reschedulingId && createPortal(
+            <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setReschedulingId(null)}>
+                <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-scale-up" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-xl font-bold mb-4 text-gray-900">Reagendar Pet</h3>
+                    <p className="text-sm text-gray-500 mb-4">O agendamento anterior permanecerá como "Não Veio". Selecione a nova data:</p>
+                    <input
+                        type="datetime-local"
+                        value={rescheduleDate}
+                        onChange={e => setRescheduleDate(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl mb-6 focus:ring-2 ring-brand-500 outline-none"
+                    />
+                    <button onClick={confirmReschedule} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95">
+                        Confirmar Reagendamento
+                    </button>
+                </div>
+            </div>,
+            document.body
         )}
     </div>)
 
@@ -2791,6 +2835,19 @@ const App: React.FC = () => {
         }
     };
 
+    const handleReschedule = async (originApp: Appointment, newDate: string) => {
+        const client = clients.find(c => c.id === originApp.clientId);
+        const pet = client?.pets.find(p => p.id === originApp.petId);
+        const appServices = services.filter(s => s.id === originApp.serviceId || (originApp.additionalServiceIds || []).includes(s.id));
+
+        if (client && pet) {
+            const newApp: Appointment = { ...originApp, date: newDate, status: 'agendado', paidAmount: undefined, paymentMethod: undefined, id: `temp_${Date.now()}` };
+            await handleAddAppointment(newApp, client, pet, appServices, originApp.durationTotal || 60);
+            alert(`Reagendado com sucesso para ${new Date(newDate).toLocaleString('pt-BR')}!`);
+            logAction('Reagendar (Não Veio)', `Pet: ${pet.name}, Nova Data: ${newDate}`);
+        }
+    };
+
     const handleUpdateStatus = (id: string, status: Appointment['status']) => {
         const updated = appointments.map(a => a.id === id ? { ...a, status } : a);
         setAppointments(updated);
@@ -2873,6 +2930,7 @@ const App: React.FC = () => {
                     accessToken={accessToken}
                     sheetId={SHEET_ID}
                     onLog={logAction}
+                    onReschedule={handleReschedule}
                 />}
                 {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} googleUser={googleUser} accessToken={accessToken} sheetId={SHEET_ID} onLog={logAction} />}
                 {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
