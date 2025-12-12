@@ -1685,12 +1685,12 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     let iterations = 0;
                     let intervalDays = 0;
 
-                    if (serviceNameLower.includes('mensal')) {
+                    if (serviceNameLower.includes('pacote 1 mensal')) {
                         iterations = 3;
                         intervalDays = 7;
-                    } else if (serviceNameLower.includes('quinzenal')) {
+                    } else if (serviceNameLower.includes('pacote quinzenal 1')) {
                         iterations = 1;
-                        intervalDays = 14;
+                        intervalDays = 15;
                     }
 
                     allAppsToCreate.push(newApp);
