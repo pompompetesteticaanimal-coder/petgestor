@@ -2625,11 +2625,12 @@ const App: React.FC = () => {
                 if (tagsMatch && tagsMatch[1]) { ratingTags = tagsMatch[1].split(',').map(t => t.trim()); }
 
                 let status: Appointment['status'] = 'agendado';
-                const statusRaw = row[15]?.toLowerCase().trim() || '';
-                if (statusRaw === 'não veio' || statusRaw === 'nao_veio') {
+                const statusRaw = (row[15] || '').toLowerCase().trim();
+                // Check for variations of "Não Veio" (includes handles cases with extra spaces/characters)
+                if (statusRaw.includes('nao veio') || statusRaw.includes('não veio') || statusRaw === 'nao_veio') {
                     status = 'nao_veio';
-                } else if (statusRaw === 'pago') {
-                    status = 'agendado'; // App considers paid via paidAmount, but let's keep status simple
+                } else if (statusRaw.includes('pago')) {
+                    status = 'agendado';
                 }
 
                 if (client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: status, notes: row[13], durationTotal: parseInt(row[14] || '60'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: googleEventId, rating: rating > 0 ? rating : undefined, ratingTags: ratingTags.length > 0 ? ratingTags : undefined }); }
