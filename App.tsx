@@ -2700,7 +2700,7 @@ const App: React.FC = () => {
                     return parseFloat(clean);
                 };
 
-                let paidAmount = 0;
+
                 if (paidAmountStr) {
                     paidAmount = parseMonetary(paidAmountStr.replace(/[^\d,.-]/g, ''));
                     if (isNaN(paidAmount)) paidAmount = 0;
