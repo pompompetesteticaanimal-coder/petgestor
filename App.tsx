@@ -13,6 +13,7 @@ import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem, App
 import PackageControlView from './components/PackageControlView';
 import { MenuView } from './components/MenuView';
 import { supabaseService } from './services/supabaseService';
+import { supabase } from './services/supabaseClient';
 import {
     Plus, Trash2, Check, X,
     Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
@@ -2485,6 +2486,33 @@ const App: React.FC = () => {
     useEffect(() => {
         if (isAuthenticated) {
             loadDataFromSupabase();
+
+            // --- REALTIME SUBSCRIPTIONS ---
+            if (!supabase) return;
+
+            const channel = supabase
+                .channel('db-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+                    console.log('Realtime: Client change detected');
+                    loadDataFromSupabase();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, () => {
+                    console.log('Realtime: Service change detected');
+                    loadDataFromSupabase();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+                    console.log('Realtime: Appointment change detected');
+                    loadDataFromSupabase();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, () => {
+                    console.log('Realtime: Pet change detected');
+                    loadDataFromSupabase();
+                })
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
         }
     }, [isAuthenticated]);
 
