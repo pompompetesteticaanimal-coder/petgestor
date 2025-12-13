@@ -1447,7 +1447,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
                         <span className="font-bold text-gray-700 group-hover:text-brand-600 transition-colors">Novo Serviço</span>
                     </button>
 
-                    {services.map((service, index) => (
+                    {(services || []).map((service, index) => (
                         <div key={service.id} onClick={() => setViewService(service)} style={{ animationDelay: `${index * 0.05}s` }} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, service }); }} className="animate-slide-up bg-white/80 backdrop-blur p-5 rounded-[2rem] shadow-sm border border-white/60 flex flex-col justify-between cursor-pointer btn-spring hover:shadow-xl hover:-translate-y-1 group relative overflow-hidden">
                             <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12 group-hover:rotate-0 group-hover:scale-110 transition-all duration-500 text-brand-500">
                                 <PawPrint size={80} />
