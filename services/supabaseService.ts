@@ -173,4 +173,20 @@ export const supabaseService = {
         });
         if (error) throw error;
     },
+
+    // --- COSTS ---
+    upsertCost: async (cost: any) => {
+        if (!supabase) return;
+        const { id, month, week, date, category, amount, status } = cost;
+        const { error } = await supabase.from('costs').upsert({
+            id,
+            month,
+            week,
+            date,
+            category,
+            amount,
+            status
+        });
+        if (error) throw error;
+    }
 };
