@@ -112,12 +112,12 @@ export const ServiceManager: React.FC<ServiceManagerProps> = ({ services, onAddS
     };
 
     return (
-        <div className="space-y-6 animate-fade-in h-full flex flex-col relative pt-2" onClick={() => setContextMenu(null)}>
-            <div className="flex justify-between items-center bg-white/60 backdrop-blur-md p-5 rounded-3xl border border-white/40 shadow-sm flex-shrink-0">
+        <div className="space-y-6 animate-fade-in relative pt-2" onClick={() => setContextMenu(null)}>
+            <div className="sticky top-0 z-20 flex justify-between items-center bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/40 shadow-sm flex-shrink-0 mb-4 transition-all">
                 <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Serviços</h2>
                 <div className="flex gap-3">
                     <button onClick={handleCleanupDuplicates} className="bg-white text-red-500 border border-red-100 px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs hover:bg-red-50 shadow-sm transition">
-                        <Trash2 size={14} /> Remover Duplicados
+                        <Trash2 size={14} /> <span className="hidden md:inline">Remover Duplicados</span>
                     </button>
                     <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs hover:bg-brand-700 shadow-lg shadow-brand-200 hover:scale-105 active:scale-95 transition">
                         <Plus size={16} /> Adicionar
@@ -125,9 +125,9 @@ export const ServiceManager: React.FC<ServiceManagerProps> = ({ services, onAddS
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0 px-1">
+            <div className="px-1">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="animate-slide-up bg-white/80 backdrop-blur p-5 rounded-[2rem] shadow-sm border border-white/60 flex flex-col justify-center items-center cursor-pointer btn-spring hover:shadow-xl hover:-translate-y-1 group relative overflow-hidden">
+                    <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="animate-slide-up bg-white/80 backdrop-blur p-5 rounded-[2rem] shadow-sm border border-white/60 flex flex-col justify-center items-center cursor-pointer btn-spring hover:shadow-xl hover:-translate-y-1 group relative overflow-hidden min-h-[160px]">
                         <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center text-brand-600 mb-2 group-hover:scale-110 transition-transform duration-300 shadow-sm">
                             <Plus size={24} />
                         </div>
@@ -140,7 +140,7 @@ export const ServiceManager: React.FC<ServiceManagerProps> = ({ services, onAddS
                             onClick={() => setViewService(service)}
                             style={{ animationDelay: `${index * 0.05}s` }}
                             onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, service }); }}
-                            className="animate-slide-up bg-white/80 backdrop-blur p-5 rounded-[2rem] shadow-sm border border-white/60 flex flex-col justify-between cursor-pointer btn-spring hover:shadow-xl hover:-translate-y-1 group relative overflow-hidden"
+                            className="animate-slide-up bg-white/80 backdrop-blur p-5 rounded-[2rem] shadow-sm border border-white/60 flex flex-col justify-between cursor-pointer btn-spring hover:shadow-xl hover:-translate-y-1 group relative overflow-hidden min-h-[160px]"
                         >
                             <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12 group-hover:rotate-0 group-hover:scale-110 transition-all duration-500 text-brand-500">
                                 <PawPrint size={80} />
