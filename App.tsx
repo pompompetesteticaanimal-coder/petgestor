@@ -8,6 +8,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { ActivityLogView } from './components/ActivityLogView';
 import { PetDetailsModal } from './components/PetDetailsModal';
 import { ServiceManager } from './components/ServiceManager';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { db } from './services/db';
 import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog } from './types';
 import PackageControlView from './components/PackageControlView';
@@ -2539,9 +2540,7 @@ const App: React.FC = () => {
             <Layout
                 currentView={currentView}
                 setView={setCurrentView}
-                onLogin={() => {
-                    handleLogout();
-                }}
+                setView={setCurrentView}
                 onLogout={() => {
                     setIsAuthenticated(false);
                     localStorage.removeItem('petgestor_auth');
@@ -2566,7 +2565,11 @@ const App: React.FC = () => {
                     onReschedule={handleReschedule}
                 />}
                 {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} onLog={logAction} />}
-                {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={() => { }} />}
+                {currentView === 'services' && (
+                    <ErrorBoundary name="ServiceManager">
+                        <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={() => { }} />
+                    </ErrorBoundary>
+                )}
                 {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} onOpen={() => setIsScheduleModalOpen(true)} onLog={logAction} />}
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
