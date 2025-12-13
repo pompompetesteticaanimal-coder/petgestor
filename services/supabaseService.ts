@@ -55,6 +55,7 @@ const mapAppointmentFromDB = (data: any): Appointment => ({
 export const supabaseService = {
     // --- CLIENTS ---
     getClients: async (): Promise<Client[]> => {
+        if (!supabase) return [];
         const { data, error } = await supabase
             .from('clients')
             .select('*, pets(*)'); // Join with pets
@@ -67,6 +68,7 @@ export const supabaseService = {
     },
 
     upsertClient: async (client: Client) => {
+        if (!supabase) return;
         const { id, name, phone, address, complement, createdAt } = client;
         const { error } = await supabase.from('clients').upsert({
             id,
@@ -98,6 +100,7 @@ export const supabaseService = {
 
     // --- SERVICES ---
     getServices: async (): Promise<Service[]> => {
+        if (!supabase) return [];
         const { data, error } = await supabase.from('services').select('*');
         if (error) {
             console.error('Error fetching services:', error);
@@ -107,6 +110,7 @@ export const supabaseService = {
     },
 
     upsertService: async (service: Service) => {
+        if (!supabase) return;
         const { id, name, price, durationMin, description, category, targetSize, targetCoat } = service;
         const { error } = await supabase.from('services').upsert({
             id,
@@ -123,6 +127,7 @@ export const supabaseService = {
 
     // --- APPOINTMENTS ---
     getAppointments: async (): Promise<Appointment[]> => {
+        if (!supabase) return [];
         const { data, error } = await supabase.from('appointments').select('*');
         if (error) {
             console.error('Error fetching appointments:', error);
@@ -132,6 +137,7 @@ export const supabaseService = {
     },
 
     upsertAppointment: async (app: Appointment) => {
+        if (!supabase) return;
         const {
             id,
             clientId,
