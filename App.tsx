@@ -7,6 +7,7 @@ import { InactiveClientsView } from './components/InactiveClientsView';
 import { LoginScreen } from './components/LoginScreen';
 import { ActivityLogView } from './components/ActivityLogView';
 import { PetDetailsModal } from './components/PetDetailsModal';
+import { ClientFormModal } from './components/ClientFormModal';
 import { ServiceManager } from './components/ServiceManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { db } from './services/db';
@@ -973,8 +974,6 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
     </div>)
 
 };
-
-import { ClientFormModal } from './components/ClientFormModal';
 
 const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; onDeleteClient: (id: string) => void; onUpdateClient: (client: Client) => void; onAddClient: (client: Client) => void; onLog: (a: string, d: string) => void; }> = ({ clients, appointments, onDeleteClient, onUpdateClient, onAddClient, onLog }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -2569,7 +2568,6 @@ const App: React.FC = () => {
             <Layout
                 currentView={currentView}
                 setView={setCurrentView}
-                setView={setCurrentView}
                 onLogout={() => {
                     setIsAuthenticated(false);
                     localStorage.removeItem('petgestor_auth');
@@ -2593,7 +2591,11 @@ const App: React.FC = () => {
                     onLog={logAction}
                     onReschedule={handleReschedule}
                 />}
-                {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} onAddClient={handleAddClient} onLog={logAction} />}
+                {currentView === 'clients' && (
+                    <ErrorBoundary name="ClientManager">
+                        <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} onAddClient={handleAddClient} onLog={logAction} />
+                    </ErrorBoundary>
+                )}
                 {currentView === 'services' && (
                     <ErrorBoundary name="ServiceManager">
                         <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={() => { }} />
