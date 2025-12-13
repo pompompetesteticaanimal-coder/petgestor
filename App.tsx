@@ -1781,8 +1781,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             const matchesCategory = s.category === category;
 
             // Size & Coat Logic
-            const matchesSize = s.targetSize === 'Todos' || !s.targetSize || (selectedPetData.size && s.targetSize.toLowerCase().includes(selectedPetData.size.toLowerCase()));
-            const matchesCoat = s.targetCoat === 'Todos' || !s.targetCoat || (selectedPetData.coat && s.targetCoat.toLowerCase().includes(selectedPetData.coat.toLowerCase()));
+            // Relaxed: If pet has no size/coat recorded, show ALL services (don't block).
+            const matchesSize = s.targetSize === 'Todos' || !s.targetSize || !selectedPetData.size || (selectedPetData.size && s.targetSize.toLowerCase().includes(selectedPetData.size.toLowerCase()));
+            const matchesCoat = s.targetCoat === 'Todos' || !s.targetCoat || !selectedPetData.coat || (selectedPetData.coat && s.targetCoat.toLowerCase().includes(selectedPetData.coat.toLowerCase()));
 
             // Breed Logic (Gato)
             const isServiceForCat = s.name.toLowerCase().includes('gato') || s.name.toLowerCase().includes('felino');
