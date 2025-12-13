@@ -2811,46 +2811,60 @@ const App: React.FC = () => {
     };
     const handleAddAppointment = async (appOrApps: Appointment | Appointment[], client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
         const appsToAdd = Array.isArray(appOrApps) ? appOrApps : [appOrApps];
-        const newAppsWithEvents: Appointment[] = [];
+        const newAppsWithFinalData: Appointment[] = [];
 
-        // 1. Process Google Calendar Creation for each
+        // Process new apps
         for (const app of appsToAdd) {
             let googleEventId = '';
+            let finalId = app.id; // Start with temp ID
             const totalDuration = manualDuration > 0 ? manualDuration : (appServices[0] ? appServices[0].durationMin : 60) + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
 
+            // 1. Google Calendar
             if (accessToken) {
                 const description = appServices.map(s => s.name).join(' + ');
                 const googleResponse = await googleService.createEvent(accessToken, { summary: `Banho/Tosa: ${pet.name}`, description: `${description}\nCliente: ${client.name}\nTel: ${client.phone}\nObs: ${app.notes}`, startTime: app.date, durationMin: totalDuration });
                 if (googleResponse) googleEventId = googleResponse.id;
             }
-            newAppsWithEvents.push({ ...app, googleEventId, durationTotal: totalDuration });
-        }
 
-        // 2. Batch Update Local State
-        const updatedApps = [...appointments, ...newAppsWithEvents];
-        setAppointments(updatedApps);
-        db.saveAppointments(updatedApps);
-        newAppsWithEvents.forEach(a => supabaseService.upsertAppointment(a).catch(console.error));
-
-        // 3. Batch Update Google Sheets
-        if (accessToken && SHEET_ID) {
-            for (const app of newAppsWithEvents) {
+            // 2. Google Sheets & ID Resolution
+            if (accessToken && SHEET_ID) {
                 try {
-                    const d = new Date(app.date); const dateStr = d.toLocaleDateString('pt-BR'); const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    const d = new Date(app.date);
+                    const dateStr = d.toLocaleDateString('pt-BR');
+                    const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                     const mainSvc = appServices[0];
                     const rowData = [
                         pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
                         appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
-                        dateStr, timeStr, app.notes || '', (app.durationTotal || 60).toString(), 'Pendente', '', '', '', app.googleEventId
+                        dateStr, timeStr, app.notes || '', (totalDuration || 60).toString(), 'Pendente', '', '', '', googleEventId
                     ];
-                    await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData);
-                } catch (e) { console.error(e); alert("Erro ao salvar agendamento na planilha (mas salvo localmente)."); }
+
+                    const res = await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData);
+
+                    // Parse accurate ID from Sheet Response
+                    if (res && res.updates && res.updates.updatedRange) {
+                        const match = res.updates.updatedRange.match(/!A(\d+)/);
+                        if (match && match[1]) {
+                            const rowNum = parseInt(match[1]);
+                            finalId = `sheet_${rowNum - 1}`; // 0-based index for ID
+                        }
+                    }
+                } catch (e) { console.error("Erro saving to sheet:", e); alert("Erro ao salvar na planilha (salvo localmente)."); }
             }
-            // Silent Sync to update IDs just once after batch? Or maybe just rely on local for now.
-            // Let's do a sync to be safe, but it might race if sheets API is slow. 
-            // Better to sync.
-            handleSyncAppointments(accessToken, true);
+
+            const appReady = { ...app, id: finalId, googleEventId, durationTotal: totalDuration };
+            newAppsWithFinalData.push(appReady);
+
+            // 3. Supabase Upsert (With FINAL ID)
+            supabaseService.upsertAppointment(appReady).catch(console.error);
         }
+
+        // 4. Update Local State
+        const updatedApps = [...appointments, ...newAppsWithFinalData];
+        setAppointments(updatedApps);
+        db.saveAppointments(updatedApps);
+
+        // Note: We skip handleSyncAppointments(true) because we already integrated the ID correctly.
     };
 
     const handleEditAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
@@ -2892,6 +2906,7 @@ const App: React.FC = () => {
         if (app && app.googleEventId && accessToken) { await googleService.deleteEvent(accessToken, app.googleEventId); }
         const updated = appointments.filter(a => a.id !== id);
         setAppointments(updated); db.saveAppointments(updated);
+        supabaseService.deleteAppointment(id).catch(console.error);
         if (id.startsWith('sheet_') && accessToken && SHEET_ID) {
             try {
                 const parts = id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1;
@@ -2982,8 +2997,10 @@ const App: React.FC = () => {
 
     const handleUpdateStatus = (id: string, status: Appointment['status']) => {
         const updated = appointments.map(a => a.id === id ? { ...a, status } : a);
+        const app = updated.find(a => a.id === id);
         setAppointments(updated);
         db.saveAppointments(updated);
+        if (app) supabaseService.upsertAppointment(app).catch(console.error);
     }
 
     const handleMarkContacted = async (client: Client, daysInactive: number) => {

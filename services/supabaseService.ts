@@ -174,6 +174,12 @@ export const supabaseService = {
         if (error) throw error;
     },
 
+    deleteAppointment: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('appointments').delete().eq('id', id);
+        if (error) throw error;
+    },
+
     // --- COSTS ---
     upsertCost: async (cost: any) => {
         if (!supabase) return;
