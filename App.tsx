@@ -11,6 +11,7 @@ import { googleService, DEFAULT_CLIENT_ID } from './services/googleCalendar';
 import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem, AppSettings, ActivityLog } from './types';
 import PackageControlView from './components/PackageControlView';
 import { MenuView } from './components/MenuView';
+import { supabaseService } from './services/supabaseService';
 import {
     Plus, Trash2, Check, X,
     Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
@@ -2651,7 +2652,7 @@ const App: React.FC = () => {
 
     const handleSyncClients = async (token: string, silent = false) => {
         // ... [Sync Clients Logic same as before] ...
-        if (!token || !SHEET_ID) { if (!silent) alert("Erro: Login ou ID da Planilha faltando."); return; } try { const rows = await googleService.getSheetValues(token, SHEET_ID, 'CADASTRO!A:O'); if (!rows || rows.length < 2) { if (!silent) alert("Planilha vazia ou aba 'CADASTRO' não encontrada."); return; } const clientsMap = new Map<string, Client>(); rows.slice(1).forEach((row: string[], index: number) => { const timestamp = row[1]; const clientName = row[3]; const phone = row[4]; const address = row[5]; const complement = row[11]; const petName = row[6]; const petBreed = row[7]; const petSize = row[8]; const petCoat = row[9]; const petNotes = row[10]; const petAge = row[12]; const petGender = row[13]; if (!clientName || !phone) return; const cleanPhone = phone.replace(/\D/g, ''); if (!clientsMap.has(cleanPhone)) { let createdIso = new Date().toISOString(); try { if (timestamp) { const [datePart, timePart] = timestamp.split(' '); const [day, month, year] = datePart.split('/'); if (year && month && day) createdIso = new Date(`${year}-${month}-${day}T${timePart || '00:00'}`).toISOString(); } } catch (e) { } clientsMap.set(cleanPhone, { id: cleanPhone, name: clientName, phone: phone, address: address || '', complement: complement || '', createdAt: createdIso, pets: [] }); } const client = clientsMap.get(cleanPhone)!; if (petName) { client.pets.push({ id: `${cleanPhone}_p_${index}`, name: petName, breed: petBreed || 'SRD', age: petAge || '', gender: petGender || '', size: petSize || '', coat: petCoat || '', notes: petNotes || '' }); } }); const newClientList = Array.from(clientsMap.values()); setClients(newClientList); db.saveClients(newClientList); if (!silent) alert(`${newClientList.length} clientes sincronizados!`); } catch (error) { console.error(error); if (!silent) alert("Erro ao sincronizar."); }
+        if (!token || !SHEET_ID) { if (!silent) alert("Erro: Login ou ID da Planilha faltando."); return; } try { const rows = await googleService.getSheetValues(token, SHEET_ID, 'CADASTRO!A:O'); if (!rows || rows.length < 2) { if (!silent) alert("Planilha vazia ou aba 'CADASTRO' não encontrada."); return; } const clientsMap = new Map<string, Client>(); rows.slice(1).forEach((row: string[], index: number) => { const timestamp = row[1]; const clientName = row[3]; const phone = row[4]; const address = row[5]; const complement = row[11]; const petName = row[6]; const petBreed = row[7]; const petSize = row[8]; const petCoat = row[9]; const petNotes = row[10]; const petAge = row[12]; const petGender = row[13]; if (!clientName || !phone) return; const cleanPhone = phone.replace(/\D/g, ''); if (!clientsMap.has(cleanPhone)) { let createdIso = new Date().toISOString(); try { if (timestamp) { const [datePart, timePart] = timestamp.split(' '); const [day, month, year] = datePart.split('/'); if (year && month && day) createdIso = new Date(`${year}-${month}-${day}T${timePart || '00:00'}`).toISOString(); } } catch (e) { } clientsMap.set(cleanPhone, { id: cleanPhone, name: clientName, phone: phone, address: address || '', complement: complement || '', createdAt: createdIso, pets: [] }); } const client = clientsMap.get(cleanPhone)!; if (petName) { client.pets.push({ id: `${cleanPhone}_p_${index}`, name: petName, breed: petBreed || 'SRD', age: petAge || '', gender: petGender || '', size: petSize || '', coat: petCoat || '', notes: petNotes || '' }); } }); const newClientList = Array.from(clientsMap.values()); setClients(newClientList); db.saveClients(newClientList); newClientList.forEach(c => supabaseService.upsertClient(c).catch(console.error)); if (!silent) alert(`${newClientList.length} clientes sincronizados!`); } catch (error) { console.error(error); if (!silent) alert("Erro ao sincronizar."); }
     };
     const handleDeleteClient = (id: string) => { const updated = clients.filter(c => c.id !== id); setClients(updated); db.saveClients(updated); };
     const handleUpdateClient = (updatedClient: Client) => {
@@ -2659,8 +2660,14 @@ const App: React.FC = () => {
         setClients(updated);
         // Also update db
         db.saveClients(updated);
+        supabaseService.upsertClient(updatedClient).catch(e => console.error("Supabase Client Update Error", e));
     };
-    const handleAddService = (service: Service) => { const updated = [...services, service]; setServices(updated); db.saveServices(updated); };
+    const handleAddService = (service: Service) => {
+        const updated = [...services, service];
+        setServices(updated);
+        db.saveServices(updated);
+        supabaseService.upsertService(service).catch(console.error);
+    };
     const handleDeleteService = (id: string) => { const updated = services.filter(s => s.id !== id); setServices(updated); db.saveServices(updated); }
     const handleSyncServices = async (token: string, silent = false) => {
         // ... [Sync Services Logic same as before] ...
@@ -2676,10 +2683,15 @@ const App: React.FC = () => {
                 };
                 const sPrice = parseMonetary(row[4] || '0');
                 if (sName) { newServices.push({ id: `sheet_svc_${idx}_${Date.now()}`, name: sName, category: sCat as any, targetSize: sSize, targetCoat: sCoat, price: isNaN(sPrice) ? 0 : sPrice, description: `Importado`, durationMin: 60 }); }
-            }); if (newServices.length > 0) { setServices(newServices); db.saveServices(newServices); if (!silent) alert(`${newServices.length} serviços importados!`); }
+            }); if (newServices.length > 0) { setServices(newServices); db.saveServices(newServices); newServices.forEach(s => supabaseService.upsertService(s).catch(console.error)); if (!silent) alert(`${newServices.length} serviços importados!`); }
         } catch (e) { console.error(e); if (!silent) alert("Erro ao sincronizar serviços."); }
     }
-    const handleUpdateApp = (updatedApp: Appointment) => { const updated = appointments.map(a => a.id === updatedApp.id ? updatedApp : a); setAppointments(updated); db.saveAppointments(updated); };
+    const handleUpdateApp = (updatedApp: Appointment) => {
+        const updated = appointments.map(a => a.id === updatedApp.id ? updatedApp : a);
+        setAppointments(updated);
+        db.saveAppointments(updated);
+        supabaseService.upsertAppointment(updatedApp).catch(console.error);
+    };
     const handleSyncAppointments = async (token: string, silent = false) => {
         // ... [Sync Appointments Logic same as before] ...
         if (!token || !SHEET_ID) return; try {
@@ -2729,7 +2741,7 @@ const App: React.FC = () => {
                 }
 
                 if (client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: status, notes: row[13], durationTotal: parseInt(row[14] || '60'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: googleEventId, rating: rating > 0 ? rating : undefined, ratingTags: ratingTags.length > 0 ? ratingTags : undefined }); }
-            }); if (newTempClients.length > 0) { const updatedClients = [...currentClients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))]; setClients(updatedClients); db.saveClients(updatedClients); } if (loadedApps.length > 0) { setAppointments(loadedApps); db.saveAppointments(loadedApps); if (!silent) alert(`${loadedApps.length} agendamentos carregados!`); } else { if (!silent) alert('Nenhum agendamento encontrado.'); }
+            }); if (newTempClients.length > 0) { const updatedClients = [...currentClients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))]; setClients(updatedClients); db.saveClients(updatedClients); updatedClients.forEach(c => supabaseService.upsertClient(c).catch(console.error)); } if (loadedApps.length > 0) { setAppointments(loadedApps); db.saveAppointments(loadedApps); loadedApps.forEach(a => supabaseService.upsertAppointment(a).catch(console.error)); if (!silent) alert(`${loadedApps.length} agendamentos carregados!`); } else { if (!silent) alert('Nenhum agendamento encontrado.'); }
         } catch (error) { console.error(error); if (!silent) alert('Erro ao sincronizar agendamentos.'); }
     };
     const handleAddAppointment = async (appOrApps: Appointment | Appointment[], client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
@@ -2753,6 +2765,7 @@ const App: React.FC = () => {
         const updatedApps = [...appointments, ...newAppsWithEvents];
         setAppointments(updatedApps);
         db.saveAppointments(updatedApps);
+        newAppsWithEvents.forEach(a => supabaseService.upsertAppointment(a).catch(console.error));
 
         // 3. Batch Update Google Sheets
         if (accessToken && SHEET_ID) {
@@ -2784,6 +2797,7 @@ const App: React.FC = () => {
         }
         const updatedList = appointments.map(a => a.id === app.id ? updatedApp : a);
         setAppointments(updatedList); db.saveAppointments(updatedList);
+        supabaseService.upsertAppointment(updatedApp).catch(console.error);
         if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
             try {
                 const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1;
@@ -2830,6 +2844,7 @@ const App: React.FC = () => {
             return a;
         });
         setAppointments(updatedApps); db.saveAppointments(updatedApps);
+        supabaseService.upsertAppointment({ ...app, paidAmount: 0, paymentMethod: undefined }).catch(console.error);
 
         const client = clients.find(c => c.id === app.clientId);
         const pet = client?.pets.find(p => p.id === app.petId);
@@ -2859,6 +2874,7 @@ const App: React.FC = () => {
         });
         setAppointments(updatedApps);
         db.saveAppointments(updatedApps);
+        supabaseService.upsertAppointment({ ...app, status: 'nao_veio' }).catch(console.error);
 
         // 2. Log Action
         const client = clients.find(c => c.id === app.clientId);
