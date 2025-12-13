@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { Client, Service, Appointment, Pet } from '../types';
+import { Client, Service, Appointment, Pet, CostItem } from '../types';
 
 // Helper to map Client from DB (snake_case) to App (camelCase)
 const mapClientFromDB = (data: any): Client => ({
@@ -181,6 +181,24 @@ export const supabaseService = {
     },
 
     // --- COSTS ---
+    getCosts: async (): Promise<CostItem[]> => {
+        if (!supabase) return [];
+        const { data, error } = await supabase.from('costs').select('*');
+        if (error) {
+            console.error('Error fetching costs:', error);
+            return [];
+        }
+        return data.map((d: any) => ({
+            id: d.id,
+            month: d.month,
+            week: d.week,
+            date: d.date,
+            category: d.category,
+            amount: Number(d.amount),
+            status: d.status
+        }));
+    },
+
     upsertCost: async (cost: any) => {
         if (!supabase) return;
         const { id, month, week, date, category, amount, status } = cost;
@@ -193,6 +211,31 @@ export const supabaseService = {
             amount,
             status
         });
+        if (error) throw error;
+    },
+
+    deleteCost: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('costs').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    // --- DELETIONS ---
+    deleteClient: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    deleteService: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('services').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    deletePet: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('pets').delete().eq('id', id);
         if (error) throw error;
     }
 };
