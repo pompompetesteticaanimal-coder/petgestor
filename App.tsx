@@ -2487,27 +2487,13 @@ const App: React.FC = () => {
         setAppointments(db.getAppointments());
         const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
         if (savedSettings) setSettings(JSON.parse(savedSettings));
-
-        if (!localStorage.getItem('petgestor_client_id')) localStorage.setItem('petgestor_client_id', DEFAULT_CLIENT_ID);
-        const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
-        const storedExpiry = localStorage.getItem(STORAGE_KEY_EXPIRY);
-        const storedUser = localStorage.getItem(STORAGE_KEY_USER);
-
-        if (storedToken && storedExpiry && storedUser) {
-            if (Date.now() < parseInt(storedExpiry)) {
-                setAccessToken(storedToken);
-                setGoogleUser(JSON.parse(storedUser));
-                loadDataFromSupabase();
-            } else {
-                localStorage.removeItem(STORAGE_KEY_TOKEN);
-                localStorage.removeItem(STORAGE_KEY_EXPIRY);
-                localStorage.removeItem(STORAGE_KEY_USER);
-            }
-        }
-
-        const interval = setInterval(() => { if ((window as any).google) { setGoogleLoaded(true); clearInterval(interval); initAuthLogic(); } }, 500);
-        return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            loadDataFromSupabase();
+        }
+    }, [isAuthenticated]);
 
     useEffect(() => { const root = document.documentElement; const themes: Record<string, string> = { rose: '225 29 72', blue: '37 99 235', purple: '147 51 234', green: '22 163 74', orange: '234 88 12' }; const color = themes[settings.theme] || themes.rose; root.style.setProperty('--brand-600', color); }, [settings.theme]);
 
@@ -2591,7 +2577,7 @@ const App: React.FC = () => {
         }
     };
 
-    const initAuthLogic = () => { if ((window as any).google) { googleService.init(async (tokenResponse) => { if (tokenResponse && tokenResponse.access_token) { const token = tokenResponse.access_token; const expiresIn = tokenResponse.expires_in || 3599; localStorage.setItem(STORAGE_KEY_TOKEN, token); localStorage.setItem(STORAGE_KEY_EXPIRY, (Date.now() + (expiresIn * 1000)).toString()); setAccessToken(token); const profile = await googleService.getUserProfile(token); if (profile) { const user = { id: profile.id, name: profile.name, email: profile.email, picture: profile.picture }; setGoogleUser(user); localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user)); } /* performFullSync(token); */ loadDataFromSupabase(); } }); } };
+
     const handleLogout = () => { setAccessToken(null); setGoogleUser(null); setIsPinUnlocked(false); localStorage.removeItem(STORAGE_KEY_TOKEN); localStorage.removeItem(STORAGE_KEY_EXPIRY); localStorage.removeItem(STORAGE_KEY_USER); if ((window as any).google) (window as any).google.accounts.id.disableAutoSelect(); }
     const handleSaveConfig = (id: string) => { localStorage.setItem('petgestor_client_id', id); setIsConfigured(true); window.location.reload(); };
     const handleResetConfig = () => { localStorage.removeItem('petgestor_client_id'); setIsConfigured(false); setGoogleUser(null); };
@@ -3016,9 +3002,7 @@ const App: React.FC = () => {
     const handlePinUnlock = (input: string) => { if (input === pin) { setIsPinUnlocked(true); return true; } return false; };
     const handleSetPin = (newPin: string) => { localStorage.setItem('petgestor_pin', newPin); setPin(newPin); setIsPinUnlocked(true); };
 
-    if (!isConfigured) return <SetupScreen onSave={handleSaveConfig} />;
 
-    if (!googleUser) return <LoginScreen onLogin={googleService.login} onReset={handleResetConfig} settings={settings} googleLoaded={googleLoaded} />;
 
     // if (isGlobalLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-brand-50"><Loader2 size={48} className="text-brand-600 animate-spin mb-4" /><p className="text-brand-700 font-bold animate-pulse">Sincronizando dados...</p></div>;
 
