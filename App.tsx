@@ -1324,7 +1324,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
     const [viewService, setViewService] = useState<Service | null>(null);
 
     const resetForm = () => { setFormData({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' }); setEditingService(null); setIsModalOpen(false); };
-    const handleEditStart = (s: Service) => { setEditingService(s); setFormData({ name: s.name, price: s.price.toString(), category: s.category, size: s.targetSize || 'Todos', coat: s.targetCoat || 'Todos' }); setIsModalOpen(true); setContextMenu(null); };
+    const handleEditStart = (s: Service) => { setEditingService(s); setFormData({ name: s.name || '', price: (s.price || 0).toString(), category: s.category || 'principal', size: s.targetSize || 'Todos', coat: s.targetCoat || 'Todos' }); setIsModalOpen(true); setContextMenu(null); };
     const handleSave = async () => {
         const priceNum = parseFloat(formData.price.replace(',', '.'));
         const newService: Service = {
@@ -1348,7 +1348,8 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
 
         // Identify duplicates
         (services || []).forEach(s => {
-            const normalized = s.name.trim().toLowerCase();
+            if (!s || !s.name) return;
+            const normalized = String(s.name).trim().toLowerCase();
             if (uniqueNames.has(normalized)) {
                 duplicates.push(s);
             } else {
@@ -1406,7 +1407,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
                                 </div>
                             </div>
                             <div className="border-t border-gray-100/50 pt-3 flex justify-between items-end">
-                                <span className="text-xl font-black text-gray-900 tracking-tight">R$ {service.price.toFixed(2)}</span>
+                                <span className="text-xl font-black text-gray-900 tracking-tight">R$ {(Number(service.price) || 0).toFixed(2)}</span>
                             </div>
                         </div>
                     ))}
@@ -1429,7 +1430,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
                             <div className="flex justify-between items-center mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                                 <div>
                                     <span className="block text-xs uppercase font-bold text-gray-400">Preço</span>
-                                    <span className="text-xl font-black text-gray-900">R$ {viewService.price.toFixed(2)}</span>
+                                    <span className="text-xl font-black text-gray-900">R$ {(Number(viewService.price) || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="text-right">
                                     <span className="block text-xs uppercase font-bold text-gray-400">Tempo</span>
