@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { EvaluationModal } from './components/EvaluationModal';
 import { Layout } from './components/Layout';
 import { InactiveClientsView } from './components/InactiveClientsView';
+import { LoginScreen } from './components/LoginScreen';
 import { ActivityLogView } from './components/ActivityLogView';
 import { PetDetailsModal } from './components/PetDetailsModal';
 import { db } from './services/db';
@@ -60,22 +61,7 @@ const calculateTotal = (app: Appointment, services: Service[]) => {
 
 // --- SUB-COMPONENTS ---
 
-const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => {
-    const [clientId, setClientId] = useState(DEFAULT_CLIENT_ID);
-    return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100 text-center">
-                <img src={DEFAULT_LOGO_URL} alt="PomPomPet" className="w-24 h-24 mx-auto mb-6 object-contain" />
-                <h1 className="text-2xl font-bold text-gray-800 mb-2">Configuração Inicial</h1>
-                <p className="text-gray-500 mb-6">ID do Cliente Google (OAuth 2.0)</p>
-                <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="Ex: 1234...apps.googleusercontent.com" className="w-full border p-3 rounded-lg focus:ring-2 ring-brand-500 outline-none font-mono text-sm mb-6" />
-                <button onClick={() => { if (clientId.trim().length > 10) onSave(clientId); else alert("ID inválido"); }} className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition">Salvar e Continuar</button>
-            </div>
-        </div>
-    );
-};
 
-import { LoginScreen } from './components/LoginScreen';
 
 const PinGuard: React.FC<{ isUnlocked: boolean; onUnlock: (pin: string) => boolean; onSetPin: (pin: string) => void; hasPin: boolean; onReset: () => void; setView: (v: ViewState) => void; }> = ({ isUnlocked, onUnlock, onSetPin, hasPin, onReset, setView }) => {
     const [inputPin, setInputPin] = useState(''); const [mode, setMode] = useState<'enter' | 'create' | 'confirm'>(hasPin ? 'enter' : 'create'); const [confirmPin, setConfirmPin] = useState(''); const [error, setError] = useState('');
@@ -2442,6 +2428,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
 // --- APP COMPONENT ---
 const App: React.FC = () => {
+    // --- AUTH STATE ---
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+    useEffect(() => {
+        const auth = localStorage.getItem('petgestor_auth');
+        if (auth === 'true') setIsAuthenticated(true);
+    }, []);
     // home is now used as a redirect or default view, but bimport { RevenueView } from './components/RevenueView'; // Assuming this is extracted or defined elsewhere if not in snippet
     // ... (App state)
     const [currentView, setCurrentView] = useState<ViewState>('home');
@@ -3006,13 +2999,7 @@ const App: React.FC = () => {
 
     // if (isGlobalLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-brand-50"><Loader2 size={48} className="text-brand-600 animate-spin mb-4" /><p className="text-brand-700 font-bold animate-pulse">Sincronizando dados...</p></div>;
 
-    // --- AUTH STATE ---
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-    useEffect(() => {
-        const auth = localStorage.getItem('petgestor_auth');
-        if (auth === 'true') setIsAuthenticated(true);
-    }, []);
 
     // ... (rest of guards)
 
