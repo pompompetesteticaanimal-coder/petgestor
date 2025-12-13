@@ -132,7 +132,7 @@ const PinGuard: React.FC<{ isUnlocked: boolean; onUnlock: (pin: string) => boole
     return (<div className="fixed inset-0 bg-gray-100 z-50 flex flex-col items-center justify-center p-4"> <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center relative"> <button onClick={() => setView('menu')} className="absolute top-4 right-4 text-gray-400"><X /></button> <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-600"> <Lock size={32} /> </div> <h2 className="text-xl font-bold text-gray-800 mb-2">{mode === 'enter' ? 'Área Protegida' : 'Criar Senha'}</h2> <div className="flex justify-center gap-4 mb-6"> {[0, 1, 2, 3].map(i => (<div key={i} className={`w-4 h-4 rounded-full border-2 ${i < inputPin.length ? 'bg-brand-600 border-brand-600' : 'border-gray-300'}`} />))} </div> {error && <p className="text-red-500 text-xs font-bold mb-4">{error}</p>} <div className="grid grid-cols-3 gap-4 mb-6"> {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(n => (<button key={n} onClick={() => handleDigit(n.toString())} className={`h-16 rounded-xl bg-gray-50 hover:bg-brand-50 text-xl font-bold text-gray-700 hover:text-brand-600 transition shadow-sm border border-gray-100 active:scale-95 ${n === 0 ? 'col-start-2' : ''}`}>{n}</button>))} <button onClick={() => setInputPin(p => p.slice(0, -1))} className="h-16 rounded-xl bg-gray-50 hover:bg-red-50 text-xl font-bold text-gray-400 hover:text-red-500 transition shadow-sm border border-gray-100 col-start-3 row-start-4"><ChevronLeft /></button> </div> {mode === 'enter' && <button onClick={onReset} className="text-xs text-gray-400 underline hover:text-brand-600">Esqueci minha senha</button>} </div> </div>);
 };
 
-const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: AppSettings; onSave: (s: AppSettings) => void; onSync: (t: 'clients' | 'services' | 'appointments' | 'costs' | 'all') => void }> = ({ isOpen, onClose, settings, onSave, onSync }) => {
+const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: AppSettings; onSave: (s: AppSettings) => void; onSync: (t: 'clients' | 'services' | 'appointments' | 'costs' | 'all') => void; onTestConnection: () => void }> = ({ isOpen, onClose, settings, onSave, onSync, onTestConnection }) => {
     const [localSettings, setLocalSettings] = useState(settings);
     if (!isOpen) return null;
     const themes = [
@@ -174,7 +174,11 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: 
                         </div>
                     </div>
                     <div className="mt-6 pt-6 border-t border-gray-100">
-                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><ArrowRightLeft size={16} className="text-blue-500" /> Sincronização e Migração</h4>
+
+                        <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-bold text-gray-800 flex items-center gap-2"><ArrowRightLeft size={16} className="text-blue-500" /> Sincronização e Migração</h4>
+                            <button onClick={onTestConnection} className="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 text-gray-600 font-bold">Testar Conexão</button>
+                        </div>
                         <p className="text-xs text-gray-400 mb-3">Sincronize com a planilha e migre dados para o banco de dados.</p>
                         <div className="grid grid-cols-2 gap-3">
                             <button onClick={() => onSync('all')} className="col-span-2 p-3 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm border border-blue-100 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 shadow-sm">
@@ -3079,6 +3083,21 @@ const App: React.FC = () => {
                         else if (type === 'costs') await handleSyncCosts(accessToken);
                     } catch (e) { console.error(e); alert("Erro na sincronização"); }
                     setIsGlobalLoading(false);
+                }}
+                onTestConnection={async () => {
+                    alert("Testando conexão com Supabase...");
+                    try {
+                        const { supabase } = await import('./services/supabaseClient');
+                        if (!supabase) { alert("ERRO: Cliente Supabase é NULL. As variáveis de ambiente (URL/Key) não foram carregadas corretamente. Verifique o arquivo .env.local e reinicie o servidor."); return; }
+
+                        const { data, error } = await supabase.from('clients').select('count', { count: 'exact', head: true });
+
+                        if (error) {
+                            alert(`ERRO DE CONEXÃO: ${error.message} (Código: ${error.code})`);
+                        } else {
+                            alert(`SUCESSO! Conectado ao Supabase com sucesso.`);
+                        }
+                    } catch (e: any) { alert(`ERRO CRÍTICO: ${e.message}`); }
                 }}
             />
             <PetDetailsModal
