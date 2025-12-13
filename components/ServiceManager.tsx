@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Trash2, Edit2, PawPrint } from 'lucide-react';
 import { Service } from '../types';
-import { supabaseService } from '../services/supabaseService';
-import { db } from '../services/db';
+// db and supabaseService are removed as they are not needed directly
 
 interface ServiceManagerProps {
     services: Service[];
@@ -56,16 +55,8 @@ export const ServiceManager: React.FC<ServiceManagerProps> = ({ services, onAddS
             durationMin: editingService?.durationMin || 30
         };
 
-        // Optimistic Update via props (Parent updates local state)
+        // Optimistic Update via props (Parent updates local state AND Supabase)
         onAddService(newService);
-
-        // Explicit Database Save
-        try {
-            await supabaseService.upsertService(newService);
-        } catch (error) {
-            console.error("Failed to save service to Supabase:", error);
-            // Optionally revert local state here if strict consistency is needed
-        }
 
         resetForm();
     };
@@ -74,14 +65,8 @@ export const ServiceManager: React.FC<ServiceManagerProps> = ({ services, onAddS
         if (!confirm(`Excluir ${service.name}?`)) return;
         setContextMenu(null);
 
-        // Optimistic Delete
+        // Delete via props (Parent updates local state AND Supabase)
         onDeleteService(service.id);
-
-        try {
-            await supabaseService.deleteService(service.id);
-        } catch (error) {
-            console.error("Failed to delete service:", error);
-        }
     };
 
     const handleCleanupDuplicates = async () => {
@@ -103,9 +88,8 @@ export const ServiceManager: React.FC<ServiceManagerProps> = ({ services, onAddS
 
         let deletedCount = 0;
         for (const service of duplicates) {
-            // Sequential delete to handle potential race conditions or errors
-            onDeleteService(service.id); // Local
-            await supabaseService.deleteService(service.id); // Remote
+            // Sequential delete via parent prop which now handles Supabase calls
+            onDeleteService(service.id);
             deletedCount++;
         }
         alert(`${deletedCount} serviços duplicados foram removidos.`);

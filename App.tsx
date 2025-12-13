@@ -2369,7 +2369,12 @@ const App: React.FC = () => {
     const handleSyncServices = async () => { };
     const handleSyncAppointments = async () => { };
 
-    const handleDeleteClient = (id: string) => { const updated = clients.filter(c => c.id !== id); setClients(updated); db.saveClients(updated); };
+    const handleDeleteClient = (id: string) => {
+        const updated = clients.filter(c => c.id !== id);
+        setClients(updated);
+        db.saveClients(updated);
+        supabaseService.deleteClient(id).catch(e => console.error("Supabase Client Delete Error", e));
+    };
     const handleUpdateClient = (updatedClient: Client) => {
         const updated = clients.map(c => c.id === updatedClient.id ? updatedClient : c);
         setClients(updated);
@@ -2382,7 +2387,12 @@ const App: React.FC = () => {
         db.saveServices(updated);
         supabaseService.upsertService(service).catch(console.error);
     };
-    const handleDeleteService = (id: string) => { const updated = services.filter(s => s.id !== id); setServices(updated); db.saveServices(updated); };
+    const handleDeleteService = (id: string) => {
+        const updated = services.filter(s => s.id !== id);
+        setServices(updated);
+        db.saveServices(updated);
+        supabaseService.deleteService(id).catch(console.error);
+    };
     const handleUpdateApp = (updatedApp: Appointment) => {
         const updated = appointments.map(a => a.id === updatedApp.id ? updatedApp : a);
         setAppointments(updated);
