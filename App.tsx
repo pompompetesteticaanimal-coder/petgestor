@@ -3016,9 +3016,6 @@ const App: React.FC = () => {
                 setIsAuthenticated(true);
                 localStorage.setItem('petgestor_auth', 'true');
             }}
-            onReset={() => { }}
-            googleLoaded={true}
-            settings={settings}
         />;
     }
 
