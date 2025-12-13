@@ -1940,6 +1940,10 @@ const App: React.FC = () => {
                     console.log('Realtime: Pet change detected');
                     loadDataFromSupabase();
                 })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'costs' }, () => {
+                    console.log('Realtime: Cost change detected');
+                    loadDataFromSupabase();
+                })
                 .subscribe();
 
             return () => {
