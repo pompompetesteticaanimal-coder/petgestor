@@ -1780,29 +1780,11 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return services.filter(s => {
             const matchesCategory = s.category === category;
 
-            // Size & Coat Logic
-            // Relaxed: If pet has no size/coat recorded, show ALL services (don't block).
-            const matchesSize = s.targetSize === 'Todos' || !s.targetSize || !selectedPetData.size || (selectedPetData.size && s.targetSize.toLowerCase().includes(selectedPetData.size.toLowerCase()));
-            const matchesCoat = s.targetCoat === 'Todos' || !s.targetCoat || !selectedPetData.coat || (selectedPetData.coat && s.targetCoat.toLowerCase().includes(selectedPetData.coat.toLowerCase()));
 
-            // Breed Logic (Gato)
-            const isServiceForCat = s.name.toLowerCase().includes('gato') || s.name.toLowerCase().includes('felino');
+            // 2025-12-14: User requested showing ALL options regardless of size/coat to allow manual selection.
+            // We only keep the Category check and the specific Cat/Dog separation (Rule 1).
 
-            // Rule 1: Cat Services are ONLY for Cats
-            if (isServiceForCat && !isPetCat) return false;
-
-            // Rule 2: If Pet is Cat, prioritize Cat Services? 
-            // We don't strictly hide "generic" services, but if a service implies Dog (e.g. standard sizes often imply dog if 'Gato' exists separately), 
-            // we let the user decide. Ideally, Cat services have Size='Todos', matching Cats.
-            // If the user meant "If it's a Cat, ONLY show Cat services", that would hide "Hidratação".
-            // So we stick to "Don't show Cat services to Dogs".
-
-            // Rule 3: The User said "OR breed". 
-            // If service explicitly names the breed/species (Gato), we might be lenient on Size/Coat if the service implies "All Cats"?
-            // E.g. "Banho Gato" (TargetSize='Todos') -> Matches.
-            // "Banho Gato" (TargetSize=undefined) -> Matches.
-
-            return matchesCategory && matchesSize && matchesCoat;
+            return matchesCategory;
         });
     };
     const navigate = (direction: 'prev' | 'next') => {
