@@ -2497,7 +2497,7 @@ const App: React.FC = () => {
             if (Date.now() < parseInt(storedExpiry)) {
                 setAccessToken(storedToken);
                 setGoogleUser(JSON.parse(storedUser));
-                performFullSync(storedToken);
+                loadDataFromSupabase();
             } else {
                 localStorage.removeItem(STORAGE_KEY_TOKEN);
                 localStorage.removeItem(STORAGE_KEY_EXPIRY);
@@ -2567,9 +2567,31 @@ const App: React.FC = () => {
         } catch (e) { console.error("Sync Logs Error", e); }
     };
 
-    const performFullSync = async (token: string) => { if (!SHEET_ID) return; setIsGlobalLoading(true); try { await handleSyncServices(token, true); await handleSyncClients(token, true); await handleSyncAppointments(token, true); await handleSyncCosts(token, true); await handleSyncContactLogs(token, true); } catch (e) { console.error("Auto Sync Failed", e); } finally { setIsGlobalLoading(false); } }
+    const loadDataFromSupabase = async () => {
+        setIsGlobalLoading(true);
+        try {
+            const [clientsData, servicesData, appsData] = await Promise.all([
+                supabaseService.getClients(),
+                supabaseService.getServices(),
+                supabaseService.getAppointments()
+            ]);
 
-    const initAuthLogic = () => { if ((window as any).google) { googleService.init(async (tokenResponse) => { if (tokenResponse && tokenResponse.access_token) { const token = tokenResponse.access_token; const expiresIn = tokenResponse.expires_in || 3599; localStorage.setItem(STORAGE_KEY_TOKEN, token); localStorage.setItem(STORAGE_KEY_EXPIRY, (Date.now() + (expiresIn * 1000)).toString()); setAccessToken(token); const profile = await googleService.getUserProfile(token); if (profile) { const user = { id: profile.id, name: profile.name, email: profile.email, picture: profile.picture }; setGoogleUser(user); localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user)); } performFullSync(token); } }); } };
+            setClients(clientsData || []);
+            setServices(servicesData || []);
+            setAppointments(appsData || []);
+
+            // Recalculate costs/logs if stored in Supabase (future) or keep local for now if not migrated completely
+            // For now, assuming costs are local or not critical to load immediately if not in sync logic
+
+        } catch (error) {
+            console.error("Error loading data from Supabase:", error);
+            alert("Erro ao carregar dados do sistema.");
+        } finally {
+            setIsGlobalLoading(false);
+        }
+    };
+
+    const initAuthLogic = () => { if ((window as any).google) { googleService.init(async (tokenResponse) => { if (tokenResponse && tokenResponse.access_token) { const token = tokenResponse.access_token; const expiresIn = tokenResponse.expires_in || 3599; localStorage.setItem(STORAGE_KEY_TOKEN, token); localStorage.setItem(STORAGE_KEY_EXPIRY, (Date.now() + (expiresIn * 1000)).toString()); setAccessToken(token); const profile = await googleService.getUserProfile(token); if (profile) { const user = { id: profile.id, name: profile.name, email: profile.email, picture: profile.picture }; setGoogleUser(user); localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user)); } /* performFullSync(token); */ loadDataFromSupabase(); } }); } };
     const handleLogout = () => { setAccessToken(null); setGoogleUser(null); setIsPinUnlocked(false); localStorage.removeItem(STORAGE_KEY_TOKEN); localStorage.removeItem(STORAGE_KEY_EXPIRY); localStorage.removeItem(STORAGE_KEY_USER); if ((window as any).google) (window as any).google.accounts.id.disableAutoSelect(); }
     const handleSaveConfig = (id: string) => { localStorage.setItem('petgestor_client_id', id); setIsConfigured(true); window.location.reload(); };
     const handleResetConfig = () => { localStorage.removeItem('petgestor_client_id'); setIsConfigured(false); setGoogleUser(null); };
@@ -3039,7 +3061,7 @@ const App: React.FC = () => {
                 settings={settings}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 isLoading={isGlobalLoading}
-                onManualRefresh={async () => { if (accessToken) await performFullSync(accessToken); else window.location.reload(); }}
+                onManualRefresh={async () => { await loadDataFromSupabase(); }}
                 onAddAppointment={() => setIsScheduleModalOpen(true)}
             >
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
@@ -3068,7 +3090,7 @@ const App: React.FC = () => {
                     if (!accessToken) { alert("Login no Google necessário para sincronizar."); return; }
                     setIsGlobalLoading(true);
                     try {
-                        if (type === 'all') await performFullSync(accessToken);
+                        if (type === 'all') await loadDataFromSupabase();
                         else if (type === 'clients') await handleSyncClients(accessToken);
                         else if (type === 'services') await handleSyncServices(accessToken);
                         else if (type === 'appointments') await handleSyncAppointments(accessToken);
