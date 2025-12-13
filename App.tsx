@@ -2438,9 +2438,15 @@ const App: React.FC = () => {
     // --- AUTH STATE ---
     const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+    // --- AUTH STATE ---
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isInitializing, setIsInitializing] = useState(true); // NEW: Splash Screen State
+
     useEffect(() => {
         const auth = localStorage.getItem('petgestor_auth');
         if (auth === 'true') setIsAuthenticated(true);
+        // Short timeout to let the app "breathe" and show splash, or just sync checks
+        setTimeout(() => setIsInitializing(false), 800);
     }, []);
     // home is now used as a redirect or default view, but bimport { RevenueView } from './components/RevenueView'; // Assuming this is extracted or defined elsewhere if not in snippet
     // ... (App state)
@@ -3030,13 +3036,21 @@ const App: React.FC = () => {
     const handleSetPin = (newPin: string) => { localStorage.setItem('petgestor_pin', newPin); setPin(newPin); setIsPinUnlocked(true); };
 
 
+    // --- RENDER ---
 
-    // if (isGlobalLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-brand-50"><Loader2 size={48} className="text-brand-600 animate-spin mb-4" /><p className="text-brand-700 font-bold animate-pulse">Sincronizando dados...</p></div>;
+    // 1. Splash Screen
+    if (isInitializing) {
+        return (
+            <div className="fixed inset-0 bg-brand-600 flex items-center justify-center z-50 flex-col animate-fade-in">
+                <div className="bg-white/20 p-6 rounded-3xl backdrop-blur-sm animate-bounce-soft">
+                    <div className="text-4xl text-white font-bold tracking-tighter">PomPomPet</div>
+                </div>
+                <div className="mt-4 text-white/80 text-sm font-medium animate-pulse">Carregando sistema...</div>
+            </div>
+        );
+    }
 
-
-
-    // ... (rest of guards)
-
+    // 2. Auth Lock (Login Screen)
     if (!isAuthenticated) {
         return <LoginScreen
             onLogin={() => {
