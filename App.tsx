@@ -2435,8 +2435,6 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
 // --- APP COMPONENT ---
 const App: React.FC = () => {
-    // --- AUTH STATE ---
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
     // --- AUTH STATE ---
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -2523,7 +2521,7 @@ const App: React.FC = () => {
                 .subscribe();
 
             return () => {
-                supabase.removeChannel(channel);
+                supabase?.removeChannel(channel);
             };
         }
     }, [isAuthenticated]);
