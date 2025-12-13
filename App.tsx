@@ -9,6 +9,7 @@ import { ActivityLogView } from './components/ActivityLogView';
 import { PetDetailsModal } from './components/PetDetailsModal';
 import { ClientManager } from './components/ClientManager';
 import { ServiceManager } from './components/ServiceManager';
+import { CostsManager } from './components/CostsManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { db } from './services/db';
 import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog } from './types';
@@ -1984,15 +1985,17 @@ const App: React.FC = () => {
     const loadDataFromSupabase = async () => {
         setIsGlobalLoading(true);
         try {
-            const [clientsData, servicesData, appsData] = await Promise.all([
+            const [clientsData, servicesData, appsData, costsData] = await Promise.all([
                 supabaseService.getClients(),
                 supabaseService.getServices(),
-                supabaseService.getAppointments()
+                supabaseService.getAppointments(),
+                supabaseService.getCosts()
             ]);
 
             setClients(clientsData || []);
             setServices(servicesData || []);
             setAppointments(appsData || []);
+            setCosts(costsData || []);
 
             // Recalculate costs/logs if stored in Supabase (future) or keep local for now if not migrated completely
             // For now, assuming costs are local or not critical to load immediately if not in sync logic
@@ -2056,6 +2059,25 @@ const App: React.FC = () => {
         setServices(updated);
         db.saveServices(updated);
         supabaseService.deleteService(id).catch(console.error);
+    };
+
+    // --- EXPENSES / COSTS HANDLERS ---
+    const handleAddCost = (cost: CostItem) => {
+        const updated = [cost, ...costs];
+        setCosts(updated);
+        supabaseService.upsertCost(cost).catch(console.error);
+    };
+
+    const handleUpdateCost = (cost: CostItem) => {
+        const updated = costs.map(c => c.id === cost.id ? cost : c);
+        setCosts(updated);
+        supabaseService.upsertCost(cost).catch(console.error);
+    };
+
+    const handleDeleteCost = (id: string) => {
+        const updated = costs.filter(c => c.id !== id);
+        setCosts(updated);
+        supabaseService.deleteCost(id).catch(console.error);
     };
     const handleUpdateApp = (updatedApp: Appointment) => {
         const updated = appointments.map(a => a.id === updatedApp.id ? updatedApp : a);
@@ -2227,7 +2249,7 @@ const App: React.FC = () => {
             >
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
-                {currentView === 'costs' && <CostsView costs={costs} />}
+                {currentView === 'costs' && <CostsManager costs={costs} onAddCost={handleAddCost} onUpdateCost={handleUpdateCost} onDeleteCost={handleDeleteCost} />}
                 {currentView === 'activity_log' && <ActivityLogView logs={logs} onBack={() => setCurrentView('menu')} />}
                 {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services}
                     onUpdateAppointment={handleUpdateApp}
