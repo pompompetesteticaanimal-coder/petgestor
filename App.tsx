@@ -75,54 +75,7 @@ const SetupScreen: React.FC<{ onSave: (id: string) => void }> = ({ onSave }) => 
     );
 };
 
-const LoginScreen: React.FC<{ onLogin: (opts?: any) => void; onReset: () => void; settings?: AppSettings; googleLoaded: boolean }> = ({ onLogin, onReset, settings, googleLoaded }) => {
-    const storedUser = localStorage.getItem('petgestor_user_profile');
-    const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
-
-    return (
-        <div className="min-h-screen bg-brand-50 flex flex-col items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
-                <div className="w-full flex justify-center mb-6">
-                    <img src={settings?.logoUrl || DEFAULT_LOGO_URL} alt="PomPomPet" className="w-48 h-auto object-contain rounded-lg" />
-                </div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">{settings?.appName || 'PomPomPet'}</h1>
-                <p className="text-gray-500 mb-8">Faça login para acessar sua agenda e clientes.</p>
-                <button
-                    onClick={() => onLogin({ hint: userEmail })}
-                    disabled={!googleLoaded}
-                    className={`w-full bg-white border-2 border-gray-200 hover:border-brand-500 hover:bg-brand-50 text-gray-700 font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all group mb-6 ${!googleLoaded ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                    <div className="bg-white p-1 rounded-full"><LogIn className="text-brand-600 group-hover:scale-110 transition-transform" /></div>
-                    {googleLoaded ? 'Entrar com Google' : 'Carregando Google...'}
-                </button>
-                <button
-                    onClick={() => {
-                        localStorage.setItem('petgestor_access_token', 'demo_token');
-                        localStorage.setItem('petgestor_token_expiry', (Date.now() + 3600000).toString());
-                        localStorage.setItem('petgestor_user_profile', JSON.stringify({ name: 'Demo User', email: 'demo@example.com', picture: '', id: 'demo_id' }));
-
-                        // Inject Mock Data
-                        const mockService: Service = { id: 'srv_demo_1', name: 'Banho Teste', price: 50, durationMin: 60, description: 'Serviço de teste', category: 'principal' };
-                        const mockClient: Client = { id: 'cli_demo_1', name: 'Cliente Demo', phone: '(11) 99999-9999', address: 'Rua Teste', pets: [{ id: 'pet_demo_1', name: 'Rex', breed: 'Vira-lata', age: '2', gender: 'Macho', size: 'Médio', coat: 'Curto', notes: 'Dócil' }] };
-                        const mockAppointment: Appointment = {
-                            id: 'app_demo_1', clientId: 'cli_demo_1', petId: 'pet_demo_1', serviceId: 'srv_demo_1', date: new Date().toISOString(), status: 'agendado', paymentMethod: '', paidAmount: 0, rating: 0, ratingTags: []
-                        };
-
-                        localStorage.setItem('petgestor_services', JSON.stringify([mockService]));
-                        localStorage.setItem('petgestor_clients', JSON.stringify([mockClient]));
-                        localStorage.setItem('petgestor_appointments', JSON.stringify([mockAppointment]));
-
-                        window.location.reload();
-                    }}
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 rounded-xl transition mb-4 text-sm"
-                >
-                    Entrar Modo Demo (Sem Login)
-                </button>
-                <button onClick={onReset} className="mt-8 text-xs text-gray-400 hover:text-red-500 underline">Alterar ID do Cliente</button>
-            </div>
-        </div>
-    );
-};
+import { LoginScreen } from './components/LoginScreen';
 
 const PinGuard: React.FC<{ isUnlocked: boolean; onUnlock: (pin: string) => boolean; onSetPin: (pin: string) => void; hasPin: boolean; onReset: () => void; setView: (v: ViewState) => void; }> = ({ isUnlocked, onUnlock, onSetPin, hasPin, onReset, setView }) => {
     const [inputPin, setInputPin] = useState(''); const [mode, setMode] = useState<'enter' | 'create' | 'confirm'>(hasPin ? 'enter' : 'create'); const [confirmPin, setConfirmPin] = useState(''); const [error, setError] = useState('');
@@ -3047,7 +3000,28 @@ const App: React.FC = () => {
 
     // if (isGlobalLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-brand-50"><Loader2 size={48} className="text-brand-600 animate-spin mb-4" /><p className="text-brand-700 font-bold animate-pulse">Sincronizando dados...</p></div>;
 
-    // Views that require PIN
+    // --- AUTH STATE ---
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+    useEffect(() => {
+        const auth = localStorage.getItem('petgestor_auth');
+        if (auth === 'true') setIsAuthenticated(true);
+    }, []);
+
+    // ... (rest of guards)
+
+    if (!isAuthenticated) {
+        return <LoginScreen
+            onLogin={() => {
+                setIsAuthenticated(true);
+                localStorage.setItem('petgestor_auth', 'true');
+            }}
+            onReset={() => { }}
+            googleLoaded={true}
+            settings={settings}
+        />;
+    }
+
     const secureViews: ViewState[] = ['revenue', 'costs'];
     if (secureViews.includes(currentView) && !isPinUnlocked) {
         return <PinGuard isUnlocked={false} onUnlock={handlePinUnlock} onSetPin={handleSetPin} hasPin={!!pin} onReset={handleLogout} setView={setCurrentView} />;
@@ -3060,12 +3034,16 @@ const App: React.FC = () => {
                 setView={setCurrentView}
                 googleUser={googleUser}
                 onLogin={googleService.login}
-                onLogout={handleLogout}
+                onLogout={() => {
+                    setIsAuthenticated(false);
+                    localStorage.removeItem('petgestor_auth');
+                    handleLogout();
+                }}
                 settings={settings}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 isLoading={isGlobalLoading}
                 onManualRefresh={async () => { if (accessToken) await performFullSync(accessToken); else window.location.reload(); }}
-                onAddAppointment={() => setIsScheduleModalOpen(true)} // PASS HANDLER
+                onAddAppointment={() => setIsScheduleModalOpen(true)}
             >
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
