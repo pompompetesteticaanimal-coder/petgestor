@@ -974,12 +974,15 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
 
 };
 
-const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; onDeleteClient: (id: string) => void; onUpdateClient: (client: Client) => void; onLog: (a: string, d: string) => void; }> = ({ clients, appointments, onDeleteClient, onUpdateClient, onLog }) => {
+import { ClientFormModal } from './components/ClientFormModal';
+
+const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; onDeleteClient: (id: string) => void; onUpdateClient: (client: Client) => void; onAddClient: (client: Client) => void; onLog: (a: string, d: string) => void; }> = ({ clients, appointments, onDeleteClient, onUpdateClient, onAddClient, onLog }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [visibleCount, setVisibleCount] = useState(20);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Client>>({});
+    const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false); // NEW STATE
 
     // Pet Editing State
     const [editingPetId, setEditingPetId] = useState<string | null>(null);
@@ -1052,8 +1055,17 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
             <div className="flex flex-col gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-5 rounded-3xl border border-white/40 shadow-sm">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Clientes & Pets</h2>
-                    <a href={PREDEFINED_FORM_URL} target="_blank" rel="noreferrer" className="bg-brand-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold hover:bg-brand-700 hover:scale-105 active:scale-95 transition shadow-lg shadow-brand-200 text-xs whitespace-nowrap"><Plus size={16} /> Novo Cadastro</a>
+                    <button onClick={() => setIsNewClientModalOpen(true)} className="bg-brand-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold hover:bg-brand-700 hover:scale-105 active:scale-95 transition shadow-lg shadow-brand-200 text-xs whitespace-nowrap"><Plus size={16} /> Novo Cadastro</button>
                 </div>
+                {/* Modal Render */}
+                <ClientFormModal
+                    isOpen={isNewClientModalOpen}
+                    onClose={() => setIsNewClientModalOpen(false)}
+                    onSave={(newClient) => {
+                        onAddClient(newClient);
+                        onLog('Novo Cliente', `Cliente: ${newClient.name}`);
+                    }}
+                />
                 <div className="relative group">
                     <Search className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-brand-500 transition-colors" size={18} />
                     <input placeholder="Buscar por cliente, telefone ou pet..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white/50 hover:bg-white focus:bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 ring-brand-200 outline-none shadow-inner transition-all placeholder:text-gray-400" />
@@ -2369,6 +2381,13 @@ const App: React.FC = () => {
     const handleSyncServices = async () => { };
     const handleSyncAppointments = async () => { };
 
+    const handleAddClient = (newClient: Client) => {
+        const updated = [newClient, ...clients];
+        setClients(updated);
+        db.saveClients(updated);
+        supabaseService.upsertClient(newClient).catch(e => console.error("Supabase Client Add Error", e));
+    };
+
     const handleDeleteClient = (id: string) => {
         const updated = clients.filter(c => c.id !== id);
         setClients(updated);
@@ -2574,7 +2593,7 @@ const App: React.FC = () => {
                     onLog={logAction}
                     onReschedule={handleReschedule}
                 />}
-                {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} onLog={logAction} />}
+                {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} onAddClient={handleAddClient} onLog={logAction} />}
                 {currentView === 'services' && (
                     <ErrorBoundary name="ServiceManager">
                         <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={() => { }} />
