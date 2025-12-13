@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ViewState, GoogleUser, AppSettings } from '../types';
+import { ViewState, AppSettings } from '../types';
 import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronLeft, TrendingUp, TrendingDown, Lock, Settings, Home, Menu, BarChart2, Package, CalendarPlus } from 'lucide-react';
 import { PullToRefresh } from './PullToRefresh';
 
@@ -8,8 +8,6 @@ interface LayoutProps {
   children: React.ReactNode;
   currentView: ViewState;
   setView: (view: ViewState) => void;
-  googleUser: GoogleUser | null;
-  onLogin: () => void;
   onLogout: () => void;
   settings?: AppSettings;
   onOpenSettings: () => void;
@@ -129,7 +127,7 @@ const GreetingBar = () => {
   );
 };
 
-export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, googleUser, onLogin, onLogout, settings, onOpenSettings, isLoading, onManualRefresh, onAddAppointment }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, onLogout, settings, onOpenSettings, isLoading, onManualRefresh, onAddAppointment }) => {
   const menuGroups = {
     operacional: (
       <div className="pb-4" key="operacional">
@@ -199,33 +197,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         </nav>
 
         {/* User Profile / Auth */}
+        {/* User Profile / Auth */}
         <div className="p-4 m-4 bg-white/50 rounded-2xl border border-white/40 shadow-sm backdrop-blur-sm">
-          {googleUser ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                {googleUser.picture ? (
-                  <img src={googleUser.picture} alt="Profile" className="w-10 h-10 rounded-full ring-2 ring-white shadow-sm" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold">{googleUser.name ? googleUser.name[0] : 'U'}</div>
-                )}
-                <div className="overflow-hidden">
-                  <p className="text-sm font-bold text-gray-800 truncate">{googleUser.name}</p>
-                  <button onClick={onLogout} className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1 mt-0.5 hover:underline decoration-red-200">
-                    Sair da conta
-                  </button>
-                  {googleUser.id === 'demo_id' && (
-                    <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="text-[10px] bg-gray-100 px-2 py-1 rounded mt-1 text-gray-500 hover:bg-gray-200 w-full text-center">
-                      Reiniciar Demo
-                    </button>
-                  )}
-                </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold">A</div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-bold text-gray-800 truncate">Administrador</p>
+                <button onClick={onLogout} className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1 mt-0.5 hover:underline decoration-red-200">
+                  Sair da conta
+                </button>
               </div>
             </div>
-          ) : (
-            <button onClick={onLogin} className="w-full bg-gray-900 hover:bg-black text-white p-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-lg shadow-gray-200 hover:shadow-gray-400 hover:-translate-y-0.5">
-              <LogIn size={16} /> Entrar com Google
-            </button>
-          )}
+          </div>
           <button onClick={onOpenSettings} className="w-full mt-3 text-xs flex items-center justify-center gap-1 text-gray-400 hover:text-brand-600 transition p-1">
             <Settings size={12} /> Configurações do Sistema
           </button>

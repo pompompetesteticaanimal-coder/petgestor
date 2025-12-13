@@ -8,8 +8,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { ActivityLogView } from './components/ActivityLogView';
 import { PetDetailsModal } from './components/PetDetailsModal';
 import { db } from './services/db';
-import { googleService, DEFAULT_CLIENT_ID } from './services/googleCalendar';
-import { Client, Service, Appointment, ViewState, Pet, GoogleUser, CostItem, AppSettings, ActivityLog } from './types';
+import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog } from './types';
 import PackageControlView from './components/PackageControlView';
 import { MenuView } from './components/MenuView';
 import { supabaseService } from './services/supabaseService';
@@ -116,18 +115,14 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; settings: 
                     <div className="mt-6 pt-6 border-t border-gray-100">
 
                         <div className="flex justify-between items-center mb-4">
-                            <h4 className="font-bold text-gray-800 flex items-center gap-2"><ArrowRightLeft size={16} className="text-blue-500" /> Sincronização e Migração</h4>
+                            <h4 className="font-bold text-gray-800 flex items-center gap-2"><ArrowRightLeft size={16} className="text-blue-500" /> Dados e Conexão</h4>
                             <button onClick={onTestConnection} className="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 text-gray-600 font-bold">Testar Conexão</button>
                         </div>
-                        <p className="text-xs text-gray-400 mb-3">Sincronize com a planilha e migre dados para o banco de dados.</p>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => onSync('all')} className="col-span-2 p-3 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm border border-blue-100 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 shadow-sm">
-                                <Sparkles size={16} /> Sincronizar Tudo (Recomendado)
+                        <p className="text-xs text-gray-400 mb-3">Recarregue os dados do banco de dados.</p>
+                        <div className="grid grid-cols-1 gap-3">
+                            <button onClick={() => onSync('all')} className="col-span-1 p-3 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm border border-blue-100 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                                <Sparkles size={16} /> Recarregar Dados
                             </button>
-                            <button onClick={() => onSync('clients')} className="p-3 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-100 hover:bg-gray-100">Clientes</button>
-                            <button onClick={() => onSync('services')} className="p-3 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-100 hover:bg-gray-100">Serviços</button>
-                            <button onClick={() => onSync('appointments')} className="p-3 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-100 hover:bg-gray-100">Agendamentos</button>
-                            <button onClick={() => onSync('costs')} className="p-3 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-100 hover:bg-gray-100">Custos</button>
                         </div>
                     </div>
                 </div>
@@ -735,7 +730,7 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     );
 };
 
-const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; onRemovePayment: (app: Appointment) => void; onNoShow: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void; accessToken: string | null; sheetId: string; onLog: (a: string, d: string) => void; onReschedule: (app: Appointment, date: string) => void; }> = ({ appointments, clients, services, onUpdateAppointment, onRemovePayment, onNoShow, onViewPet, accessToken, sheetId, onLog, onReschedule }) => {
+const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; onRemovePayment: (app: Appointment) => void; onNoShow: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void; onLog: (a: string, d: string) => void; onReschedule: (app: Appointment, date: string) => void; }> = ({ appointments, clients, services, onUpdateAppointment, onRemovePayment, onNoShow, onViewPet, onLog, onReschedule }) => {
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
     const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid' | 'noShow'>('toReceive'); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: Appointment } | null>(null);
     const [showEvaluationModal, setShowEvaluationModal] = useState(false);
@@ -772,20 +767,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         const finalAmount = parseFloat(amount);
         const updatedApp = { ...app, paidAmount: finalAmount, paymentMethod: method as any };
 
-        // Sync Payment to Sheet (Cols Q, R)
-        if (app.id.startsWith('sheet_') && accessToken && sheetId) {
-            try {
-                const parts = app.id.split('_');
-                const index = parseInt(parts[1]);
-                const rowNumber = index + 1;
-                const range = `Agendamento!P${rowNumber}:R${rowNumber}`;
-                const values = ['Pago', finalAmount.toString().replace('.', ','), method];
-                await googleService.updateSheetValues(accessToken, sheetId, range, values);
-            } catch (e) {
-                console.error("Failed", e);
-                alert("Erro ao salvar pagamento na planilha. O pagamento foi salvo localmente mas pode não aparecer para outros usuários.");
-            }
-        }
+        // No Google Sync needed here anymore. Upsert handled by parent onUpdateAppointment (via Supabase)
 
         onUpdateAppointment(updatedApp);
         setEditingId(null);
@@ -809,16 +791,6 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         const finalApp = { ...evaluatingApp, rating, ratingTags: tags, notes: fullNote };
         onUpdateAppointment(finalApp);
 
-        if (finalApp.id.startsWith('sheet_') && accessToken && sheetId) {
-            try {
-                const parts = finalApp.id.split('_');
-                const rowNumber = parseInt(parts[1]) + 1;
-                await googleService.updateSheetValues(accessToken, sheetId, `Agendamento!N${rowNumber}`, [fullNote]);
-            } catch (e) {
-                console.error("Failed to sync evaluation", e);
-                alert("Erro ao salvar avaliação na planilha.");
-            }
-        }
         setEvaluatingApp(null);
         setShowEvaluationModal(false);
     };
@@ -1000,7 +972,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
 
 };
 
-const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; onDeleteClient: (id: string) => void; onUpdateClient: (client: Client) => void; googleUser: GoogleUser | null; accessToken: string | null; sheetId: string; onLog: (a: string, d: string) => void; }> = ({ clients, appointments, onDeleteClient, onUpdateClient, googleUser, accessToken, sheetId, onLog }) => {
+const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; onDeleteClient: (id: string) => void; onUpdateClient: (client: Client) => void; onLog: (a: string, d: string) => void; }> = ({ clients, appointments, onDeleteClient, onUpdateClient, onLog }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [visibleCount, setVisibleCount] = useState(20);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -1036,38 +1008,7 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
         const updatedPets = selectedClient.pets.map(p => p.id === editingPetId ? { ...p, ...petEditForm } as Pet : p);
         const updatedClient = { ...selectedClient, pets: updatedPets };
 
-        // 1. Update Sheet
-        if (accessToken && sheetId) {
-            try {
-                // Determine Row from Pet ID
-                const parts = editingPetId.split('_p_');
-                if (parts.length < 2) throw new Error("Invalid Pet ID format");
-                const idx = parseInt(parts[1]);
-                if (isNaN(idx)) throw new Error("Invalid Index");
-                const row = idx + 2;
-
-                // Sync specific cells for this pet
-                // Pet Name (G), Breed (H), Size (I), Coat (J), Notes (K), Age (M), Gender (N)
-                // A1 Refs: G${row}, H${row}, etc.
-
-                const updates = [
-                    { range: `CADASTRO!G${row}`, values: [[petEditForm.name]] },
-                    { range: `CADASTRO!H${row}`, values: [[petEditForm.breed || 'SRD']] },
-                    { range: `CADASTRO!I${row}`, values: [[petEditForm.size || '']] },
-                    { range: `CADASTRO!J${row}`, values: [[petEditForm.coat || '']] },
-                    { range: `CADASTRO!K${row}`, values: [[petEditForm.notes || '']] },
-                    { range: `CADASTRO!M${row}`, values: [[petEditForm.age || '']] },
-                    { range: `CADASTRO!N${row}`, values: [[petEditForm.gender || '']] },
-                ];
-
-                await Promise.all(updates.map(u => googleService.updateSheetValues(accessToken, sheetId, u.range, u.values)));
-            } catch (e) {
-                console.error("Failed to sync pet update", e);
-                alert("Salvo localmente. Erro ao sincronizar com planilha.");
-            }
-        }
-
-        // 2. Update Local
+        // 2. Update Local (Supabase handled by parent)
         setSelectedClient(updatedClient);
         onUpdateClient(updatedClient);
         setEditingPetId(null);
@@ -1078,46 +1019,7 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
         if (!selectedClient || !editForm.name) return;
         const updatedClient = { ...selectedClient, ...editForm } as Client;
 
-        // 1. Update Sheet
-        if (accessToken && sheetId) {
-            try {
-                // We need to update ALL rows for this client.
-                // We can find rows by looking at pet IDs.
-                // Pet ID format: ${cleanPhone}_p_${rowIndex}
-                // Row Index is 0-based from the data slice? No, handleSyncClients used `idx` from forEach on `rows.slice(1)`.
-                // So Row Number in Sheet = idx + 2.
-                // Let's parse the pet IDs.
-
-                const updatePromises = selectedClient.pets.map(async (pet) => {
-                    const parts = pet.id.split('_p_');
-                    if (parts.length < 2) return;
-                    const idx = parseInt(parts[1]);
-                    if (isNaN(idx)) return;
-
-                    const row = idx + 2;
-                    // Columns: D(Name)=Col 4, F(Address)=Col 6, L(Complement)=Col 12. 
-                    // (A=1, B=2, C=3, D=4, E=5, F=6 ... L=12)
-                    // We need to update specific cells.
-                    // Google Sheets API batchUpdate is best, but here we use values.update per cell or range if contiguous.
-                    // Name is Col D (index 3 in 0-based array of row values? No, A1 notation uses 1-based col letters)
-
-                    // Let's update Name (D)
-                    await googleService.updateSheetValues(accessToken, sheetId, `CADASTRO!D${row}`, [[updatedClient.name]]);
-                    // Address (F)
-                    await googleService.updateSheetValues(accessToken, sheetId, `CADASTRO!F${row}`, [[updatedClient.address]]);
-                    // Complement (L)
-                    await googleService.updateSheetValues(accessToken, sheetId, `CADASTRO!L${row}`, [[updatedClient.complement || '']]);
-                });
-
-                await Promise.all(updatePromises);
-                alert('Cadastro atualizado com sucesso!');
-            } catch (e) {
-                console.error("Erro ao atualizar planilha:", e);
-                alert("Erro ao sincronizar com a planilha (mas salvo localmente).");
-            }
-        }
-
-        // 2. Update Local
+        // 2. Update Local (Supabase handled by parent)
         onUpdateClient(updatedClient);
         setSelectedClient(updatedClient);
         setIsEditing(false);
@@ -1414,7 +1316,7 @@ const ClientManager: React.FC<{ clients: Client[]; appointments: Appointment[]; 
     );
 };
 
-const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service) => void; onDeleteService: (id: string) => void; onSyncServices: (silent: boolean) => void; accessToken: string | null; sheetId: string; }> = ({ services, onAddService, onDeleteService, onSyncServices, sheetId, accessToken }) => {
+const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service) => void; onDeleteService: (id: string) => void; onSyncServices: (silent: boolean) => void; }> = ({ services, onAddService, onDeleteService, onSyncServices }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingService, setEditingService] = useState<Service | null>(null);
     const [formData, setFormData] = useState({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' });
@@ -1423,11 +1325,24 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
 
     const resetForm = () => { setFormData({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' }); setEditingService(null); setIsModalOpen(false); };
     const handleEditStart = (s: Service) => { setEditingService(s); setFormData({ name: s.name, price: s.price.toString(), category: s.category, size: s.targetSize || 'Todos', coat: s.targetCoat || 'Todos' }); setIsModalOpen(true); setContextMenu(null); };
-    const handleSave = async () => { if (!accessToken || !sheetId) return alert('Necessário estar logado para salvar.'); const priceNum = parseFloat(formData.price.replace(',', '.')); const rowData = [formData.name, formData.category, formData.size, formData.coat, priceNum.toString().replace('.', ',')]; try { if (editingService) { const parts = editingService.id.split('_'); if (parts.length >= 3) { const index = parseInt(parts[2]); const row = index + 2; const range = `Serviço!A${row}:E${row}`; await googleService.updateSheetValues(accessToken, sheetId, range, rowData); } } else { await googleService.appendSheetValues(accessToken, sheetId, 'Serviço!A:E', rowData); } onSyncServices(true); resetForm(); } catch (e) { console.error(e); alert('Erro ao salvar na planilha.'); } };
-    const handleDelete = async (service: Service) => { if (!confirm(`Excluir ${service.name}?`)) return; setContextMenu(null); if (service.id.startsWith('sheet_svc_') && accessToken && sheetId) { const parts = service.id.split('_'); if (parts.length >= 3) { const index = parseInt(parts[2]); const row = index + 2; try { await googleService.clearSheetValues(accessToken, sheetId, `Serviço!A${row}:E${row}`); onSyncServices(true); return; } catch (e) { console.error(e); alert('Erro ao excluir da planilha.'); } } } onDeleteService(service.id); };
+    const handleSave = async () => {
+        const priceNum = parseFloat(formData.price.replace(',', '.'));
+        const newService: Service = {
+            id: editingService ? editingService.id : crypto.randomUUID(),
+            name: formData.name,
+            price: priceNum,
+            category: formData.category as 'principal' | 'adicional',
+            targetSize: formData.size,
+            targetCoat: formData.coat,
+            description: editingService?.description,
+            durationMin: editingService?.durationMin || 30 // Preserve or default
+        };
+        onAddService(newService);
+        resetForm();
+    };
+    const handleDelete = async (service: Service) => { if (!confirm(`Excluir ${service.name}?`)) return; setContextMenu(null); onDeleteService(service.id); };
 
     const handleCleanupDuplicates = async () => {
-        if (!accessToken || !sheetId) return alert("Conecte-se ao Google para usar essa função.");
         const uniqueNames = new Set<string>();
         const duplicates: Service[] = [];
 
@@ -1446,24 +1361,10 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
 
         let deletedCount = 0;
         for (const service of duplicates) {
-            // Delete Logic (Simplified version of handleDelete without confirm)
-            if (service.id.startsWith('sheet_svc_')) {
-                const parts = service.id.split('_');
-                if (parts.length >= 3) {
-                    const index = parseInt(parts[2]);
-                    const row = index + 2;
-                    try {
-                        await googleService.clearSheetValues(accessToken, sheetId, `Serviço!A${row}:E${row}`);
-                        deletedCount++;
-                    } catch (e) { console.error("Falha ao excluir duplicata", service.name, e); }
-                }
-            } else {
-                // Local delete (if any)
-                onDeleteService(service.id);
-            }
+            onDeleteService(service.id);
+            deletedCount++;
         }
         alert(`${deletedCount} serviços duplicados foram removidos.`);
-        onSyncServices(true);
     };
 
     // ... ServiceManager internal logic ...
@@ -1474,7 +1375,6 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
                 <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Serviços</h2>
                 <div className="flex gap-3">
                     <button onClick={handleCleanupDuplicates} className="bg-white text-red-500 border border-red-100 px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs hover:bg-red-50 shadow-sm transition"><Trash2 size={14} /> Remover Duplicados</button>
-                    <button onClick={() => onSyncServices(false)} className="bg-white text-gray-600 border border-gray-200 px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs hover:bg-gray-50 shadow-sm transition"><Sparkles size={14} className="text-brand-500" /> Sincronizar</button>
                     <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs hover:bg-brand-700 shadow-lg shadow-brand-200 hover:scale-105 active:scale-95 transition"><Plus size={16} /> Adicionar</button>
                 </div>
             </div>
@@ -1589,7 +1489,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
     );
 };
 
-const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; googleUser: GoogleUser | null; isOpen: boolean; onClose: () => void; onOpen: () => void; onLog: (a: string, d: string) => void; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete, isOpen, onClose, onOpen, onLog }) => {
+const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; isOpen: boolean; onClose: () => void; onOpen: () => void; onLog: (a: string, d: string) => void; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete, isOpen, onClose, onOpen, onLog }) => {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
     const [currentDate, setCurrentDate] = useState(new Date());
     // const [isModalOpen, setIsModalOpen] = useState(false); // LIFTED UP
@@ -2498,8 +2398,6 @@ const App: React.FC = () => {
     const [logs, setLogs] = useState<ActivityLog[]>([]);
     const [contactLogs, setContactLogs] = useState<{ clientId: string, date: string }[]>([]);
     const [isConfigured, setIsConfigured] = useState(true);
-    const [accessToken, setAccessToken] = useState<string | null>(null);
-    const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
     const [settings, setSettings] = useState<AppSettings>({ appName: 'PomPomPet', logoUrl: '', theme: 'rose', sidebarOrder: ['operacional', 'cadastros', 'gerencial'], darkMode: false });
     const [petDetailsData, setPetDetailsData] = useState<{ pet: Pet, client: Client } | null>(null);
@@ -2513,17 +2411,11 @@ const App: React.FC = () => {
         }
     }, [settings.darkMode]);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [googleLoaded, setGoogleLoaded] = useState(false);
 
     // --- PIN SECURITY STATE ---
     const [pin, setPin] = useState(localStorage.getItem('petgestor_pin') || '');
     const [isPinUnlocked, setIsPinUnlocked] = useState(false);
 
-    const SHEET_ID = localStorage.getItem('petgestor_sheet_id') || PREDEFINED_SHEET_ID;
-
-    const STORAGE_KEY_TOKEN = 'petgestor_access_token';
-    const STORAGE_KEY_EXPIRY = 'petgestor_token_expiry';
-    const STORAGE_KEY_USER = 'petgestor_user_profile';
     const STORAGE_KEY_SETTINGS = 'petgestor_settings';
 
     useEffect(() => {
@@ -2598,31 +2490,7 @@ const App: React.FC = () => {
     }, [settings.theme, settings.darkMode]);
 
     const handleSyncContactLogs = async (token: string, silent = false) => {
-        if (!token || !SHEET_ID) return;
-        try {
-            const rows = await googleService.getSheetValues(token, SHEET_ID, 'Painel de inativos!A:D');
-            if (!rows || rows.length < 2) return;
-            const newLogs: { clientId: string, date: string }[] = [];
-            rows.slice(1).forEach((row: string[]) => {
-                // A: DATA/hora, D: TELEFONE
-                const dateStr = row[0];
-                const phone = row[3];
-                if (!dateStr || !phone) return;
-
-                let isoDate = new Date().toISOString();
-                try {
-                    // Extract date part dd/mm/yyyy
-                    const [datePart, timePart] = dateStr.split(' ');
-                    const [d, m, y] = datePart.split('/');
-                    if (d && m && y) {
-                        isoDate = new Date(`${y}-${m}-${d}T${timePart || '00:00:00'}`).toISOString();
-                        newLogs.push({ clientId: phone.replace(/\D/g, ''), date: isoDate });
-                    }
-                } catch (e) { console.log('Error parsing date', dateStr); }
-            });
-            setContactLogs(newLogs);
-            if (!silent && newLogs.length > 0) console.log(`${newLogs.length} contact logs synced.`);
-        } catch (e) { console.error("Sync Logs Error", e); }
+        // Deprecated Google Sync
     };
 
     const loadDataFromSupabase = async () => {
@@ -2650,87 +2518,30 @@ const App: React.FC = () => {
     };
 
 
-    const handleLogout = () => { setAccessToken(null); setGoogleUser(null); setIsPinUnlocked(false); localStorage.removeItem(STORAGE_KEY_TOKEN); localStorage.removeItem(STORAGE_KEY_EXPIRY); localStorage.removeItem(STORAGE_KEY_USER); if ((window as any).google) (window as any).google.accounts.id.disableAutoSelect(); }
+    const handleLogout = () => { setIsPinUnlocked(false); localStorage.removeItem('petgestor_auth'); }
     const handleSaveConfig = (id: string) => { localStorage.setItem('petgestor_client_id', id); setIsConfigured(true); window.location.reload(); };
-    const handleResetConfig = () => { localStorage.removeItem('petgestor_client_id'); setIsConfigured(false); setGoogleUser(null); };
+    const handleResetConfig = () => { localStorage.removeItem('petgestor_client_id'); setIsConfigured(false); };
 
 
 
     const logAction = async (action: string, details: string) => {
-        if (!accessToken || !SHEET_ID) return;
-        const user = googleUser?.name || 'Desconhecido';
+        const user = 'Usuario Local';
         const date = new Date().toISOString();
         const device = navigator.userAgent;
         const newLog: ActivityLog = { id: `log_${Date.now()}`, date, user, action, details, device };
-
-        // Update Local
         setLogs(prev => [newLog, ...prev]);
-
-        // Append to Sheet
-        try {
-            await googleService.appendSheetValues(accessToken, SHEET_ID, 'Log!A:E', [
-                [date, user, action, details, device]
-            ]);
-        } catch (e) {
-            console.error("Failed to log action", e);
-        }
     };
 
-    const handleFetchLogs = async (token: string, id: string) => {
-        try {
-            const data = await googleService.getSheetValues(token, id, 'Log!A:E');
-            if (data && data.values) {
-                const loadedLogs: ActivityLog[] = data.values.slice(1).map((row: string[], i: number) => ({
-                    id: `log_sheet_${i}`,
-                    date: row[0],
-                    user: row[1],
-                    action: row[2],
-                    details: row[3],
-                    device: row[4]
-                })).reverse(); // Newest first
-                setLogs(loadedLogs);
-            }
-        } catch (e) {
-            console.error("Failed to fetch logs", e);
-        }
-    };
+    const handleFetchLogs = async () => { };
+    const handleSyncCosts = async () => { };
+    const handleSyncClients = async () => { };
+    const handleSyncServices = async () => { };
+    const handleSyncAppointments = async () => { };
 
-    const handleSyncCosts = async (token: string, silent = false) => {
-        // ... [Sync Costs Logic same as before] ...
-        if (!token || !SHEET_ID) return; try {
-            const rows = await googleService.getSheetValues(token, SHEET_ID, 'Custo Mensal!A:F'); if (!rows || rows.length < 2) return; const loadedCosts: CostItem[] = []; rows.slice(1).forEach((row: string[], idx: number) => { const dateStr = row[2]; const typeStr = row[3]; const costStr = row[4]; const statusStr = row[5] ? row[5].trim() : ''; if (!dateStr || !costStr) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = dateStr.split('/'); if (day && month && year) isoDate = `${year}-${month}-${day}T00:00:00`; } catch (e) { } let amount = 0; const cleanCost = costStr.replace(/[^\d,.-]/g, '').trim(); amount = parseFloat(cleanCost.includes(',') ? cleanCost.replace(/\./g, '').replace(',', '.') : cleanCost); if (isNaN(amount)) amount = 0; loadedCosts.push({ id: `cost_${idx}`, month: row[0], week: row[1], date: isoDate, category: typeStr, amount: amount, status: statusStr.toLowerCase() === 'pago' ? 'Pago' : '' }); }); setCosts(loadedCosts);
-            let successCount = 0;
-            for (const c of loadedCosts) {
-                try {
-                    await supabaseService.upsertCost(c);
-                    successCount++;
-                } catch (e) { console.error("Error syncing cost", c.id, e); }
-            }
-            if (!silent) alert(`${loadedCosts.length} custos carregados! ${successCount} migrados para Supabase.`);
-        } catch (e) { console.error(e); }
-    };
-
-    const handleSyncClients = async (token: string, silent = false) => {
-        // ... [Sync Clients Logic same as before] ...
-        if (!token || !SHEET_ID) { if (!silent) alert("Erro: Login ou ID da Planilha faltando."); return; } try {
-            const rows = await googleService.getSheetValues(token, SHEET_ID, 'CADASTRO!A:O'); if (!rows || rows.length < 2) { if (!silent) alert("Planilha vazia ou aba 'CADASTRO' não encontrada."); return; } const clientsMap = new Map<string, Client>(); rows.slice(1).forEach((row: string[], index: number) => { const timestamp = row[1]; const clientName = row[3]; const phone = row[4]; const address = row[5]; const complement = row[11]; const petName = row[6]; const petBreed = row[7]; const petSize = row[8]; const petCoat = row[9]; const petNotes = row[10]; const petAge = row[12]; const petGender = row[13]; if (!clientName || !phone) return; const cleanPhone = phone.replace(/\D/g, ''); if (!clientsMap.has(cleanPhone)) { let createdIso = new Date().toISOString(); try { if (timestamp) { const [datePart, timePart] = timestamp.split(' '); const [day, month, year] = datePart.split('/'); if (year && month && day) createdIso = new Date(`${year}-${month}-${day}T${timePart || '00:00'}`).toISOString(); } } catch (e) { } clientsMap.set(cleanPhone, { id: cleanPhone, name: clientName, phone: phone, address: address || '', complement: complement || '', createdAt: createdIso, pets: [] }); } const client = clientsMap.get(cleanPhone)!; if (petName) { client.pets.push({ id: `${cleanPhone}_p_${index}`, name: petName, breed: petBreed || 'SRD', age: petAge || '', gender: petGender || '', size: row[5] || '', coat: row[6] || '', notes: row[13] || '' }); } }); const newClientList = Array.from(clientsMap.values()); setClients(newClientList); db.saveClients(newClientList);
-
-            let successCount = 0;
-            for (const c of newClientList) {
-                try {
-                    await supabaseService.upsertClient(c);
-                    successCount++;
-                } catch (e) { console.error('Error syncing client', c.name, e); }
-            }
-
-            if (!silent) alert(`${newClientList.length} carregados! ${successCount} migrados para Supabase.`);
-        } catch (error) { console.error(error); if (!silent) alert("Erro ao sincronizar."); }
-    };
     const handleDeleteClient = (id: string) => { const updated = clients.filter(c => c.id !== id); setClients(updated); db.saveClients(updated); };
     const handleUpdateClient = (updatedClient: Client) => {
         const updated = clients.map(c => c.id === updatedClient.id ? updatedClient : c);
         setClients(updated);
-        // Also update db
         db.saveClients(updated);
         supabaseService.upsertClient(updatedClient).catch(e => console.error("Supabase Client Update Error", e));
     };
@@ -2740,107 +2551,12 @@ const App: React.FC = () => {
         db.saveServices(updated);
         supabaseService.upsertService(service).catch(console.error);
     };
-    const handleDeleteService = (id: string) => { const updated = services.filter(s => s.id !== id); setServices(updated); db.saveServices(updated); }
-    const handleSyncServices = async (token: string, silent = false) => {
-        // ... [Sync Services Logic same as before] ...
-        if (!token || !SHEET_ID) { if (!silent) alert("Erro: Login ou ID da Planilha faltando."); return; } try {
-            const rows = await googleService.getSheetValues(token, SHEET_ID, 'Serviço!A:E'); if (!rows || rows.length < 2) { if (!silent) alert("Aba 'Serviço' vazia ou não encontrada."); return; } const newServices: Service[] = []; rows.slice(1).forEach((row: string[], idx: number) => {
-                const sName = row[0]; const sCat = (row[1] || 'principal').toLowerCase().includes('adicional') ? 'adicional' : 'principal'; const sSize = row[2] && row[2].trim() !== '' ? row[2] : 'Todos'; const sCoat = row[3] && row[3].trim() !== '' ? row[3] : 'Todos';
-                const parseMonetary = (val: string) => {
-                    if (!val) return 0;
-                    const clean = val.replace(/[^\d,.-]/g, '').trim();
-                    if (clean.includes(',')) { return parseFloat(clean.replace(/\./g, '').replace(',', '.')); }
-                    if (/^\d{1,3}(\.\d{3})*$/.test(clean)) { return parseFloat(clean.replace(/\./g, '')); }
-                    return parseFloat(clean);
-                };
-                const sPrice = parseMonetary(row[4] || '0');
-                if (sName) { newServices.push({ id: `sheet_svc_${idx}_${Date.now()}`, name: sName, category: sCat as any, targetSize: sSize, targetCoat: sCoat, price: isNaN(sPrice) ? 0 : sPrice, description: `Importado`, durationMin: 60 }); }
-            }); if (newServices.length > 0) {
-                setServices(newServices); db.saveServices(newServices);
-                let successCount = 0;
-                for (const s of newServices) {
-                    try {
-                        await supabaseService.upsertService(s);
-                        successCount++;
-                    } catch (e) { console.error("Error syncing service", s.name, e); }
-                }
-                if (!silent) alert(`${newServices.length} carregados! ${successCount} migrados para Supabase.`);
-            }
-        } catch (e) { console.error(e); if (!silent) alert("Erro ao sincronizar serviços."); }
-    }
+    const handleDeleteService = (id: string) => { const updated = services.filter(s => s.id !== id); setServices(updated); db.saveServices(updated); };
     const handleUpdateApp = (updatedApp: Appointment) => {
         const updated = appointments.map(a => a.id === updatedApp.id ? updatedApp : a);
         setAppointments(updated);
         db.saveAppointments(updated);
         supabaseService.upsertAppointment(updatedApp).catch(console.error);
-    };
-    const handleSyncAppointments = async (token: string, silent = false) => {
-        // ... [Sync Appointments Logic same as before] ...
-        if (!token || !SHEET_ID) return; try {
-            const rows = await googleService.getSheetValues(token, SHEET_ID, 'Agendamento!A:T'); if (!rows || rows.length < 5) { if (!silent) alert('Aba Agendamento vazia (Linhas 1-4 ignoradas).'); return; } const loadedApps: Appointment[] = []; const newTempClients: Client[] = []; const currentClients = db.getClients(); const existingClientIds = new Set(currentClients.map(c => c.id)); rows.forEach((row: string[], idx: number) => {
-                if (idx < 4) return; const petName = row[0]; const clientName = row[1]; const clientPhone = row[2] || ''; const clientAddr = row[3] || ''; const petBreed = row[4]; const datePart = row[11]; const timePart = row[12]; const serviceName = row[7]; const paidAmountStr = row[16]; const paymentMethod = row[17]; const googleEventId = row[19]; if (!clientName || !datePart) return; let isoDate = new Date().toISOString(); try { const [day, month, year] = datePart.split('/'); if (day && month && year) isoDate = `${year}-${month}-${day}T${timePart || '00:00'}`; } catch (e) { } const cleanPhone = clientPhone.replace(/\D/g, '') || `temp_${idx}`; let client = currentClients.find(c => c.id === cleanPhone) || currentClients.find(c => c.name.toLowerCase() === clientName.toLowerCase()) || newTempClients.find(c => c.id === cleanPhone); if (!client) { client = { id: cleanPhone, name: clientName, phone: clientPhone, address: clientAddr, pets: [] }; newTempClients.push(client); } let pet = client.pets.find(p => p.name.toLowerCase() === petName?.toLowerCase()); if (!pet && petName) { pet = { id: `${client.id}_p_${idx}`, name: petName, breed: petBreed || 'SRD', age: '', gender: '', size: row[5] || '', coat: row[6] || '', notes: row[13] || '' }; client.pets.push(pet); } const currentServices = db.getServices(); const service = currentServices.find(s => s.name.toLowerCase() === serviceName?.toLowerCase()) || currentServices[0]; const addServiceIds: string[] = [];[row[8], row[9], row[10]].forEach(name => { if (name) { const foundSvc = currentServices.find(s => s.name.toLowerCase() === name.toLowerCase().trim()); if (foundSvc) addServiceIds.push(foundSvc.id); } }); let paidAmount = 0;
-                const parseMonetary = (val: string) => {
-                    if (!val) return 0;
-                    const clean = val.trim();
-                    if (clean.includes(',')) {
-                        // BR Format: 1.000,50 -> 1000.50
-                        return parseFloat(clean.replace(/\./g, '').replace(',', '.'));
-                    }
-                    if (/^\d{1,3}(\.\d{3})*$/.test(clean)) {
-                        // Integer with thousand separators: 1.000 -> 1000
-                        return parseFloat(clean.replace(/\./g, ''));
-                    }
-                    // US Format or Plain: 1000.50 -> 1000.50
-                    return parseFloat(clean);
-                };
-
-
-                if (paidAmountStr) {
-                    paidAmount = parseMonetary(paidAmountStr.replace(/[^\d,.-]/g, ''));
-                    if (isNaN(paidAmount)) paidAmount = 0;
-                }
-
-                // Parse Rating logic
-                let rating = 0;
-                let ratingTags: string[] = [];
-                const notes = row[13] || '';
-                const ratingMatch = notes.match(/\[Avaliação: (\d+)\/5\]/);
-                if (ratingMatch && ratingMatch[1]) rating = parseInt(ratingMatch[1]);
-                const tagsMatch = notes.match(/\[Tags: (.*?)\]/);
-                if (tagsMatch && tagsMatch[1]) { ratingTags = tagsMatch[1].split(',').map(t => t.trim()); }
-
-                let status: Appointment['status'] = 'agendado';
-                const statusRaw = (row[15] || '').toLowerCase().trim();
-                // Check for variations of "Não Veio" (includes handles cases with extra spaces/characters)
-                if (statusRaw.includes('nao veio') || statusRaw.includes('não veio') || statusRaw === 'nao_veio') {
-                    status = 'nao_veio';
-                } else if (statusRaw.includes('cancelado')) {
-                    status = 'cancelado';
-                } else if (statusRaw.includes('concluido') || statusRaw.includes('concluído') || statusRaw.includes('realizado')) {
-                    status = 'concluido';
-                } else if (statusRaw.includes('pago')) {
-                    status = 'agendado';
-                }
-
-                if (client && pet) { loadedApps.push({ id: `sheet_${idx}`, clientId: client.id, petId: pet.id, serviceId: service?.id || 'unknown', additionalServiceIds: addServiceIds, date: isoDate, status: status, notes: row[13], durationTotal: parseInt(row[14] || '60'), paidAmount: paidAmount > 0 ? paidAmount : undefined, paymentMethod: paymentMethod as any, googleEventId: googleEventId, rating: rating > 0 ? rating : undefined, ratingTags: ratingTags.length > 0 ? ratingTags : undefined }); }
-            });
-
-            if (newTempClients.length > 0) {
-                const updatedClients = [...currentClients, ...newTempClients.filter(nc => !existingClientIds.has(nc.id))]; setClients(updatedClients); db.saveClients(updatedClients);
-                for (const c of updatedClients) { await supabaseService.upsertClient(c).catch(console.error); }
-            }
-            if (loadedApps.length > 0) {
-                setAppointments(loadedApps); db.saveAppointments(loadedApps);
-                let successCount = 0;
-                for (const a of loadedApps) {
-                    try {
-                        await supabaseService.upsertAppointment(a);
-                        successCount++;
-                    } catch (e) { console.error('Error syncing appointment', a.id, e); }
-                }
-                if (!silent) alert(`${loadedApps.length} carregados! ${successCount} migrados.`);
-            } else { if (!silent) alert('Nenhum agendamento encontrado.'); }
-        } catch (error) { console.error(error); if (!silent) alert('Erro ao sincronizar agendamentos.'); }
     };
     const handleAddAppointment = async (appOrApps: Appointment | Appointment[], client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
         const appsToAdd = Array.isArray(appOrApps) ? appOrApps : [appOrApps];
@@ -2848,47 +2564,12 @@ const App: React.FC = () => {
 
         // Process new apps
         for (const app of appsToAdd) {
-            let googleEventId = '';
-            let finalId = app.id; // Start with temp ID
+            let finalId = app.id.startsWith('local_') ? app.id : `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const totalDuration = manualDuration > 0 ? manualDuration : (appServices[0] ? appServices[0].durationMin : 60) + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
 
-            // 1. Google Calendar
-            if (accessToken) {
-                const description = appServices.map(s => s.name).join(' + ');
-                const googleResponse = await googleService.createEvent(accessToken, { summary: `Banho/Tosa: ${pet.name}`, description: `${description}\nCliente: ${client.name}\nTel: ${client.phone}\nObs: ${app.notes}`, startTime: app.date, durationMin: totalDuration });
-                if (googleResponse) googleEventId = googleResponse.id;
-            }
-
-            // 2. Google Sheets & ID Resolution
-            if (accessToken && SHEET_ID) {
-                try {
-                    const d = new Date(app.date);
-                    const dateStr = d.toLocaleDateString('pt-BR');
-                    const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                    const mainSvc = appServices[0];
-                    const rowData = [
-                        pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
-                        appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
-                        dateStr, timeStr, app.notes || '', (totalDuration || 60).toString(), 'Pendente', '', '', '', googleEventId
-                    ];
-
-                    const res = await googleService.appendSheetValues(accessToken, SHEET_ID, 'Agendamento!A:T', rowData);
-
-                    // Parse accurate ID from Sheet Response
-                    if (res && res.updates && res.updates.updatedRange) {
-                        const match = res.updates.updatedRange.match(/!A(\d+)/);
-                        if (match && match[1]) {
-                            const rowNum = parseInt(match[1]);
-                            finalId = `sheet_${rowNum - 1}`; // 0-based index for ID
-                        }
-                    }
-                } catch (e) { console.error("Erro saving to sheet:", e); alert("Erro ao salvar na planilha (salvo localmente)."); }
-            }
-
-            const appReady = { ...app, id: finalId, googleEventId, durationTotal: totalDuration };
+            const appReady = { ...app, id: finalId, durationTotal: totalDuration };
             newAppsWithFinalData.push(appReady);
 
-            // 3. Supabase Upsert (With FINAL ID)
             supabaseService.upsertAppointment(appReady).catch(console.error);
         }
 
@@ -2896,33 +2577,16 @@ const App: React.FC = () => {
         const updatedApps = [...appointments, ...newAppsWithFinalData];
         setAppointments(updatedApps);
         db.saveAppointments(updatedApps);
-
-        // Note: We skip handleSyncAppointments(true) because we already integrated the ID correctly.
     };
 
     const handleEditAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
-        const googleEventId = app.googleEventId; const totalDuration = manualDuration > 0 ? manualDuration : (appServices[0] ? appServices[0].durationMin : 60) + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
+        const totalDuration = manualDuration > 0 ? manualDuration : (appServices[0] ? appServices[0].durationMin : 60) + (appServices.length > 1 ? appServices.slice(1).reduce((acc, s) => acc + (s.durationMin || 0), 0) : 0);
         const updatedApp = { ...app, durationTotal: totalDuration };
-        if (accessToken && googleEventId) {
-            const description = appServices.map(s => s.name).join(' + ');
-            await googleService.updateEvent(accessToken, googleEventId, { summary: `Banho/Tosa: ${pet.name}`, description: `${description}\nCliente: ${client.name}\nTel: ${client.phone}\nObs: ${app.notes}`, startTime: app.date, durationMin: totalDuration });
-        }
+
         const updatedList = appointments.map(a => a.id === app.id ? updatedApp : a);
         setAppointments(updatedList); db.saveAppointments(updatedList);
         supabaseService.upsertAppointment(updatedApp).catch(console.error);
-        if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
-            try {
-                const parts = app.id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1;
-                const d = new Date(app.date); const dateStr = d.toLocaleDateString('pt-BR'); const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                const mainSvc = appServices[0];
-                const rowData = [
-                    pet.name, client.name, client.phone, client.address, pet.breed, pet.size, pet.coat, mainSvc.name,
-                    appServices[1] ? appServices[1].name : '', appServices[2] ? appServices[2].name : '', appServices[3] ? appServices[3].name : '',
-                    dateStr, timeStr, app.notes || '', totalDuration.toString(), (app.status === 'nao_veio' ? 'Não Veio' : (app.paidAmount ? 'Pago' : 'Pendente')), '', app.paidAmount ? app.paidAmount.toString().replace('.', ',') : '', app.paymentMethod || '', googleEventId
-                ];
-                await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`, rowData);
-            } catch (e) { console.error(e); alert("Erro ao atualizar agendamento na planilha."); }
-        }
+
         logAction('Editar Agendamento', `Pet: ${pet.name}, Cliente: ${client.name}`);
     };
 
@@ -2936,16 +2600,9 @@ const App: React.FC = () => {
             logAction('Excluir Agendamento', `Pet: ${pet?.name}, Cliente: ${client?.name}, Data: ${app.date}`);
         }
 
-        if (app && app.googleEventId && accessToken) { await googleService.deleteEvent(accessToken, app.googleEventId); }
         const updated = appointments.filter(a => a.id !== id);
         setAppointments(updated); db.saveAppointments(updated);
         supabaseService.deleteAppointment(id).catch(console.error);
-        if (id.startsWith('sheet_') && accessToken && SHEET_ID) {
-            try {
-                const parts = id.split('_'); const index = parseInt(parts[1]); const rowNumber = index + 1;
-                await googleService.clearSheetValues(accessToken, SHEET_ID, `Agendamento!A${rowNumber}:T${rowNumber}`);
-            } catch (e) { console.error(e); }
-        }
     };
 
     const handleRemovePayment = async (app: Appointment) => {
@@ -2962,16 +2619,6 @@ const App: React.FC = () => {
         const client = clients.find(c => c.id === app.clientId);
         const pet = client?.pets.find(p => p.id === app.petId);
         logAction('Remover Pagamento', `Pet: ${pet?.name}, Data: ${app.date}`);
-
-        if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
-            try {
-                const idx = parseInt(app.id.split('_')[1]);
-                if (!isNaN(idx)) {
-                    const row = idx + 1;
-                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!P${row}:R${row}`, ['Pendente', '', '']);
-                }
-            } catch (e) { console.error("Erro ao limpar pagamento:", e); alert("Erro ao sincronizar cancelamento de pagamento."); }
-        }
     };
 
 
@@ -2993,26 +2640,6 @@ const App: React.FC = () => {
         const client = clients.find(c => c.id === app.clientId);
         const pet = client?.pets.find(p => p.id === app.petId);
         logAction('Não Compareceu', `Pet: ${pet?.name}, Cliente: ${client?.name}, Data: ${app.date}`);
-
-        // 3. Sync to Sheet
-        if (app.id.startsWith('sheet_') && accessToken && SHEET_ID) {
-            try {
-                const idx = parseInt(app.id.split('_')[1]);
-                if (!isNaN(idx)) {
-                    const row = idx + 1; // 1-based Row Index
-
-                    // Col P = Status (index 15) -> "Não Veio"
-                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!P${row}:P${row}`, ['Não Veio']);
-
-                    // Col N = Notes -> Append [NÃO VEIO] if not present
-                    const note = `${app.notes || ''} [NÃO VEIO]`.trim();
-                    await googleService.updateSheetValues(accessToken, SHEET_ID, `Agendamento!N${row}:N${row}`, [note]);
-                }
-            } catch (e) {
-                console.error("Erro ao marcar como 'Não Compareceu' na planilha:", e);
-                alert("Salvo localmente, mas erro ao sincronizar status na planilha.");
-            }
-        }
     };
 
     const handleReschedule = async (originApp: Appointment, newDate: string) => {
@@ -3037,37 +2664,9 @@ const App: React.FC = () => {
     }
 
     const handleMarkContacted = async (client: Client, daysInactive: number) => {
-        if (!accessToken || !SHEET_ID) {
-            alert("Erro: Não conectado ao Google Sheets.");
-            return;
-        }
-
-        try {
-            const pet = client.pets[0];
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('pt-BR');
-            const timeStr = now.toLocaleTimeString('pt-BR');
-
-            // Columns: DATA/hora, Pet, Cliente, TELEFONE, ENDERECO, ANIMAL/RACA, STATUS
-            const rowData = [
-                `${dateStr} ${timeStr}`,
-                pet?.name || '?',
-                client.name,
-                client.phone,
-                client.address,
-                `${pet?.name || ''}/${pet?.breed || ''}`,
-                'Contactado'
-            ];
-
-            // Append to "Painel de inativos" sheet - Try/Catch specific for sheet existence
-            await googleService.appendSheetValues(accessToken, SHEET_ID, 'Painel de inativos!A:G', rowData);
-            alert(`Cliente ${client.name} registrado como contactado!`);
-            // Update local logs immediately so UI refreshes
-            setContactLogs(prev => [...prev, { clientId: client.id, date: new Date().toISOString() }]);
-        } catch (e) {
-            console.error(e);
-            alert("Erro ao salvar na planilha. Verifique se a aba 'Painel de inativos' existe.");
-        }
+        // Local log only
+        setContactLogs(prev => [...prev, { clientId: client.id, date: new Date().toISOString() }]);
+        alert(`Cliente ${client.name} marcado como contactado.`);
     };
 
     // --- PIN LOGIC Handlers ---
@@ -3109,8 +2708,9 @@ const App: React.FC = () => {
             <Layout
                 currentView={currentView}
                 setView={setCurrentView}
-                googleUser={googleUser}
-                onLogin={googleService.login}
+                onLogin={() => {
+                    handleLogout();
+                }}
                 onLogout={() => {
                     setIsAuthenticated(false);
                     localStorage.removeItem('petgestor_auth');
@@ -3131,29 +2731,22 @@ const App: React.FC = () => {
                     onRemovePayment={handleRemovePayment}
                     onNoShow={handleNoShow}
                     onViewPet={(pet, client) => setPetDetailsData({ pet, client })}
-                    accessToken={accessToken}
-                    sheetId={SHEET_ID}
                     onLog={logAction}
                     onReschedule={handleReschedule}
                 />}
-                {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} googleUser={googleUser} accessToken={accessToken} sheetId={SHEET_ID} onLog={logAction} />}
-                {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={(s) => accessToken && handleSyncServices(accessToken, s)} accessToken={accessToken} sheetId={SHEET_ID} />}
-                {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} googleUser={googleUser} isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} onOpen={() => setIsScheduleModalOpen(true)} onLog={logAction} />}
+                {currentView === 'clients' && <ClientManager clients={clients} appointments={appointments} onDeleteClient={handleDeleteClient} onUpdateClient={handleUpdateClient} onLog={logAction} />}
+                {currentView === 'services' && <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={() => { }} />}
+                {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} onOpen={() => setIsScheduleModalOpen(true)} onLog={logAction} />}
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }}
                 onSync={async (type) => {
-                    if (!accessToken) { alert("Login no Google necessário para sincronizar."); return; }
                     setIsGlobalLoading(true);
                     try {
-                        if (type === 'all') await loadDataFromSupabase();
-                        else if (type === 'clients') await handleSyncClients(accessToken);
-                        else if (type === 'services') await handleSyncServices(accessToken);
-                        else if (type === 'appointments') await handleSyncAppointments(accessToken);
-                        else if (type === 'costs') await handleSyncCosts(accessToken);
-                    } catch (e) { console.error(e); alert("Erro na sincronização"); }
+                        await loadDataFromSupabase();
+                    } catch (e) { console.error(e); alert("Erro na atualização"); }
                     setIsGlobalLoading(false);
                 }}
                 onTestConnection={async () => {
