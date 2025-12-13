@@ -14,6 +14,7 @@ interface ServiceManagerProps {
 }
 
 export const ServiceManager: React.FC<ServiceManagerProps> = ({ services, onAddService, onDeleteService }) => {
+    console.log("ServiceManager Rendering", { servicesCount: services?.length });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingService, setEditingService] = useState<Service | null>(null);
     const [formData, setFormData] = useState({ name: '', price: '', category: 'principal', size: 'Todos', coat: 'Todos' });

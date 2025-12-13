@@ -2533,6 +2533,7 @@ const App: React.FC = () => {
         return <PinGuard isUnlocked={false} onUnlock={handlePinUnlock} onSetPin={handleSetPin} hasPin={!!pin} onReset={handleLogout} setView={setCurrentView} />;
     }
 
+    console.log("App Render CurrentView:", currentView);
     return (
         <HashRouter>
             <Layout
