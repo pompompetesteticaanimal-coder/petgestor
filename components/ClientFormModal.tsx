@@ -192,6 +192,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({ isOpen, onClos
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
