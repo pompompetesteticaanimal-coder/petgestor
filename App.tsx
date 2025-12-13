@@ -1426,6 +1426,46 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
     const handleSave = async () => { if (!accessToken || !sheetId) return alert('Necessário estar logado para salvar.'); const priceNum = parseFloat(formData.price.replace(',', '.')); const rowData = [formData.name, formData.category, formData.size, formData.coat, priceNum.toString().replace('.', ',')]; try { if (editingService) { const parts = editingService.id.split('_'); if (parts.length >= 3) { const index = parseInt(parts[2]); const row = index + 2; const range = `Serviço!A${row}:E${row}`; await googleService.updateSheetValues(accessToken, sheetId, range, rowData); } } else { await googleService.appendSheetValues(accessToken, sheetId, 'Serviço!A:E', rowData); } onSyncServices(true); resetForm(); } catch (e) { console.error(e); alert('Erro ao salvar na planilha.'); } };
     const handleDelete = async (service: Service) => { if (!confirm(`Excluir ${service.name}?`)) return; setContextMenu(null); if (service.id.startsWith('sheet_svc_') && accessToken && sheetId) { const parts = service.id.split('_'); if (parts.length >= 3) { const index = parseInt(parts[2]); const row = index + 2; try { await googleService.clearSheetValues(accessToken, sheetId, `Serviço!A${row}:E${row}`); onSyncServices(true); return; } catch (e) { console.error(e); alert('Erro ao excluir da planilha.'); } } } onDeleteService(service.id); };
 
+    const handleCleanupDuplicates = async () => {
+        if (!accessToken || !sheetId) return alert("Conecte-se ao Google para usar essa função.");
+        const uniqueNames = new Set<string>();
+        const duplicates: Service[] = [];
+
+        // Identify duplicates
+        (services || []).forEach(s => {
+            const normalized = s.name.trim().toLowerCase();
+            if (uniqueNames.has(normalized)) {
+                duplicates.push(s);
+            } else {
+                uniqueNames.add(normalized);
+            }
+        });
+
+        if (duplicates.length === 0) return alert("Nenhum serviço duplicado encontrado.");
+        if (!confirm(`Encontrei ${duplicates.length} serviços duplicados. Deseja excluir as cópias extras automaticamente?`)) return;
+
+        let deletedCount = 0;
+        for (const service of duplicates) {
+            // Delete Logic (Simplified version of handleDelete without confirm)
+            if (service.id.startsWith('sheet_svc_')) {
+                const parts = service.id.split('_');
+                if (parts.length >= 3) {
+                    const index = parseInt(parts[2]);
+                    const row = index + 2;
+                    try {
+                        await googleService.clearSheetValues(accessToken, sheetId, `Serviço!A${row}:E${row}`);
+                        deletedCount++;
+                    } catch (e) { console.error("Falha ao excluir duplicata", service.name, e); }
+                }
+            } else {
+                // Local delete (if any)
+                onDeleteService(service.id);
+            }
+        }
+        alert(`${deletedCount} serviços duplicados foram removidos.`);
+        onSyncServices(true);
+    };
+
     // ... ServiceManager internal logic ...
 
     return (
@@ -1433,6 +1473,7 @@ const ServiceManager: React.FC<{ services: Service[]; onAddService: (s: Service)
             <div className="flex justify-between items-center bg-white/60 backdrop-blur-md p-5 rounded-3xl border border-white/40 shadow-sm flex-shrink-0">
                 <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Serviços</h2>
                 <div className="flex gap-3">
+                    <button onClick={handleCleanupDuplicates} className="bg-white text-red-500 border border-red-100 px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs hover:bg-red-50 shadow-sm transition"><Trash2 size={14} /> Remover Duplicados</button>
                     <button onClick={() => onSyncServices(false)} className="bg-white text-gray-600 border border-gray-200 px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs hover:bg-gray-50 shadow-sm transition"><Sparkles size={14} className="text-brand-500" /> Sincronizar</button>
                     <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs hover:bg-brand-700 shadow-lg shadow-brand-200 hover:scale-105 active:scale-95 transition"><Plus size={16} /> Adicionar</button>
                 </div>
