@@ -154,7 +154,7 @@ const CustomXAxisTick = ({ x, y, payload, data }: any) => {
     );
 };
 
-const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: string; appointments: Appointment[]; clients: Client[]; services: Service[] }> = ({ isOpen, onClose, date, appointments, clients, services }) => {
+const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: string; appointments: Appointment[]; clients: Client[]; services: Service[]; onAppointmentClick: (app: Appointment) => void }> = ({ isOpen, onClose, date, appointments, clients, services, onAppointmentClick }) => {
     const [isClosing, setIsClosing] = useState(false);
 
     useEffect(() => {
@@ -208,7 +208,7 @@ const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: st
                             const mainSvc = services.find(s => s.id === app.serviceId);
                             const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(s => s).map(s => s?.name).join(', ');
                             return (
-                                <div key={app.id} style={{ animationDelay: `${idx * 0.05}s` }} className="animate-scale-up-sm bg-white/60 hover:bg-white/80 backdrop-blur-md p-4 rounded-3xl shadow-sm border border-white/60 flex gap-4 hover:shadow-lg transition-all group relative overflow-hidden cursor-pointer active:scale-[0.98]" onClick={() => setDetailsApp(app)}>
+                                <div key={app.id} style={{ animationDelay: `${idx * 0.05}s` }} className="animate-scale-up-sm bg-white/60 hover:bg-white/80 backdrop-blur-md p-4 rounded-3xl shadow-sm border border-white/60 flex gap-4 hover:shadow-lg transition-all group relative overflow-hidden cursor-pointer active:scale-[0.98]" onClick={() => onAppointmentClick(app)}>
                                     <div className="flex flex-col items-center justify-center min-w-[3.5rem] border-r border-gray-100/50 pr-4 pl-1">
                                         <span className="text-xl font-black text-gray-800 tracking-tight">{time}</span>
                                         <div className={`mt-1.5 w-2 h-2 rounded-full ring-2 ring-white ${app.status === 'concluido' ? 'bg-green-500' : app.status === 'cancelado' ? 'bg-red-500' : 'bg-brand-500'}`} />
@@ -1237,27 +1237,44 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
-    // --- SIDE-BY-SIDE LAYOUT ALGORITHM (GRID + STACK) ---
+    // --- SIDE-BY-SIDE LAYOUT ALGORITHM (Exact Start Time Stacking) ---
     const getLayout = useCallback((dayApps: Appointment[]) => {
-        // Sort by time (Timezone Agnostic)
-        const sorted = [...dayApps].sort((a, b) => {
-            if (!a.date || !b.date) return 0;
-            const timeA = a.date.includes('T') ? a.date.split('T')[1] : '00:00';
-            const timeB = b.date.includes('T') ? b.date.split('T')[1] : '00:00';
-            const [hA, mA] = timeA.split(':');
-            const [hB, mB] = timeB.split(':');
-            return (parseInt(hA) * 60 + parseInt(mA)) - (parseInt(hB) * 60 + parseInt(mB));
+        // 1. Group by Exact Start Time
+        const groups: { [time: string]: Appointment[] } = {};
+
+        dayApps.forEach(app => {
+            const time = app.date.includes('T') ? app.date.split('T')[1] : '09:00';
+            if (!groups[time]) groups[time] = [];
+            groups[time].push(app);
         });
 
-        const nodes = sorted.map(app => {
-            if (!app.date) return { app, start: 0, end: 0 };
-            const timePart = app.date.includes('T') ? app.date.split('T')[1] : '09:00';
+        // 2. Create Nodes (Stacks or Singles)
+        // If a time slot has > 1 app, it becomes a Single Node (represented by the stack leader)
+        // If it has 1 app, it's a Single Node.
+        const nodes: { app: Appointment, start: number, end: number, isStack: boolean, cluster: Appointment[] }[] = [];
+
+        Object.values(groups).forEach(group => {
+            const leader = group[0];
+            const timePart = leader.date.includes('T') ? leader.date.split('T')[1] : '09:00';
             const [hStr, mStr] = timePart.split(':');
             const start = (parseInt(hStr) * 60 + parseInt(mStr)) * 60000;
-            const end = start + (app.durationTotal || 60) * 60000;
-            return { app, start, end };
+
+            // For a stack, we use the MAX duration of the group to define the block height
+            const maxDuration = Math.max(...group.map(a => a.durationTotal || 60));
+            const end = start + maxDuration * 60000;
+
+            if (group.length > 1) {
+                nodes.push({ app: leader, start, end, isStack: true, cluster: group });
+            } else {
+                nodes.push({ app: leader, start, end, isStack: false, cluster: [leader] });
+            }
         });
 
+        // Sort nodes by start time
+        nodes.sort((a, b) => a.start - b.start);
+
+        // 3. Normal Column Layout Algorithm on these Nodes
+        // (Same algorithm as before, but operating on 'nodes' which might be stacks)
         const clusters: typeof nodes[] = [];
         if (nodes.length > 0) {
             let currentCluster = [nodes[0]];
@@ -1276,43 +1293,25 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         }
 
         const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number, index: number, totalCount: number, isStack?: boolean, hidden?: boolean, cluster?: Appointment[] }[] = [];
-        clusters.forEach(cluster => {
-            const count = cluster.length;
 
-            // NEW LOGIC: Always Stack if Count > 1
-            // This satisfies "Agrupamento Vertical" and prevents broken columns on mobile
-            if (count > 1) {
-                // Render ONLY the first item as a Stack Representative
+        clusters.forEach(cluster => {
+            const width = 100 / cluster.length;
+            cluster.forEach((node, i) => {
                 layoutResult.push({
-                    app: cluster[0].app,
-                    left: '2.5%', // Centered slightly
-                    width: '95%',
-                    zIndex: 20,
+                    app: node.app,
+                    left: `${i * width}%`,
+                    width: `${width}%`,
+                    zIndex: 10 + i,
                     topOffset: 0,
-                    index: 0,
-                    totalCount: count,
-                    isStack: true, // Force stack mode
+                    index: i,
+                    totalCount: cluster.length, // This count is "columns", not "stack depth"
+                    isStack: node.isStack,
                     hidden: false,
-                    cluster: cluster.map(n => n.app)
+                    cluster: node.cluster
                 });
-                // Indices 1..N are implicit in the stack and not rendered as separate cards
-            } else {
-                // Single Item - Normal Width
-                cluster.forEach((node, index) => {
-                    layoutResult.push({
-                        app: node.app,
-                        left: '0%',
-                        width: '100%',
-                        zIndex: 10,
-                        topOffset: 0,
-                        index: index,
-                        totalCount: 1,
-                        isStack: false,
-                        hidden: false
-                    });
-                });
-            }
+            });
         });
+
         return layoutResult;
     }, []);
 
@@ -1477,21 +1476,25 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                             appDate.getFullYear() === d.getFullYear();
                     });
 
-                    // Clustering Logic for Week View
+                    // Clustering Logic for Week View (Exact Start Time)
                     const clusters: { start: number, end: number, apps: Appointment[] }[] = [];
-                    dayApps.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(app => {
-                        const [hStr, mStr] = app.date.split('T')[1].split(':');
-                        const appStart = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
-                        const appEnd = appStart + (app.durationTotal || 60);
 
-                        // Try to find an existing cluster this overlaps with
-                        const existing = clusters.find(c => (appStart >= c.start && appStart < c.end) || (appStart <= c.start && appEnd > c.start));
-                        if (existing) {
-                            existing.apps.push(app);
-                            existing.end = Math.max(existing.end, appEnd);
-                        } else {
-                            clusters.push({ start: appStart, end: appEnd, apps: [app] });
-                        }
+                    // Group by Start Time first
+                    const groups: { [time: string]: Appointment[] } = {};
+                    dayApps.forEach(app => {
+                        const time = app.date.includes('T') ? app.date.split('T')[1] : '09:00';
+                        if (!groups[time]) groups[time] = [];
+                        groups[time].push(app);
+                    });
+
+                    // Create clusters from groups
+                    Object.values(groups).forEach(group => {
+                        const leader = group[0];
+                        const [hStr, mStr] = leader.date.split('T')[1].split(':');
+                        const appStart = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
+                        const maxDuration = Math.max(...group.map(a => a.durationTotal || 60));
+                        const appEnd = appStart + maxDuration;
+                        clusters.push({ start: appStart, end: appEnd, apps: group });
                     });
 
                     return (
@@ -2441,6 +2444,7 @@ const App: React.FC = () => {
                     appointments={selectedCluster}
                     clients={clients}
                     services={services}
+                    onAppointmentClick={(app) => { setSelectedCluster(null); setDetailsApp(app); }}
                 />
             )}
         </HashRouter>
