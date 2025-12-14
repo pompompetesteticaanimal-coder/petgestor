@@ -222,7 +222,8 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                         {(() => {
                                             const clientApps = appointments.filter(a => a.clientId === selectedClient!.id);
                                             const pastApps = clientApps.filter(a => a.status === 'concluido').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                                            const futureApps = clientApps.filter(a => a.status === 'agendado').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                            const todayStr = new Date().toISOString().split('T')[0];
+                                            const futureApps = clientApps.filter(a => a.status === 'agendado' && a.date >= todayStr).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                                             const ratedApps = pastApps.filter(a => a.rating);
                                             const avgRating = ratedApps.length > 0 ? ratedApps.reduce((acc, curr) => acc + (curr.rating || 0), 0) / ratedApps.length : 0;
 
