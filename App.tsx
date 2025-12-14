@@ -187,7 +187,7 @@ const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: st
             onClick={handleClose}
         >
             <div
-                className={`w-full max-w-md bg-white/85 shadow-2xl overflow-hidden flex flex-col transition-transform duration-500 cubic-bezier(0.2, 0.8, 0.2, 1) ${isClosing ? 'translate-y-[100%]' : 'translate-y-0'} ${isOpen ? 'animate-slide-up-ios' : ''}`}
+                className={`w-full max-w-md bg-white/85 shadow-2xl overflow-hidden flex flex-col transition-transform duration-500 cubic-bezier(0.2, 0.8, 0.2, 1) ${!isOpen || isClosing ? 'translate-y-[100%]' : 'translate-y-0'}`}
                 style={{
                     borderTopLeftRadius: '24px',
                     borderTopRightRadius: '24px',
@@ -1384,13 +1384,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 >
                     {/* Visual Stack Cards (Pure CSS Logic) */}
                     <div className="relative w-full h-full">
-                        {/* Card 3 (Bottom) */}
+                        {/* Card 3 (Bottom) - Shifted Down & Right */}
                         {count > 2 && (
-                            <div className="absolute top-0 left-0 w-full h-full bg-brand-200 rounded-2xl shadow-sm transform translate-y-2.5 scale-90 opacity-60 z-0 transition-all duration-300 group-hover:translate-y-3" />
+                            <div className="absolute top-0 left-0 w-full h-full bg-brand-200 rounded-2xl shadow-sm transform translate-x-2.5 translate-y-2.5 z-0 transition-all duration-300 group-hover:translate-x-3 group-hover:translate-y-3" />
                         )}
-                        {/* Card 2 (Middle) */}
+                        {/* Card 2 (Middle) - Shifted Down & Right */}
                         {count > 1 && (
-                            <div className="absolute top-0 left-0 w-full h-full bg-brand-300 rounded-2xl shadow-sm transform translate-y-1.5 scale-95 opacity-80 z-10 transition-all duration-300 group-hover:translate-y-2" />
+                            <div className="absolute top-0 left-0 w-full h-full bg-brand-300 rounded-2xl shadow-sm transform translate-x-1.5 translate-y-1.5 z-10 transition-all duration-300 group-hover:translate-x-2 group-hover:translate-y-2" />
                         )}
                         {/* Card 1 (Top / Main Content) */}
                         <div className="absolute top-0 left-0 w-full h-full bg-brand-500 border border-brand-400 rounded-2xl shadow-md z-20 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 group-hover:-translate-y-0.5">
@@ -1553,7 +1553,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                 return (
                                     <div
                                         key={mainApp.id}
-                                        style={{ top: `${top}px`, height: `${height}px`, width: '110%', left: '-5%' }}
+                                        style={{ top: `${top}px`, height: `${height}px`, width: '100%' }}
                                         className="absolute z-10 transition-all hover:z-20 group"
                                     >
                                         <AppointmentCard
