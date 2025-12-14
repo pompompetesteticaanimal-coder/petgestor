@@ -295,7 +295,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const current = new Date(startOfWeek); current.setDate(startOfWeek.getDate() + dayIndex);
             const cYear = current.getFullYear(); const cMonth = String(current.getMonth() + 1).padStart(2, '0'); const cDay = String(current.getDate()).padStart(2, '0');
             const targetDateStr = `${cYear}-${cMonth}-${cDay}`;
-            const dailyApps = appointments.filter(a => { if (a.status === 'cancelado' || a.status === 'nao_veio') return false; const aDate = new Date(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
+            const dailyApps = appointments.filter(a => { if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false; const aDate = new Date(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
             const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateTotal(app, services), 0);
             const formattedDate = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'short' });
             let growth = 0; if (data.length > 0) { const prev = data[data.length - 1]; if (prev.faturamento > 0) growth = ((totalRevenue - prev.faturamento) / prev.faturamento) * 100; }
@@ -310,7 +310,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const month = parseInt(monthStr) - 1;
         const getWeekData = (targetYear: number, targetWeek: number) => {
             const apps = appointments.filter(app => {
-                if (app.status === 'cancelado' || app.status === 'nao_veio') return false;
+                if (!app.date || app.status === 'cancelado' || app.status === 'nao_veio') return false;
                 const d = new Date(app.date);
                 return getISOWeek(d) === targetWeek && d.getFullYear() === targetYear;
             });
@@ -334,15 +334,15 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const data: any[] = []; const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const startMonth = selectedYear === 2025 ? 7 : 0;
         for (let i = startMonth; i < 12; i++) {
-            const monthApps = appointments.filter(a => { const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === i && a.status !== 'cancelado' && a.status !== 'nao_veio'; });
+            const monthApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === i && a.status !== 'cancelado' && a.status !== 'nao_veio'; });
             const stats = calculateStats(monthApps);
-            let revGrowth = 0; if (i > startMonth) { const prevApps = appointments.filter(a => { const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === (i - 1) && a.status !== 'cancelado' && a.status !== 'nao_veio'; }); const prevStats = calculateStats(prevApps); if (prevStats.grossRevenue > 0) revGrowth = ((stats.grossRevenue - prevStats.grossRevenue) / prevStats.grossRevenue) * 100; }
+            let revGrowth = 0; if (i > startMonth) { const prevApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === (i - 1) && a.status !== 'cancelado' && a.status !== 'nao_veio'; }); const prevStats = calculateStats(prevApps); if (prevStats.grossRevenue > 0) revGrowth = ((stats.grossRevenue - prevStats.grossRevenue) / prevStats.grossRevenue) * 100; }
             data.push({ name: monthNames[i], faturamento: stats.grossRevenue, rawRevenue: stats.grossRevenue, pets: stats.totalPets, revGrowth, });
         }
         return data;
     }, [selectedYear, appointments, services]);
 
-    const dailyApps = useMemo(() => appointments.filter(a => a.date.startsWith(selectedDate)), [appointments, selectedDate]);
+    const dailyApps = useMemo(() => appointments.filter(a => a.date && a.date.startsWith(selectedDate)), [appointments, selectedDate]);
     const dailyStats = useMemo(() => calculateStats(dailyApps), [dailyApps, services]);
     const weeklyChartData = useMemo(() => getWeeklyChartData(), [getWeeklyChartData]);
 
@@ -354,7 +354,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const diff = date.getDate() - day;
         const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
         const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
-        const wApps = appointments.filter(a => { if (a.status === 'cancelado' || a.status === 'nao_veio') return false; const ad = new Date(a.date); return ad >= startOfWeek && ad <= endOfWeek; });
+        const wApps = appointments.filter(a => { if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false; const ad = new Date(a.date); return ad >= startOfWeek && ad <= endOfWeek; });
         return calculateStats(wApps);
     };
     // eslint-disable-next-line
@@ -363,9 +363,9 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const monthlyChartData = useMemo(() => getMonthlyChartData(), [getMonthlyChartData]);
     const yearlyChartData = useMemo(() => getYearlyChartData(), [getYearlyChartData]);
 
-    const monthlyApps = appointments.filter(a => a.date.startsWith(selectedMonth));
+    const monthlyApps = appointments.filter(a => a.date && a.date.startsWith(selectedMonth));
     const monthlyStats = calculateStats(monthlyApps);
-    const yearlyApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
+    const yearlyApps = appointments.filter(a => a.date && new Date(a.date).getFullYear() === selectedYear);
     const yearlyStats = calculateStats(yearlyApps);
 
     // --- NEW STATS LOGIC ---
@@ -429,8 +429,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const prevStart = new Date(curr.start); prevStart.setDate(prevStart.getDate() - 7);
             const prev = getWeekRange(prevStart);
 
-            const currApps = appointments.filter(a => { const d = new Date(a.date); return d >= curr.start && d <= curr.end; });
-            const prevApps = appointments.filter(a => { const d = new Date(a.date); return d >= prev.start && d <= prev.end; });
+            const currApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d >= curr.start && d <= curr.end; });
+            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d >= prev.start && d <= prev.end; });
 
             // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
             // Let's use precise dates if possible, or fallback to pro-rated.
@@ -450,8 +450,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
             const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
 
-            const currApps = appointments.filter(a => { const d = new Date(a.date); return d >= currStart && d <= currEnd; });
-            const prevApps = appointments.filter(a => { const d = new Date(a.date); return d >= prevStart && d <= prevEnd; });
+            const currApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d >= currStart && d <= currEnd; });
+            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d >= prevStart && d <= prevEnd; });
 
             const cDays = countBusinessDays(currStart, currEnd);
             const pDays = countBusinessDays(prevStart, prevEnd);
@@ -465,8 +465,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
         }
         else if (activeTab === 'yearly') {
-            const currApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear);
-            const prevApps = appointments.filter(a => new Date(a.date).getFullYear() === selectedYear - 1);
+            const currApps = appointments.filter(a => a.date && new Date(a.date).getFullYear() === selectedYear);
+            const prevApps = appointments.filter(a => a.date && new Date(a.date).getFullYear() === selectedYear - 1);
 
             // Yearly Cost
             const getYearCost = (year: number) => costs.filter(c => new Date(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
@@ -554,7 +554,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                             {dailyApps.length === 0 ? (
                                 <div className="p-8 text-center text-gray-400 font-medium">Nenhum agendamento neste dia.</div>
                             ) : (
-                                dailyApps.sort((a, b) => a.date.localeCompare(b.date)).map((app, index) => {
+                                dailyApps.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((app, index) => {
                                     const client = clients.find(c => c.id === app.clientId);
                                     const pet = client?.pets.find(p => p.id === app.petId);
                                     const mainSvc = services.find(s => s.id === app.serviceId);
@@ -2027,6 +2027,8 @@ const App: React.FC = () => {
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
     const [settings, setSettings] = useState<AppSettings>({ appName: 'PomPomPet', logoUrl: '', theme: 'rose', sidebarOrder: ['operacional', 'cadastros', 'gerencial'], darkMode: false });
     const [petDetailsData, setPetDetailsData] = useState<{ pet: Pet, client: Client } | null>(null);
+    const [selectedCluster, setSelectedCluster] = useState<Appointment[] | null>(null);
+    const [detailsApp, setDetailsApp] = useState<Appointment | null>(null);
 
     // --- DARK MODE EFFECT ---
     useEffect(() => {
