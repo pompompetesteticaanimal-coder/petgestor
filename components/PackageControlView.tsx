@@ -101,7 +101,11 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
         fortnightly: packageData.filter(i => i.type === 'Quinzenal').length,
         renewals: packageData.filter(i => i.isRenewal).length,
         revenue: packageData.reduce((acc, curr) => {
-            const service = services.find(s => s.name === curr.serviceName); // Simplified lookup, ideally use ID if available in item
+            // Logic: Always sum the price of the FIRST package (e.g. "Pacote Mensal 1") 
+            // because subsequent packages might be $0 or pro-rated.
+            // Heuristic: Replace the first digit found in the name with '1'.
+            const baseName = curr.serviceName.replace(/\d+/, '1');
+            const service = services.find(s => s.name === baseName) || services.find(s => s.name === curr.serviceName);
             return acc + (service?.price || 0);
         }, 0)
     };
