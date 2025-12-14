@@ -1231,8 +1231,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
+    // --- SIDE-BY-SIDE LAYOUT ALGORITHM (GRID) ---
     const getLayout = useCallback((dayApps: Appointment[]) => {
-        // Sort by time
+        // Sort by time (Timezone Agnostic)
         const sorted = [...dayApps].sort((a, b) => {
             const [hA, mA] = a.date.split('T')[1].split(':');
             const [hB, mB] = b.date.split('T')[1].split(':');
@@ -1240,9 +1241,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         });
 
         const nodes = sorted.map(app => {
-            // Parse string directly to avoid Timezone shifts
             const [hStr, mStr] = app.date.split('T')[1].split(':');
-            const start = (parseInt(hStr) * 60 + parseInt(mStr)) * 60000; // relative ms from 00:00
+            const start = (parseInt(hStr) * 60 + parseInt(mStr)) * 60000;
             const end = start + (app.durationTotal || 60) * 60000;
             return { app, start, end };
         });
@@ -1252,7 +1252,6 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             let currentCluster = [nodes[0]];
             let clusterEnd = nodes[0].end;
             for (let i = 1; i < nodes.length; i++) {
-                // Check overlap
                 if (nodes[i].start < clusterEnd) {
                     currentCluster.push(nodes[i]);
                     clusterEnd = Math.max(clusterEnd, nodes[i].end);
@@ -1268,13 +1267,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number, index: number, totalCount: number }[] = [];
         clusters.forEach(cluster => {
             const count = cluster.length;
-            const widthPercent = 100 / count;
+            const widthPercent = 98 / count; // Slightly less than 100% for gap
 
             cluster.forEach((node, index) => {
                 layoutResult.push({
                     app: node.app,
-                    left: `${index * widthPercent}%`, // Columnar Layout
-                    width: `${widthPercent}%`,      // Share width equally
+                    left: `${index * widthPercent}%`,
+                    width: `${widthPercent}%`,
                     zIndex: 10 + index,
                     topOffset: 0,
                     index: index,
