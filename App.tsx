@@ -1352,13 +1352,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                 const c = clients.find(cl => cl.id === a.clientId);
                                 const p = c?.pets.find(pt => pt.id === a.petId);
                                 const s = services.find(sv => sv.id === a.serviceId);
-                                const isGrooming = s?.name.toLowerCase().includes('tosa');
+                                const isGrooming = s?.name?.toLowerCase().includes('tosa') || false;
 
                                 return (
                                     <div key={a.id} className="relative w-7 h-7">
                                         <div className="w-7 h-7 rounded-full bg-white border-2 border-brand-300 shadow-sm flex items-center justify-center text-[10px] font-extrabold text-brand-600 overflow-hidden">
                                             {/* Avatar Placeholder or Image if we had it */}
-                                            {p?.name.substring(0, 1).toUpperCase()}
+                                            {p?.name ? p.name.substring(0, 1).toUpperCase() : '?'}
                                         </div>
                                         {/* Tiny Service Icon Badge */}
                                         <div className="absolute -bottom-1 -right-1 bg-brand-700 rounded-full p-0.5 border border-white">
@@ -1399,12 +1399,12 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 <div className={`w-full h-full p-2 border shadow-sm rounded-xl overflow-hidden flex flex-col justify-between ${colorClass} cursor-pointer hover:shadow-lg hover:scale-[1.02] btn-spring`}>
                     <div className="flex flex-col w-full overflow-hidden">
                         <div className="flex justify-between items-start w-full mb-0.5">
-                            <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{pet?.name}</span>
+                            <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{pet?.name || 'Pet'}</span>
                             {avgRating > 0 && <div className="flex bg-white/60 px-1 py-0.5 rounded-md items-center ml-1 shadow-sm"><Star size={8} className="fill-yellow-500 text-yellow-500" /><span className="text-[9px] font-bold ml-0.5 text-yellow-700">{avgRating.toFixed(1)}</span></div>}
                         </div>
                         <div className="flex items-center gap-1 text-[10px] font-semibold opacity-70 truncate mb-1">
                             <User size={10} />
-                            {client?.name.split(' ')[0]}
+                            {client?.name ? client.name.split(' ')[0] : 'Cliente'}
                         </div>
                         <div className="flex flex-col w-full mt-auto">
                             {mainSvc && <div className="truncate font-bold text-[11px] leading-3 mb-0.5">{mainSvc.name}</div>}
@@ -1419,7 +1419,6 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             </div>
         );
     };
-
     const renderDayView = () => {
         const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
         const dateStr = currentDate.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps);
@@ -2448,7 +2447,9 @@ const App: React.FC = () => {
                         <div className="flex justify-between items-center mb-6 px-1">
                             <div>
                                 <h3 className="text-xl font-black text-gray-800 tracking-tight">Agendamentos Simultâneos</h3>
-                                <div className="text-xs font-semibold text-gray-400 mt-0.5 uppercase tracking-wider">{selectedCluster[0]?.date.split('T')[1].substring(0, 5)} • {selectedCluster.length} PETS</div>
+                                <div className="text-xs font-semibold text-gray-400 mt-0.5 uppercase tracking-wider">
+                                    {selectedCluster[0]?.date ? selectedCluster[0].date.split('T')[1].substring(0, 5) : '--:--'} • {selectedCluster.length} PETS
+                                </div>
                             </div>
                             <button onClick={() => setSelectedCluster(null)} className="p-2 hover:bg-black/5 rounded-full transition-colors">
                                 <X size={24} className="text-gray-400" />
@@ -2466,16 +2467,16 @@ const App: React.FC = () => {
                                         <div className="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity" />
 
                                         <div className="w-14 h-14 rounded-2xl bg-brand-100/50 flex items-center justify-center text-brand-600 font-extrabold text-xl shadow-inner">
-                                            {pet?.name.substring(0, 1).toUpperCase()}
+                                            {pet?.name ? pet.name.substring(0, 1).toUpperCase() : '?'}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-baseline">
-                                                <span className="font-extrabold text-gray-800 text-lg truncate">{pet?.name}</span>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 rounded-full text-gray-500">{client?.name.split(' ')[0]}</span>
+                                                <span className="font-extrabold text-gray-800 text-lg truncate">{pet?.name || 'Pet'}</span>
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 rounded-full text-gray-500">{client?.name ? client.name.split(' ')[0] : 'Client'}</span>
                                             </div>
                                             <div className="text-sm font-bold text-brand-600 mt-0.5 truncate flex items-center gap-1.5">
                                                 {srv?.name?.toLowerCase().includes('tosa') ? <Scissors size={12} /> : <Sparkles size={12} />}
-                                                {srv?.name}
+                                                {srv?.name || 'Serviço'}
                                             </div>
                                         </div>
                                         <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-300">
