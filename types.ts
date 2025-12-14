@@ -79,3 +79,28 @@ export interface ActivityLog {
 }
 
 export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu' | 'inactive_clients' | 'packages' | 'activity_log';
+
+export const BRAZIL_DOG_BREEDS = [
+  'SRD (Vira-lata)',
+  'Shih Tzu',
+  'Yorkshire Terrier',
+  'Poodle',
+  'Lhasa Apso',
+  'Buldogue Francês',
+  'Golden Retriever',
+  'Labrador',
+  'Maltês',
+  'Pug',
+  'Spitz Alemão',
+  'Pinscher',
+  'Schnauzer',
+  'Beagle',
+  'Border Collie',
+  'Daschund (Salsicha)',
+  'Rottweiler',
+  'Pit Bull',
+  'Chow Chow',
+  'Cocker Spaniel',
+  'Pastor Alemão',
+  'Outra'
+];

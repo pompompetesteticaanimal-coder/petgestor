@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check, Plus, Trash2, PawPrint } from 'lucide-react';
-import { Client, Pet } from '../types';
+import { Client, Pet, BRAZIL_DOG_BREEDS } from '../types';
 
 interface ClientFormModalProps {
     isOpen: boolean;
@@ -138,10 +138,11 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({ isOpen, onClos
                                                 <input value={pet.name} onChange={e => updatePet(index, 'name', e.target.value)} className="w-full pl-10 pr-4 py-3.5 bg-gray-50 border-none rounded-xl font-bold text-gray-800 focus:ring-2 ring-purple-200 outline-none transition-all" placeholder="Nome do Pet" />
                                             </div>
                                         </div>
-                                        <div className="col-span-2">
-                                            <label className="text-[10px] uppercase font-bold text-gray-400 ml-1 mb-1 block">Raça</label>
-                                            <input value={pet.breed} onChange={e => updatePet(index, 'breed', e.target.value)} className="w-full bg-gray-50 border-none p-3.5 rounded-xl font-medium text-gray-800 focus:ring-2 ring-purple-200 outline-none transition-all" placeholder="Ex: Shih-tzu" />
-                                        </div>
+                                        <label className="text-[10px] uppercase font-bold text-gray-400 ml-1 mb-1 block">Raça</label>
+                                        <select value={pet.breed} onChange={e => updatePet(index, 'breed', e.target.value)} className="w-full bg-gray-50 border-none p-3.5 rounded-xl font-medium text-gray-800 focus:ring-2 ring-purple-200 outline-none transition-all cursor-pointer">
+                                            <option value="">Selecione</option>
+                                            {BRAZIL_DOG_BREEDS.map(b => <option key={b} value={b}>{b}</option>)}
+                                        </select>
 
                                         <div>
                                             <label className="text-[10px] uppercase font-bold text-gray-400 ml-1 mb-1 block">Porte</label>

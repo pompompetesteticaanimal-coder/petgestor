@@ -238,7 +238,10 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                                                     </div>
                                                                     <div>
                                                                         <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Raça</label>
-                                                                        <input value={petEditForm.breed || ''} onChange={e => setPetEditForm({ ...petEditForm, breed: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2 text-sm" />
+                                                                        <select value={petEditForm.breed || ''} onChange={e => setPetEditForm({ ...petEditForm, breed: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2 text-sm">
+                                                                            <option value="">Selecione</option>
+                                                                            {BRAZIL_DOG_BREEDS.map(b => <option key={b} value={b}>{b}</option>)}
+                                                                        </select>
                                                                     </div>
                                                                     <div>
                                                                         <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Idade</label>
