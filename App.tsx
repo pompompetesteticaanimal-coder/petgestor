@@ -184,7 +184,7 @@ const BottomSheetList: React.FC<{ isOpen: boolean; onClose: () => void; timeSlot
                         const client = clients.find(c => c.id === app.clientId);
                         const pet = client?.pets.find(p => p.id === app.petId);
                         const mainSvc = services.find(s => s.id === app.serviceId);
-                        const isGrooming = mainSvc?.name?.toLowerCase().includes('tosa');
+                        const isGrooming = (mainSvc?.name || '').toLowerCase().includes('tosa');
 
                         return (
                             <div key={app.id} className="sheet-item cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onEdit(app)}>
