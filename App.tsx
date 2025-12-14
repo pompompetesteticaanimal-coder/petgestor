@@ -1279,49 +1279,39 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         clusters.forEach(cluster => {
             const count = cluster.length;
 
-            // Logic: Max 2 columns. If > 2, the 2nd column is a Stack.
-            // Col 1: Index 0
-            // Col 2: Index 1 (Stack if count > 2)
-            // Hidden: Index 2+
-
-            cluster.forEach((node, index) => {
-                let left = '0%';
-                let width = '100%';
-                let isStack = false;
-                let hidden = false;
-
-                if (count === 1) {
-                    left = '0%'; width = '100%';
-                } else if (count === 2) {
-                    width = '49%'; // 50% with gap
-                    left = index === 0 ? '0%' : '51%';
-                } else {
-                    // Count > 2: Stack Mode
-                    if (index === 0) {
-                        width = '49%'; left = '0%';
-                    } else if (index === 1) {
-                        width = '49%'; left = '51%';
-                        isStack = true;
-                    } else {
-                        hidden = true;
-                    }
-                }
-
-                if (!hidden) {
+            // NEW LOGIC: Always Stack if Count > 1
+            // This satisfies "Agrupamento Vertical" and prevents broken columns on mobile
+            if (count > 1) {
+                // Render ONLY the first item as a Stack Representative
+                layoutResult.push({
+                    app: cluster[0].app,
+                    left: '2.5%', // Centered slightly
+                    width: '95%',
+                    zIndex: 20,
+                    topOffset: 0,
+                    index: 0,
+                    totalCount: count,
+                    isStack: true, // Force stack mode
+                    hidden: false,
+                    cluster: cluster.map(n => n.app)
+                });
+                // Indices 1..N are implicit in the stack and not rendered as separate cards
+            } else {
+                // Single Item - Normal Width
+                cluster.forEach((node, index) => {
                     layoutResult.push({
                         app: node.app,
-                        left,
-                        width,
-                        zIndex: 10 + index,
+                        left: '0%',
+                        width: '100%',
+                        zIndex: 10,
                         topOffset: 0,
                         index: index,
-                        totalCount: count,
-                        isStack: isStack,
-                        hidden: false,
-                        cluster: isStack ? cluster.map(n => n.app) : undefined
+                        totalCount: 1,
+                        isStack: false,
+                        hidden: false
                     });
-                }
-            });
+                });
+            }
         });
         return layoutResult;
     }, []);
@@ -1436,22 +1426,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             <div key={dateStr} className={`relative h-[1680px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 14 }, (_, i) => i + 6).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
                 <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)] overflow-x-auto"> {Array.from({ length: 84 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)}
-                    {/* Overflow Indicators Layer */}
-                    <div className="absolute top-0 right-0 h-full w-[60px] pointer-events-none z-50 flex flex-col items-end">
-                        {layoutItems.filter((item: any) => item.index === 0 && item.totalCount > 2).map((item: any) => {
-                            // Parse string directly to avoid Timezone shifts (User sees what is stored)
-                            if (!item.app.date) return null;
-                            const timePart = item.app.date.includes('T') ? item.app.date.split('T')[1] : '09:00';
-                            const [hStr, mStr] = timePart.split(':');
-                            const startMin = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
-                            const top = startMin * 2;
-                            return (
-                                <div key={`overflow-${item.app.id}`} className="absolute right-1 bg-red-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg flex items-center gap-0.5 animate-pulse" style={{ top: `${top + 5}px` }}>
-                                    +{item.totalCount - 2} <ChevronRight size={10} />
-                                </div>
-                            );
-                        })}
-                    </div>
+
                     {layoutItems.map((item: any, idx) => {
                         const app = item.app;
                         if (!app.date) return null;
