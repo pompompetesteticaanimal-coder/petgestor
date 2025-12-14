@@ -46,6 +46,7 @@ export interface Appointment {
   paymentMethod?: 'Credito' | 'Debito' | 'Pix' | 'Dinheiro' | ''; // Forma de Pagamento
   rating?: number; // 1-5
   ratingTags?: string[]; // Tags de avaliação
+  googleEventId?: string; // Sync ID
 }
 
 export interface CostItem {

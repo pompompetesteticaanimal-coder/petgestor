@@ -181,23 +181,40 @@ const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: st
     });
 
     return (
-        <div className={`fixed inset-0 z-[100] flex items-end justify-center pointer-events-none ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}>
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm pointer-events-auto transition-opacity" onClick={handleClose} />
-            <div className={`bg-white/90 backdrop-blur-xl w-full max-w-2xl rounded-t-[2.5rem] shadow-[0_-10px_60px_-15px_rgba(0,0,0,0.3)] border-t border-white/50 flex flex-col max-h-[85vh] pointer-events-auto relative transform transition-transform duration-300 ease-out ${isClosing ? 'translate-y-full' : 'animate-slide-up-mobile'}`} onClick={e => e.stopPropagation()}>
-                <div className="w-full h-8 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing" onClick={handleClose}>
-                    <div className="w-12 h-1.5 bg-gray-300/50 rounded-full backdrop-blur-md" />
+        <div
+            className="fixed inset-0 z-[100] flex items-end justify-center backdrop-blur-[2px] transition-all duration-500"
+            style={{ background: 'rgba(0,0,0,0.2)' }}
+            onClick={handleClose}
+        >
+            <div
+                className={`w-full max-w-md bg-white/85 shadow-2xl overflow-hidden flex flex-col transition-transform duration-500 cubic-bezier(0.2, 0.8, 0.2, 1) ${isClosing ? 'translate-y-[100%]' : 'translate-y-0'} ${isOpen ? 'animate-slide-up-ios' : ''}`}
+                style={{
+                    borderTopLeftRadius: '24px',
+                    borderTopRightRadius: '24px',
+                    backdropFilter: 'blur(20px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                    paddingBottom: 'env(safe-area-inset-bottom)',
+                    maxHeight: '85vh',
+                    boxShadow: '0px -10px 40px rgba(0, 0, 0, 0.1)'
+                }}
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Drag Handle */}
+                <div className="w-full flex justify-center pt-3 pb-1" onClick={onClose}>
+                    <div className="w-12 h-1.5 bg-gray-300/50 rounded-full cursor-pointer hover:bg-gray-400/50 transition-colors" />
                 </div>
-                <div className="px-6 pb-4 flex justify-between items-end border-b border-gray-100/50 mb-2">
+
+                <div className="px-6 py-4 flex justify-between items-center border-b border-gray-200/50">
                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="p-2.5 bg-brand-100/50 text-brand-600 rounded-2xl backdrop-blur-sm"><CalendarIcon size={22} /></div>
-                            <h3 className="font-bold text-2xl text-gray-900 tracking-tight capitalize">{dateObj.toLocaleDateString('pt-BR', { weekday: 'long' })}</h3>
-                        </div>
-                        <p className="text-gray-500 font-medium pl-1 text-sm">{dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</p>
+                        <h3 className="font-bold text-2xl text-gray-900 tracking-tight">{dateObj.toLocaleDateString('pt-BR', { weekday: 'long' })}</h3>
+                        <p className="text-gray-500 font-medium text-sm capitalize">{dateObj.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}</p>
                     </div>
-                    <button onClick={handleClose} className="bg-gray-100/50 hover:bg-gray-200/50 text-gray-600 p-2.5 rounded-full transition-all mb-1 backdrop-blur-sm"><X size={20} /></button>
+                    <div className="bg-gray-100/50 p-2 rounded-full cursor-pointer hover:bg-gray-200/50 transition-colors" onClick={onClose}>
+                        <X size={20} className="text-gray-500" />
+                    </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-transparent">
+
+                <div className="p-4 overflow-y-auto flex-1 space-y-2">
                     {sortedApps.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-gray-400"><CalendarIcon size={48} className="mb-4 opacity-30" /><p className="font-medium">Nenhum agendamento para este dia.</p></div>
                     ) : (
@@ -1344,49 +1361,61 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             }
         };
 
-        // --- STACK VIEW (AVATAR SUMMARY) ---
+        // --- STACK VIEW (CSS 3D Deck) ---
         if (isStack && clusterApps && clusterApps.length > 0) {
-            // Get avatars for the first few apps
-            const previewApps = clusterApps.slice(0, 3);
-            const remainder = clusterApps.length - 3;
+            // We render the top 3 cards to create the stack effect
+            // The logic: 
+            // - The container is the click target (for interaction)
+            // - The children are absolutely positioned to create the stack
+
+            const count = clusterApps.length;
+            const topApp = clusterApps[0];
+            const client = clients.find(c => c.id === topApp.clientId);
+            const pet = client?.pets.find(p => p.id === topApp.petId);
+            const mainSvc = services.find(s => s.id === topApp.serviceId);
+            const isGrooming = mainSvc?.name?.toLowerCase().includes('tosa') || false;
 
             return (
-                <div style={style} className="absolute rounded-2xl transition-all cursor-pointer hover:scale-105 z-30 group" onClick={handleClick} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                    {/* Deck Effect Layers */}
-                    <div className="absolute top-1 left-1 w-full h-full bg-brand-200 rounded-2xl shadow-sm -z-10" />
-                    <div className="absolute top-2 left-2 w-full h-full bg-brand-100 rounded-2xl shadow-sm -z-20" />
-
-                    {/* Main Stack Card */}
-                    <div className="w-full h-full bg-brand-500 border border-brand-400 shadow-md rounded-2xl p-1.5 flex flex-col items-center justify-center relative overflow-hidden">
-                        {/* Background Decoration */}
-                        <div className="absolute -right-4 -top-4 w-12 h-12 bg-white/10 rounded-full blur-md" />
-
-                        <div className="flex flex-wrap gap-1 justify-center items-center w-full h-full content-center">
-                            {previewApps.map(a => {
-                                const c = clients.find(cl => cl.id === a.clientId);
-                                const p = c?.pets.find(pt => pt.id === a.petId);
-                                const s = services.find(sv => sv.id === a.serviceId);
-                                const isGrooming = s?.name?.toLowerCase().includes('tosa') || false;
-
-                                return (
-                                    <div key={a.id} className="relative w-7 h-7">
-                                        <div className="w-7 h-7 rounded-full bg-white border-2 border-brand-300 shadow-sm flex items-center justify-center text-[10px] font-extrabold text-brand-600 overflow-hidden">
-                                            {/* Avatar Placeholder or Image if we had it */}
-                                            {p?.name ? p.name.substring(0, 1).toUpperCase() : '?'}
-                                        </div>
-                                        {/* Tiny Service Icon Badge */}
-                                        <div className="absolute -bottom-1 -right-1 bg-brand-700 rounded-full p-0.5 border border-white">
-                                            {isGrooming ? <Scissors size={6} className="text-white" /> : <Sparkles size={6} className="text-white" />}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-
-                            {remainder > 0 && (
-                                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold text-white border border-white/30">
-                                    +{remainder}
+                <div
+                    style={style}
+                    className="absolute z-30 group cursor-pointer transition-transform active:scale-95"
+                    onClick={handleClick}
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                >
+                    {/* Visual Stack Cards (Pure CSS Logic) */}
+                    <div className="relative w-full h-full">
+                        {/* Card 3 (Bottom) */}
+                        {count > 2 && (
+                            <div className="absolute top-0 left-0 w-full h-full bg-brand-200 rounded-2xl shadow-sm transform translate-y-2.5 scale-90 opacity-60 z-0 transition-all duration-300 group-hover:translate-y-3" />
+                        )}
+                        {/* Card 2 (Middle) */}
+                        {count > 1 && (
+                            <div className="absolute top-0 left-0 w-full h-full bg-brand-300 rounded-2xl shadow-sm transform translate-y-1.5 scale-95 opacity-80 z-10 transition-all duration-300 group-hover:translate-y-2" />
+                        )}
+                        {/* Card 1 (Top / Main Content) */}
+                        <div className="absolute top-0 left-0 w-full h-full bg-brand-500 border border-brand-400 rounded-2xl shadow-md z-20 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 group-hover:-translate-y-0.5">
+                            {/* Content */}
+                            <div className="flex gap-2 items-center justify-center p-1">
+                                {/* Avatar */}
+                                <div className="w-8 h-8 rounded-full bg-white border-2 border-brand-200 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0">
+                                    <span className="text-xs font-bold text-gray-500">{pet?.name?.charAt(0).toUpperCase()}</span>
                                 </div>
-                            )}
+
+                                {/* Text + Badge */}
+                                <div className="flex flex-col items-start min-w-0">
+                                    <span className="text-[10px] font-bold text-white truncate max-w-[60px] leading-tight">{pet?.name}</span>
+                                    {count > 1 && (
+                                        <div className="bg-white/20 px-1 py-0.5 rounded text-[8px] font-bold text-white truncate flex items-center gap-0.5">
+                                            +{count - 1} <span className="opacity-70">mais</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Service Icon Badge */}
+                            <div className="absolute bottom-1 right-1 bg-white/20 p-0.5 rounded-full backdrop-blur-sm">
+                                {isGrooming ? <Scissors size={8} className="text-white" /> : <Sparkles size={8} className="text-white" />}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2001,17 +2030,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 document.body
             )}
             {/* Day Details Modal */}
-            {selectedDayForDetails && createPortal(
-                <DayDetailsModal
-                    isOpen={!!selectedDayForDetails}
-                    onClose={() => setSelectedDayForDetails(null)}
-                    date={selectedDayForDetails || ''}
-                    appointments={appointments.filter(a => a.date.startsWith(selectedDayForDetails || '') && a.status !== 'cancelado')}
-                    clients={clients}
-                    services={services}
-                />,
-                document.body
-            )}
+
         </div>
     );
 };
