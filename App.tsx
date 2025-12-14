@@ -1232,34 +1232,51 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
     const getLayout = useCallback((dayApps: Appointment[]) => {
-        const sorted = [...dayApps].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        const nodes = sorted.map(app => { const start = new Date(app.date).getTime(); const end = start + (app.durationTotal || 60) * 60000; return { app, start, end }; });
+        // Sort by time
+        const sorted = [...dayApps].sort((a, b) => {
+            const [hA, mA] = a.date.split('T')[1].split(':');
+            const [hB, mB] = b.date.split('T')[1].split(':');
+            return (parseInt(hA) * 60 + parseInt(mA)) - (parseInt(hB) * 60 + parseInt(mB));
+        });
+
+        const nodes = sorted.map(app => {
+            // Parse string directly to avoid Timezone shifts
+            const [hStr, mStr] = app.date.split('T')[1].split(':');
+            const start = (parseInt(hStr) * 60 + parseInt(mStr)) * 60000; // relative ms from 00:00
+            const end = start + (app.durationTotal || 60) * 60000;
+            return { app, start, end };
+        });
+
         const clusters: typeof nodes[] = [];
         if (nodes.length > 0) {
             let currentCluster = [nodes[0]];
             let clusterEnd = nodes[0].end;
             for (let i = 1; i < nodes.length; i++) {
-                if (nodes[i].start < clusterEnd) { currentCluster.push(nodes[i]); clusterEnd = Math.max(clusterEnd, nodes[i].end); } else { clusters.push(currentCluster); currentCluster = [nodes[i]]; clusterEnd = nodes[i].end; }
+                // Check overlap
+                if (nodes[i].start < clusterEnd) {
+                    currentCluster.push(nodes[i]);
+                    clusterEnd = Math.max(clusterEnd, nodes[i].end);
+                } else {
+                    clusters.push(currentCluster);
+                    currentCluster = [nodes[i]];
+                    clusterEnd = nodes[i].end;
+                }
             }
             clusters.push(currentCluster);
         }
+
         const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number, index: number, totalCount: number }[] = [];
         clusters.forEach(cluster => {
-            // Cascading Layout: All overlapping items form a single group
-            // We shift each item slightly right and down to reveal headers
-            cluster.forEach((node, index) => {
-                const count = cluster.length;
-                // If it's a cluster, we cascade. If single, full width.
-                const isStack = count > 1;
+            const count = cluster.length;
+            const widthPercent = 100 / count;
 
+            cluster.forEach((node, index) => {
                 layoutResult.push({
                     app: node.app,
-                    left: isStack ? `${index * 15}%` : '0%', // Shift right for fan effect
-                    width: isStack ? '85%' : '100%', // Fixed high width to ensure readability & force scroll if container allows
+                    left: `${index * widthPercent}%`, // Columnar Layout
+                    width: `${widthPercent}%`,      // Share width equally
                     zIndex: 10 + index,
-                    // Reverted topOffset (User Requirement: Strict Start Time)
                     topOffset: 0,
-                    // Stats for Overflow Indicator
                     index: index,
                     totalCount: count
                 });
