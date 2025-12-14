@@ -67,8 +67,10 @@ export const PetDetailsModal: React.FC<PetDetailsModalProps> = ({ isOpen, onClos
                     {/* Stats Row */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <div className="bg-orange-50 p-3 rounded-2xl border border-orange-100 flex flex-col items-center justify-center text-center">
-                            <div className="flex items-center gap-1 text-orange-600 font-bold text-xl">
-                                {averageRating} <Star size={16} fill="currentColor" />
+                            <div className="flex items-center gap-1 text-orange-600 font-bold text-xl justify-center">
+                                {[1, 2, 3, 4, 5].map(s => (
+                                    <Star key={s} size={16} className={Number(averageRating) >= s ? "fill-orange-500 text-orange-500" : "text-orange-200"} />
+                                ))}
                             </div>
                             <span className="text-xs text-orange-400 font-medium uppercase tracking-wide">Avaliação Média</span>
                         </div>

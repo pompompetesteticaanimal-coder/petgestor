@@ -1407,7 +1407,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     <div className="flex flex-col w-full overflow-hidden">
                         <div className="flex justify-between items-start w-full mb-0.5">
                             <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{pet?.name || 'Pet'}</span>
-                            {avgRating > 0 && <div className="flex bg-white/60 px-1 py-0.5 rounded-md items-center ml-1 shadow-sm"><Star size={8} className="fill-yellow-500 text-yellow-500" /><span className="text-[9px] font-bold ml-0.5 text-yellow-700">{avgRating.toFixed(1)}</span></div>}
+                            {avgRating > 0 && (
+                                <div className="flex bg-white/60 px-1 py-0.5 rounded-md items-center ml-1 shadow-sm gap-0.5">
+                                    {[1, 2, 3, 4, 5].map(s => (
+                                        <Star key={s} size={8} className={avgRating >= s ? "fill-yellow-500 text-yellow-500" : "text-gray-300"} />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div className="flex items-center gap-1 text-[10px] font-semibold opacity-70 truncate mb-1">
                             <User size={10} />
