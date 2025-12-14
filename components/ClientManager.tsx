@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Plus, Trash2, Phone, Search, Star, MapPin, PawPrint, Check, X,
-    Settings, Clock, Activity, Edit2
+    Settings, Clock, Activity, Edit2, Calendar
 } from 'lucide-react';
 import { Client, Appointment, Pet, BRAZIL_DOG_BREEDS, getBreedEmoji } from '../types';
 import { ClientFormModal } from './ClientFormModal';
@@ -217,6 +217,85 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* New Stats & History Section */}
+                                        {(() => {
+                                            const clientApps = appointments.filter(a => a.clientId === selectedClient!.id);
+                                            const pastApps = clientApps.filter(a => a.status === 'concluido').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                                            const futureApps = clientApps.filter(a => a.status === 'agendado').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                            const ratedApps = pastApps.filter(a => a.rating);
+                                            const avgRating = ratedApps.length > 0 ? ratedApps.reduce((acc, curr) => acc + (curr.rating || 0), 0) / ratedApps.length : 0;
+
+                                            return (
+                                                <div className="mb-8 space-y-6">
+                                                    {/* Rating Card */}
+                                                    {ratedApps.length > 0 && (
+                                                        <div className="bg-yellow-50 p-4 rounded-3xl border border-yellow-100 flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="p-3 bg-white rounded-2xl shadow-sm text-yellow-500"><Star size={20} className="fill-current" /></div>
+                                                                <div>
+                                                                    <p className="text-[10px] uppercase font-bold text-yellow-600/70 tracking-wider mb-0.5">Média de Avaliação</p>
+                                                                    <div className="flex items-end gap-1.5">
+                                                                        <span className="text-2xl font-black text-gray-800 leading-none">{avgRating.toFixed(1)}</span>
+                                                                        <span className="text-xs font-bold text-gray-400 mb-0.5">/ 5.0</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <span className="block text-2xl font-black text-gray-800 leading-none">{ratedApps.length}</span>
+                                                                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Avaliações</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Future Visits */}
+                                                    {futureApps.length > 0 && (
+                                                        <div>
+                                                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Calendar size={14} /> Próximas Visitas</h3>
+                                                            <div className="space-y-2">
+                                                                {futureApps.slice(0, 3).map(app => (
+                                                                    <div key={app.id} className="bg-gray-50 p-3 rounded-2xl flex justify-between items-center border border-gray-100">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="w-10 h-10 bg-white rounded-xl flex flex-col items-center justify-center border border-gray-100 shadow-sm">
+                                                                                <span className="text-xs font-bold text-gray-400 uppercase">{new Date(app.date).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}</span>
+                                                                                <span className="text-sm font-black text-gray-800 leading-none">{new Date(app.date).getDate()}</span>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="font-bold text-gray-800 text-sm">{app.date.split('T')[1].slice(0, 5)}</p>
+                                                                                <p className="text-xs text-gray-500 font-medium">Agendado</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* History */}
+                                                    <div>
+                                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Clock size={14} /> Histórico ({pastApps.length})</h3>
+                                                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                                                            {pastApps.map(app => (
+                                                                <div key={app.id} className="flex justify-between items-center p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className={`w-2 h-2 rounded-full ${app.rating ? 'bg-green-400' : 'bg-gray-300'}`} />
+                                                                        <div>
+                                                                            <p className="font-bold text-gray-700 text-sm">{new Date(app.date).toLocaleDateString('pt-BR')}</p>
+                                                                            <div className="flex items-center gap-1">
+                                                                                {app.rating && <Star size={10} className="fill-yellow-400 text-yellow-400" />}
+                                                                                <span className="text-xs text-gray-400 font-medium">{app.rating ? `${app.rating}.0` : 'Sem avaliação'}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-gray-400">{app.paidAmount ? `R$ ${app.paidAmount}` : '-'}</span>
+                                                                </div>
+                                                            ))}
+                                                            {pastApps.length === 0 && <p className="text-center text-xs text-gray-400 py-4 italic">Nenhuma visita anterior.</p>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
 
                                         <div className="bg-gray-50/50 rounded-3xl p-5 border border-gray-100 mb-8">
                                             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">

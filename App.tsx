@@ -537,12 +537,38 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6"><StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" /><StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Normal e Tesoura" /><StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" /><StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" /></div>
                     <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
-                        <h3 className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 border-b border-gray-100/50 dark:border-gray-700/50 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento do Dia</h3>
+                        <div className="p-5 border-b border-gray-100/50 dark:border-gray-700/50 flex justify-between items-center">
+                            <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento do Dia</h3>
+                            <button onClick={() => { setIsDailySearchOpen(!isDailySearchOpen); if (isDailySearchOpen) setDailySearchTerm(''); }} className={`p-2 rounded-xl transition-all ${isDailySearchOpen ? 'bg-brand-50 text-brand-600' : 'text-gray-400 hover:bg-gray-50'}`}>
+                                {isDailySearchOpen ? <X size={18} /> : <Search size={18} />}
+                            </button>
+                        </div>
+                        {isDailySearchOpen && (
+                            <div className="px-5 pt-0 pb-4 animate-slide-down">
+                                <input
+                                    autoFocus
+                                    placeholder="Buscar por cliente ou pet..."
+                                    value={dailySearchTerm}
+                                    onChange={e => setDailySearchTerm(e.target.value)}
+                                    className="w-full bg-white border-2 border-brand-100 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-200 placeholder:font-medium"
+                                />
+                            </div>
+                        )}
                         <div className="p-4 space-y-3">
-                            {dailyApps.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400 font-medium">Nenhum agendamento neste dia.</div>
-                            ) : (
-                                dailyApps.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((app, index) => {
+                            {(() => {
+                                const filteredDailyApps = dailyApps.filter(app => {
+                                    if (!dailySearchTerm) return true;
+                                    const c = clients.find(cl => cl.id === app.clientId);
+                                    const p = c?.pets.find(pt => pt.id === app.petId);
+                                    const term = dailySearchTerm.toLowerCase();
+                                    return c?.name.toLowerCase().includes(term) || p?.name.toLowerCase().includes(term);
+                                });
+
+                                if (filteredDailyApps.length === 0) {
+                                    return <div className="p-8 text-center text-gray-400 font-medium">Nenhum agendamento encontrado.</div>;
+                                }
+
+                                return filteredDailyApps.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((app, index) => {
                                     const client = clients.find(c => c.id === app.clientId);
                                     const pet = client?.pets.find(p => p.id === app.petId);
                                     const mainSvc = services.find(s => s.id === app.serviceId);
