@@ -154,101 +154,62 @@ const CustomXAxisTick = ({ x, y, payload, data }: any) => {
     );
 };
 
-const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: string; appointments: Appointment[]; clients: Client[]; services: Service[]; onAppointmentClick: (app: Appointment) => void }> = ({ isOpen, onClose, date, appointments, clients, services, onAppointmentClick }) => {
-    if (!isOpen) return null;
+// iOS Bottom Sheet Implementation
+const BottomSheetList: React.FC<{ isOpen: boolean; onClose: () => void; timeSlot: string; appointments: Appointment[]; clients: Client[]; services: Service[]; onEdit: (app: Appointment) => void }> = ({ isOpen, onClose, timeSlot, appointments, clients, services, onEdit }) => {
+    const [active, setActive] = useState(false);
 
     useEffect(() => {
-        document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = 'unset'; };
-    }, []);
+        if (isOpen) {
+            requestAnimationFrame(() => setActive(true));
+            document.body.style.overflow = 'hidden';
+        } else {
+            setActive(false);
+            document.body.style.overflow = 'unset';
+        }
+    }, [isOpen]);
 
-    const [y, m, d] = date.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
-    const sortedApps = [...appointments].sort((a, b) => {
-        const timeA = a.date.includes('T') ? a.date.split('T')[1] : '00:00';
-        const timeB = b.date.includes('T') ? b.date.split('T')[1] : '00:00';
-        return timeA.localeCompare(timeB);
-    });
+    if (!isOpen && !active) return null;
 
     return (
-        <div
-            className="fixed inset-0 z-[100] flex items-end justify-center backdrop-blur-[2px] transition-all duration-300 animate-fade-in"
-            style={{ background: 'rgba(0,0,0,0.2)' }}
-            onClick={onClose}
-        >
-            <div
-                className="w-full max-w-md bg-white/85 shadow-2xl overflow-hidden flex flex-col animate-slide-up-ios"
-                style={{
-                    borderTopLeftRadius: '24px',
-                    borderTopRightRadius: '24px',
-                    backdropFilter: 'blur(20px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                    paddingBottom: 'env(safe-area-inset-bottom)',
-                    maxHeight: '85vh',
-                    boxShadow: '0px -10px 40px rgba(0, 0, 0, 0.1)'
-                }}
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Drag Handle */}
-                <div className="w-full flex justify-center pt-3 pb-1" onClick={onClose}>
-                    <div className="w-12 h-1.5 bg-gray-300/50 rounded-full cursor-pointer hover:bg-gray-400/50 transition-colors" />
+        <>
+            <div className={`modal-overlay ${active ? 'active' : ''}`} id="overlay" onClick={onClose}></div>
+            <div className={`bottom-sheet ${active ? 'active' : ''}`} id="bottomSheet">
+                <div className="sheet-handle"></div>
+                <div className="sheet-header">
+                    <h3>Agendamentos ({timeSlot})</h3>
+                    <button className="close-btn text-lg text-gray-400 font-bold bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center" onClick={onClose}>✕</button>
                 </div>
+                <div className="sheet-content">
+                    {appointments.map(app => {
+                        const client = clients.find(c => c.id === app.clientId);
+                        const pet = client?.pets.find(p => p.id === app.petId);
+                        const mainSvc = services.find(s => s.id === app.serviceId);
+                        const isGrooming = mainSvc?.name?.toLowerCase().includes('tosa');
 
-                <div className="px-6 py-4 flex justify-between items-center border-b border-gray-200/50">
-                    <div>
-                        <h3 className="font-bold text-2xl text-gray-900 tracking-tight">{dateObj.toLocaleDateString('pt-BR', { weekday: 'long' })}</h3>
-                        <p className="text-gray-500 font-medium text-sm capitalize">{dateObj.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}</p>
-                    </div>
-                    <div className="bg-gray-100/50 p-2 rounded-full cursor-pointer hover:bg-gray-200/50 transition-colors" onClick={onClose}>
-                        <X size={20} className="text-gray-500" />
-                    </div>
-                </div>
+                        return (
+                            <div key={app.id} className="sheet-item cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onEdit(app)}>
+                                {/* Avatar: Emojis as requested */}
+                                <div className="item-avatar bg-transparent flex items-center justify-center text-2xl mr-3" style={{ width: 'auto', height: 'auto' }}>
+                                    🐶🐱
+                                </div>
 
-                <div className="p-4 overflow-y-auto flex-1 space-y-2">
-                    {sortedApps.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-400"><CalendarIcon size={48} className="mb-4 opacity-30" /><p className="font-medium">Nenhum agendamento para este dia.</p></div>
-                    ) : (
-                        sortedApps.map((app, idx) => {
-                            const client = clients.find(c => c.id === app.clientId);
-                            const pet = client?.pets.find(p => p.id === app.petId);
-                            const time = app.date.split('T')[1].slice(0, 5);
-                            const mainSvc = services.find(s => s.id === app.serviceId);
-                            const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(s => s).map(s => s?.name).join(', ');
-                            return (
-                                <div key={app.id} style={{ animationDelay: `${idx * 0.05}s` }} className="animate-scale-up-sm bg-white/40 hover:bg-white/60 active:bg-white/80 backdrop-blur-md p-3 rounded-2xl border border-white/40 flex items-center justify-between gap-3 shadow-sm mb-2 transition-all cursor-pointer" onClick={() => onAppointmentClick(app)}>
-                                    {/* Left: Avatar */}
-                                    <div className="relative w-12 h-12 flex-shrink-0">
-                                        <div className="w-12 h-12 rounded-full bg-gray-200 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
-                                            {/* In a real app we'd show the pet photo here. For now, initial. */}
-                                            <span className="text-lg font-bold text-gray-500">{pet?.name?.charAt(0).toUpperCase()}</span>
-                                        </div>
-                                        {/* Status Dot */}
-                                        <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${app.status === 'concluido' ? 'bg-green-500' : 'bg-brand-500'}`} />
-                                    </div>
-
-                                    {/* Middle: Info */}
-                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                        <h4 className="font-bold text-gray-800 text-[15px] truncate leading-tight">
-                                            {pet?.name} <span className="font-normal text-gray-600">- {mainSvc?.name}</span>
-                                        </h4>
-                                        <p className="text-xs text-gray-500 font-medium truncate">
-                                            ({pet?.breed || 'Raça não inf.'})
-                                        </p>
-                                    </div>
-
-                                    {/* Right: Service Icon */}
-                                    <div className="p-2 bg-white/50 rounded-full text-gray-400 shadow-sm border border-white/50">
-                                        {mainSvc?.name?.toLowerCase().includes('tosa') ? <Scissors size={20} /> : <Sparkles size={20} />}
+                                <div className="item-info">
+                                    <span className="pet-name text-[15px] leading-tight text-gray-900">
+                                        {pet?.name} <span className="font-normal text-gray-600">- {mainSvc?.name}</span> <span className="text-gray-400 font-normal">({pet?.breed || 'Pet'})</span>
+                                    </span>
+                                    <div className="item-icon mt-1 text-gray-400 text-sm flex gap-2">
+                                        {/* Icons */}
+                                        <span className="text-lg">🛁</span>
+                                        {isGrooming && <span className="text-lg">✂️</span>}
+                                        {app.additionalServiceIds && app.additionalServiceIds.length > 0 && <span className="text-lg">✚</span>}
                                     </div>
                                 </div>
-                            );
-                        })
-                    )}
-                    <div className="h-8" />
+                            </div>
+                        );
+                    })}
                 </div>
-                {sortedApps.length > 0 && (<div className="p-4 border-t border-gray-100 bg-white text-center"><span className="px-4 py-1.5 bg-gray-100 text-gray-500 text-xs font-bold rounded-full">Total: {sortedApps.length}</span></div>)}
             </div>
-        </div>
+        </>
     );
 };
 
