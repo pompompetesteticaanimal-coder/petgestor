@@ -103,6 +103,7 @@ export const BRAZIL_DOG_BREEDS = [
   'Cocker Spaniel',
   'Pastor Alemão',
   'Outra'
+];
 
 export const BREED_EMOJI_MAP: Record<string, string> = {
   'SRD (Vira-lata)': '🐕',

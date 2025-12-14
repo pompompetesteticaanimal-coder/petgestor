@@ -12,7 +12,7 @@ import { ServiceManager } from './components/ServiceManager';
 import { CostsManager } from './components/CostsManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { db } from './services/db';
-import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog } from './types';
+import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog, getBreedEmoji } from './types';
 import PackageControlView from './components/PackageControlView';
 import { MenuView } from './components/MenuView';
 import { supabaseService } from './services/supabaseService';
