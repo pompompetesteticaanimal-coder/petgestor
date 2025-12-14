@@ -554,7 +554,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                     return (
                                         <div key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className={`animate-slide-up bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
                                             <div className="flex flex-col justify-center items-center px-2 border-r border-gray-100 dark:border-gray-700 min-w-[70px]">
-                                                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{app.date.split('T')[1].substring(0, 5)}</span>
                                                 <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Horário</span>
                                             </div>
                                             <div className="flex-1 py-1 min-w-0">
@@ -858,7 +858,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                             {isPaid && <div className="bg-green-100 text-green-700 p-1 rounded-full"><CheckCircle size={12} /></div>}
                         </div>
                         <div className="text-xs font-medium text-gray-500 truncate mt-0.5">{client?.name}</div>
-                        <div className="text-[10px] text-gray-400 mt-2 flex items-center gap-1.5 font-mono bg-white/50 w-fit px-2 py-1 rounded-lg"> <Clock size={12} className="text-brand-400" /> {new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} </div>
+                        <div className="text-[10px] text-gray-400 mt-2 flex items-center gap-1.5 font-mono bg-white/50 w-fit px-2 py-1 rounded-lg"> <Clock size={12} className="text-brand-400" /> {app.date.split('T')[1].substring(0, 5)} </div>
                     </div>
                     <div className="text-right flex-shrink-0">
                         <div className="text-xl font-black text-gray-800 tracking-tight">R$ {expected.toFixed(2)}</div>
@@ -1277,7 +1277,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             layoutResult.push({
                 app: current.app,
                 left: `${left}%`,
-                width: `${90}%`, // Fixed width for cleaner look
+                width: `${94 - left}%`, // Dynamic width to fit container (with small gap)
                 zIndex: 10 + i, // Later ones on top
                 topOffset: 0,
                 index: i,
@@ -1836,6 +1836,11 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                 )}
                             </div>
                             <div className="flex gap-4 w-full md:w-auto">
+                                {editingAppId && (
+                                    <button onClick={() => { if (confirm('Excluir este agendamento?')) { onDelete(editingAppId); onClose(); } }} className="px-5 py-4 bg-red-50 text-red-500 font-bold rounded-xl hover:bg-red-100 transition-colors text-sm flex items-center gap-2">
+                                        <Trash2 size={20} /> <span className="hidden md:inline">Excluir</span>
+                                    </button>
+                                )}
                                 <button onClick={() => { resetForm(); onClose(); }} className="flex-1 md:flex-none px-8 py-4 rounded-xl text-gray-500 font-bold hover:bg-gray-100 transition-colors text-sm">Cancelar</button>
                                 <button
                                     onClick={handleSave}
