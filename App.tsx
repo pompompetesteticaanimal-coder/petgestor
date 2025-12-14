@@ -633,7 +633,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                         </div>
                                     );
                                 })
-                            )}
+                            })()}
                         </div>
                     </div>
                 </section>
