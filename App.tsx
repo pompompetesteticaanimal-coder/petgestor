@@ -1326,7 +1326,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     {/* Overflow Indicators Layer */}
                     <div className="absolute top-0 right-0 h-full w-[60px] pointer-events-none z-50 flex flex-col items-end">
                         {layoutItems.filter((item: any) => item.index === 0 && item.totalCount > 2).map((item: any) => {
-                            const startMin = (new Date(item.app.date).getHours() - 6) * 60 + new Date(item.app.date).getMinutes(); // Start at 6
+                            // Parse string directly to avoid Timezone shifts (User sees what is stored)
+                            const [hStr, mStr] = item.app.date.split('T')[1].split(':');
+                            const startMin = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
                             const top = startMin * 2;
                             return (
                                 <div key={`overflow-${item.app.id}`} className="absolute right-1 bg-red-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg flex items-center gap-0.5 animate-pulse" style={{ top: `${top + 5}px` }}>
@@ -1336,7 +1338,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                         })}
                     </div>
                     {layoutItems.map((item: any, idx) => {
-                        const app = item.app; const d = new Date(app.date); const startMin = (d.getHours() - 6) * 60 + d.getMinutes(); // Start at 6
+                        const app = item.app;
+                        const [hStr, mStr] = app.date.split('T')[1].split(':');
+                        const startMin = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
                         const height = (app.durationTotal || 60) * 2;
                         const top = startMin * 2;
 
@@ -1373,7 +1377,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     // Clustering Logic for Week View
                     const clusters: { start: number, end: number, apps: Appointment[] }[] = [];
                     dayApps.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach(app => {
-                        const appStart = (new Date(app.date).getHours() - 6) * 60 + new Date(app.date).getMinutes(); // Start at 6
+                        const [hStr, mStr] = app.date.split('T')[1].split(':');
+                        const appStart = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
                         const appEnd = appStart + (app.durationTotal || 60);
 
                         // Try to find an existing cluster this overlaps with
