@@ -222,54 +222,53 @@ export const supabaseService = {
             return [];
         }
         return data.map((d: any) => ({
-            return data.map((d: any) => ({
-                id: d.id,
-                month: d.month,
-                week: d.week,
-                date: normalizeDate(d.date || d.data_vencimento, d.created_at), // Fallback to common PT-BR col names if needed
-                category: d.category || d.descricao || 'Despesa',
-                amount: safeAmount(d.amount || d.valor),
-                status: d.status
-            }));
-        },
+            id: d.id,
+            month: d.month,
+            week: d.week,
+            date: normalizeDate(d.date || d.data_vencimento, d.created_at),
+            category: d.category || d.descricao || 'Despesa',
+            amount: safeAmount(d.amount || d.valor),
+            status: d.status
+        }));
+    },
 
-            upsertCost: async (cost: any) => {
-                if (!supabase) return;
-                const { id, month, week, date, category, amount, status } = cost;
-                const { error } = await supabase.from('costs').upsert({
-                    id,
-                    month,
-                    week,
-                    date,
-                    category,
-                    amount,
-                    status
-                });
-                if (error) throw error;
-            },
+    upsertCost: async (cost: any) => {
+        if (!supabase) return;
+        const { id, month, week, date, category, amount, status } = cost;
+        const { error } = await supabase.from('costs').upsert({
+            id,
+            month,
+            week,
+            date,
+            category,
+            amount,
+            status
+        });
+        if (error) throw error;
+    },
 
-            deleteCost: async (id: string) => {
-                if (!supabase) return;
-                const { error } = await supabase.from('costs').delete().eq('id', id);
-                if (error) throw error;
-            },
+    deleteCost: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('costs').delete().eq('id', id);
+        if (error) throw error;
+    },
 
-            // --- DELETIONS ---
-            deleteClient: async (id: string) => {
-                if (!supabase) return;
-                const { error } = await supabase.from('clients').delete().eq('id', id);
-                if (error) throw error;
-            },
+    // --- DELETIONS ---
+    deleteClient: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) throw error;
+    },
 
-            deleteService: async (id: string) => {
-                if (!supabase) return;
-                const { error } = await supabase.from('services').delete().eq('id', id);
-                if (error) throw error;
-            },
+    deleteService: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('services').delete().eq('id', id);
+        if (error) throw error;
+    },
 
-            deletePet: async (id: string) => {
-                if (!supabase) return;
-                const { error } = await supabase.from('pets').delete().eq('id', id);
-                if (error) throw error;
-            }
+    deletePet: async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('pets').delete().eq('id', id);
+        if (error) throw error;
+    }
 };
