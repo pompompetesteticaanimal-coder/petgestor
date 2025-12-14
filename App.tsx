@@ -1437,53 +1437,28 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                             appDate.getFullYear() === d.getFullYear();
                     });
 
-                    // Clustering Logic for Week View (Exact Start Time)
-                    const clusters: { start: number, end: number, apps: Appointment[] }[] = [];
-
-                    // Group by Start Time first
-                    const groups: { [time: string]: Appointment[] } = {};
-                    dayApps.forEach(app => {
-                        const time = app.date.includes('T') ? app.date.split('T')[1] : '09:00';
-                        if (!groups[time]) groups[time] = [];
-                        groups[time].push(app);
-                    });
-
-                    // Create clusters from groups
-                    Object.values(groups).forEach(group => {
-                        const leader = group[0];
-                        const [hStr, mStr] = leader.date.split('T')[1].split(':');
-                        const appStart = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
-                        const maxDuration = Math.max(...group.map(a => a.durationTotal || 60));
-                        const appEnd = appStart + maxDuration;
-                        clusters.push({ start: appStart, end: appEnd, apps: group });
-                    });
+                    // Use Shared Layout Logic for Cascading Staircase
+                    const layoutItems = getLayout(dayApps);
 
                     return (
                         <div key={dIdx} className="flex-1 border-r border-gray-50 relative min-w-[60px]">
                             {Array.from({ length: 84 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)}
-                            {clusters.map((cluster, idx) => {
-                                const mainApp = cluster.apps[0];
-                                const count = cluster.apps.length;
-                                const top = cluster.start * 2;
-                                const height = (cluster.end - cluster.start) * 2;
+                            {layoutItems.map((item: any, idx) => {
+                                const app = item.app;
+                                const timePart = app.date.includes('T') ? app.date.split('T')[1] : '09:00';
+                                const [hStr, mStr] = timePart.split(':');
+                                const startMin = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
+                                const height = (app.durationTotal || 60) * 2;
+                                const top = startMin * 2;
 
                                 return (
-                                    <div
-                                        key={mainApp.id}
-                                        style={{ top: `${top}px`, height: `${height}px`, width: '100%' }}
-                                        className="absolute z-10 transition-all hover:z-20 group"
-                                    >
-                                        <AppointmentCard
-                                            app={mainApp}
-                                            style={{ width: '90%', height: '100%', marginLeft: '5%' }}
-                                            onClick={setDetailsApp}
-                                            onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })}
-                                            isStack={count > 1}
-                                            clusterApps={cluster.apps}
-                                            stackTotal={count}
-                                            onStackClick={() => setSelectedCluster(cluster.apps)}
-                                        />
-                                    </div>
+                                    <AppointmentCard
+                                        key={app.id}
+                                        app={app}
+                                        style={{ top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }}
+                                        onClick={setDetailsApp}
+                                        onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })}
+                                    />
                                 );
                             })}
                         </div>
