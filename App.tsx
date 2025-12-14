@@ -2395,51 +2395,48 @@ const App: React.FC = () => {
                 client={petDetailsData?.client || null}
                 appointments={appointments}
             />
-        </HashRouter>
-        {/* Cluster Sheet (Partial Modal) */ }
-    {
-        selectedCluster && (
-            <div className="fixed inset-0 z-[200] flex justify-center items-end bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCluster(null)}>
-                <div className="bg-white w-full max-w-md rounded-t-3xl shadow-2xl p-4 animate-slide-up max-h-[80vh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
-                    <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4" />
-                    <div className="flex justify-between items-center mb-4 px-2">
-                        <h3 className="text-lg font-bold text-gray-800">Agendamentos neste horário</h3>
-                        <button onClick={() => setSelectedCluster(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                            <X size={20} className="text-gray-500" />
-                        </button>
-                    </div>
-                    <div className="flex flex-col gap-3 pb-6">
-                        {selectedCluster.map((app) => {
-                            // Reuse AppointmentCard logic or simplified? simplified list item.
-                            const client = clients.find(c => c.id === app.clientId);
-                            const pet = client?.pets.find(p => p.id === app.petId);
-                            const displayTime = app.date.split('T')[1].substring(0, 5);
-                            return (
-                                <div key={app.id} onClick={() => { setSelectedCluster(null); setDetailsApp(app); }} className="flex items-center gap-4 p-3 rounded-2xl border border-gray-100 shadow-sm bg-white hover:border-brand-200 hover:shadow-md transition-all cursor-pointer">
-                                    <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 font-bold text-lg">
-                                        {pet?.name.substring(0, 1).toUpperCase()}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between">
-                                            <span className="font-extrabold text-gray-800">{pet?.name}</span>
-                                            <span className="text-xs font-semibold text-gray-500">{displayTime}</span>
+
+            {/* Cluster Sheet (Partial Modal) */}
+            {selectedCluster && (
+                <div className="fixed inset-0 z-[200] flex justify-center items-end bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCluster(null)}>
+                    <div className="bg-white w-full max-w-md rounded-t-3xl shadow-2xl p-4 animate-slide-up max-h-[80vh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4" />
+                        <div className="flex justify-between items-center mb-4 px-2">
+                            <h3 className="text-lg font-bold text-gray-800">Agendamentos neste horário</h3>
+                            <button onClick={() => setSelectedCluster(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        </div>
+                        <div className="flex flex-col gap-3 pb-6">
+                            {selectedCluster.map((app) => {
+                                const client = clients.find(c => c.id === app.clientId);
+                                const pet = client?.pets.find(p => p.id === app.petId);
+                                const displayTime = app.date.split('T')[1].substring(0, 5);
+                                return (
+                                    <div key={app.id} onClick={() => { setSelectedCluster(null); setDetailsApp(app); }} className="flex items-center gap-4 p-3 rounded-2xl border border-gray-100 shadow-sm bg-white hover:border-brand-200 hover:shadow-md transition-all cursor-pointer">
+                                        <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 font-bold text-lg">
+                                            {pet?.name.substring(0, 1).toUpperCase()}
                                         </div>
-                                        <div className="text-xs text-gray-500 font-medium">{client?.name}</div>
-                                        <div className="text-xs font-bold text-brand-600 mt-0.5">
-                                            {services.find(s => s.id === app.serviceId)?.name}
+                                        <div className="flex-1">
+                                            <div className="flex justify-between">
+                                                <span className="font-extrabold text-gray-800">{pet?.name}</span>
+                                                <span className="text-xs font-semibold text-gray-500">{displayTime}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-500 font-medium">{client?.name}</div>
+                                            <div className="text-xs font-bold text-brand-600 mt-0.5">
+                                                {services.find(s => s.id === app.serviceId)?.name}
+                                            </div>
                                         </div>
+                                        <ChevronRight size={18} className="text-gray-300" />
                                     </div>
-                                    <ChevronRight size={18} className="text-gray-300" />
-                                </div>
-                            )
-                        })}
+                                )
+                            })}
+                        </div>
                     </div>
                 </div>
-            </div>
-        )
-    }
+            )}
+        </HashRouter>
     );
 }
 
 export default App;
-```
