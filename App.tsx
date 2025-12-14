@@ -345,6 +345,20 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const dailyStats = useMemo(() => calculateStats(filteredDailyApps), [filteredDailyApps, services]);
     const weeklyChartData = useMemo(() => getWeeklyChartData(), [getWeeklyChartData]);
 
+    const weeklyApps = useMemo(() => {
+        const [y, m, d] = selectedDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        const day = date.getDay();
+        const diff = date.getDate() - day;
+        const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
+        return appointments.filter(a => {
+            if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false;
+            const ad = new Date(a.date);
+            return ad >= startOfWeek && ad <= endOfWeek;
+        }).sort((a, b) => a.date.localeCompare(b.date));
+    }, [selectedDate, appointments]);
+
     // Calculate weeklyStats
     const calculateWeeklyStats = () => {
         const [y, m, d] = selectedDate.split('-').map(Number);
@@ -654,6 +668,80 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                     </div>
 
                     <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Diária</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={weeklyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} dy={10} /><YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Bar yAxisId="right" dataKey="pets" fill="#c7d2fe" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#4f46e5" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
+
+                    <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
+                        <h3 className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 border-b border-gray-100/50 dark:border-gray-700/50 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento da Semana</h3>
+                        <div className="p-4 space-y-6">
+                            {(() => {
+                                const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                                const grouped = weeklyApps.reduce((acc, app) => {
+                                    const day = new Date(app.date).getDay();
+                                    if (!acc[day]) acc[day] = [];
+                                    acc[day].push(app);
+                                    return acc;
+                                }, {} as Record<number, Appointment[]>);
+
+                                return days.map((dayName, dayIdx) => {
+                                    const dayApps = grouped[dayIdx] || [];
+                                    if (dayApps.length === 0) return null;
+
+                                    return (
+                                        <div key={dayIdx}>
+                                            <h4 className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-3 pl-1">{dayName}</h4>
+                                            <div className="space-y-3">
+                                                {dayApps.map((app, index) => {
+                                                    const client = clients.find(c => c.id === app.clientId);
+                                                    const pet = client?.pets.find(p => p.id === app.petId);
+                                                    const mainSvc = services.find(s => s.id === app.serviceId);
+                                                    const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
+                                                    const val = calculateTotal(app, services);
+                                                    const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido');
+
+                                                    return (
+                                                        <div key={app.id} className={`bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
+                                                            <div className="flex flex-col justify-center items-center px-2 border-r border-gray-100 dark:border-gray-700 min-w-[70px]">
+                                                                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{app.date.split('T')[1].substring(0, 5)}</span>
+                                                                <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Horário</span>
+                                                            </div>
+                                                            <div className="flex-1 py-1 min-w-0">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div>
+                                                                        <h4
+                                                                            className="font-bold text-gray-900 dark:text-white truncate cursor-pointer hover:text-brand-600 transition-colors flex items-center gap-2"
+                                                                            onClick={() => pet && client && onViewPet?.(pet, client)}
+                                                                        >
+                                                                            {pet?.name}
+                                                                        </h4>
+                                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client?.name}</p>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>
+                                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                                                            {isPaid ? 'Pago' : app.status === 'nao_veio' ? 'Não Veio' : 'Pendente'}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-2 flex flex-wrap gap-1">
+                                                                    <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-600 truncate max-w-full">
+                                                                        {mainSvc?.name}
+                                                                    </span>
+                                                                    {addSvcs && addSvcs.length > 0 && addSvcs.map((s, i) => (
+                                                                        <span key={i} className="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-gray-100 dark:border-gray-700 truncate">
+                                                                            + {s?.name}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
+                    </div>
                 </section>
             )}
 
