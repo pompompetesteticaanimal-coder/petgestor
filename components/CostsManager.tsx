@@ -17,6 +17,8 @@ interface CostsManagerProps {
 export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, onUpdateCost, onDeleteCost }) => {
     const [activeTab, setActiveTab] = useState<'dashboard' | 'records'>('dashboard');
     const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('yearly');
+    // Default to current year, but if no costs in current year and we have costs elsewhere, maybe smart-select?
+    // For now, keep simple behavior but add UI warning.
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
 
@@ -155,7 +157,9 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                     </div>
                     <div>
                         <h2 className="text-xl font-black text-gray-800 tracking-tight">Gestão de Despesas</h2>
-                        <p className="text-xs text-gray-500 font-medium">Controle Financeiro</p>
+                        <p className="text-xs text-gray-500 font-medium">
+                            Controle Financeiro • {costs.length} registros carregados
+                        </p>
                     </div>
                 </div>
 
@@ -290,7 +294,11 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                             <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
                                                 <div className="flex flex-col items-center gap-2 opacity-50">
                                                     <LayoutDashboard size={32} />
-                                                    <p className="font-medium">Nenhum registro encontrado.</p>
+                                                    <p className="font-medium">
+                                                        {costs.length > 0
+                                                            ? `Nenhum registro em ${selectedYear}. Verifique o filtro de Ano/Mês.`
+                                                            : "Nenhum registro encontrado no banco de dados."}
+                                                    </p>
                                                 </div>
                                             </td>
                                         </tr>
