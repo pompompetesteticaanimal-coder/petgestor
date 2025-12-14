@@ -361,19 +361,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
     const weeklyStats = useMemo(() => calculateStats(weeklyApps), [weeklyApps, services]);
 
-    // Calculate weeklyStats
-    const calculateWeeklyStats = () => {
-        const [y, m, d] = selectedDate.split('-').map(Number);
-        const date = new Date(y, m - 1, d);
-        const day = date.getDay();
-        const diff = date.getDate() - day;
-        const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
-        const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
-        const wApps = appointments.filter(a => { if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false; const ad = new Date(a.date); return ad >= startOfWeek && ad <= endOfWeek; });
-        return calculateStats(wApps);
-    };
-    // eslint-disable-next-line
-    const weeklyStats = useMemo(() => calculateWeeklyStats(), [selectedDate, appointments, services]);
+
 
     const monthlyChartData = useMemo(() => getMonthlyChartData(), [getMonthlyChartData]);
     const yearlyChartData = useMemo(() => getYearlyChartData(), [getYearlyChartData]);
