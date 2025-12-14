@@ -1000,6 +1000,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const [notes, setNotes] = useState('');
 
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+    const [nowMinutes, setNowMinutes] = useState(0);
     const [selectedCluster, setSelectedCluster] = useState<Appointment[] | null>(null);
 
     useEffect(() => {
