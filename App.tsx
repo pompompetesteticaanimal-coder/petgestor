@@ -1501,76 +1501,45 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 )}
             </div>
 
-            {/* Unified Day/Cluster Details Modal */}
-            {(selectedCluster || selectedDayForDetails) && (
-                <DayDetailsModal
-                    isOpen={true}
-                    onClose={() => { setSelectedCluster(null); setSelectedDayForDetails(null); }}
-                    date={selectedCluster ? (selectedCluster[0]?.date.split('T')[0] || currentDate.toISOString().split('T')[0]) : selectedDayForDetails!}
-                    appointments={selectedCluster || appointments.filter(a => {
-                        if (a.status === 'cancelado') return false;
-                        return a.date.startsWith(selectedDayForDetails!);
-                    }).sort((a, b) => a.date.localeCompare(b.date))}
-                    clients={clients}
-                    services={services}
-                    onAppointmentClick={(app) => { setSelectedCluster(null); setSelectedDayForDetails(null); setDetailsApp(app); }}
-                />
-            )}
+            {/* Unified Bottom Sheet Logic */}
+            {(selectedCluster || selectedDayForDetails || detailsApp) && createPortal((() => {
+                let appsToShow: Appointment[] = [];
+                let label = '';
 
-            {detailsApp && createPortal((() => {
-                const client = clients.find(c => c.id === detailsApp.clientId);
-                const pet = client?.pets.find(p => p.id === detailsApp.petId);
-                const s = services.find(srv => srv.id === detailsApp.serviceId);
-                const addSvcs = detailsApp.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
-                const rating = detailsApp.rating;
-                const tags = detailsApp.ratingTags;
+                if (selectedDayForDetails && !selectedCluster && !detailsApp) {
+                    // Day Click
+                    appsToShow = appointments.filter(a => a.date.startsWith(selectedDayForDetails)).sort((a, b) => a.date.localeCompare(b.date));
+                    label = new Date(selectedDayForDetails).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                } else if (selectedCluster) {
+                    // Stack Click
+                    appsToShow = selectedCluster;
+                    label = selectedCluster[0]?.date.split('T')[1].slice(0, 5) || 'Grupo';
+                } else if (detailsApp) {
+                    // Single App Click - Show context (others at same time?) or just it?
+                    // User said: Clicking opens the sheet.
+                    // Let's find overlapping apps for that time to populate the list "Apple style"
+                    const d = detailsApp.date.split('T')[0];
+                    const t = detailsApp.date.split('T')[1];
+                    appsToShow = appointments.filter(a => a.date.startsWith(d) && a.date.includes(t));
+                    label = t.slice(0, 5);
+                }
 
                 return (
-                    <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setDetailsApp(null)}>
-                        <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => setDetailsApp(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"><X size={20} /></button>
-
-                            {(rating || tags) && (
-                                <div className="flex justify-center flex-col items-center mb-6 bg-yellow-50/50 p-4 rounded-2xl border border-yellow-100">
-                                    <div className="flex text-yellow-500 mb-2 drop-shadow-sm">
-                                        {[1, 2, 3, 4, 5].map(st => <Star key={st} size={24} className={(rating || 0) >= st ? "fill-current" : "text-gray-200"} strokeWidth={(rating || 0) >= st ? 0 : 2} />)}
-                                    </div>
-                                    {tags && tags.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 justify-center">
-                                            {tags.map(t => <span key={t} className="px-3 py-1 bg-white text-yellow-700 rounded-full text-xs font-bold shadow-sm border border-yellow-100">{t}</span>)}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="mb-6 text-center">
-                                <h3 className="text-2xl font-bold text-gray-800">{pet?.name}</h3>
-                                <p className="text-gray-500 font-medium">{client?.name}</p>
-                            </div>
-
-                            <div className="bg-gray-50 rounded-2xl p-4 space-y-3 text-sm mb-6">
-                                <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Phone size={16} /></div><span className="font-medium text-gray-700">{client?.phone}</span></div>
-                                <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><MapPin size={16} /></div><span className="font-medium text-gray-700 truncate">{client?.address} {client?.complement}</span></div>
-                                <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0"><FileText size={16} /></div><span className="font-medium italic text-gray-600 pt-1">{
-                                    (() => {
-                                        let displayNote = detailsApp.notes || pet?.notes || 'Sem obs';
-                                        displayNote = displayNote.replace(/\[Avaliação: \d+\/5\]/g, '').replace(/\[Tags: .*?\]/g, '').trim();
-                                        return displayNote || 'Sem obs';
-                                    })()
-                                }</span></div>
-                            </div>
-
-                            <div className="mb-6">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Serviços</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="px-3 py-1.5 bg-brand-100 text-brand-700 rounded-lg text-xs font-bold shadow-sm">{s?.name}</span>
-                                    {addSvcs?.map(as => <span key={as?.id} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold border border-gray-200">{as?.name}</span>)}
-                                </div>
-                            </div>
-
-                            <button onClick={() => { setDetailsApp(null); handleStartEdit(detailsApp); }} className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brand-700 active:scale-95 transition shadow-lg shadow-brand-200"><Edit2 size={18} /> Editar Agendamento</button>
-                        </div>
-                    </div>
+                    <BottomSheetList
+                        isOpen={true}
+                        onClose={() => { setDetailsApp(null); setSelectedCluster(null); setSelectedDayForDetails(null); }}
+                        timeSlot={label}
+                        appointments={appsToShow}
+                        clients={clients}
+                        services={services}
+                        onEdit={(app) => {
+                            // When clicking an item in the sheet, close sheet and open "Edit Mode"
+                            setDetailsApp(null);
+                            setSelectedCluster(null);
+                            setSelectedDayForDetails(null);
+                            handleStartEdit(app); // Opens the big edit drawer/modal
+                        }}
+                    />
                 );
             })(), document.body)}
             {/* NEW/EDIT MODAL - Controlled by Props */}
