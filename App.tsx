@@ -1236,13 +1236,18 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const getLayout = useCallback((dayApps: Appointment[]) => {
         // Sort by time (Timezone Agnostic)
         const sorted = [...dayApps].sort((a, b) => {
-            const [hA, mA] = a.date.split('T')[1].split(':');
-            const [hB, mB] = b.date.split('T')[1].split(':');
+            if (!a.date || !b.date) return 0;
+            const timeA = a.date.includes('T') ? a.date.split('T')[1] : '00:00';
+            const timeB = b.date.includes('T') ? b.date.split('T')[1] : '00:00';
+            const [hA, mA] = timeA.split(':');
+            const [hB, mB] = timeB.split(':');
             return (parseInt(hA) * 60 + parseInt(mA)) - (parseInt(hB) * 60 + parseInt(mB));
         });
 
         const nodes = sorted.map(app => {
-            const [hStr, mStr] = app.date.split('T')[1].split(':');
+            if (!app.date) return { app, start: 0, end: 0 };
+            const timePart = app.date.includes('T') ? app.date.split('T')[1] : '09:00';
+            const [hStr, mStr] = timePart.split(':');
             const start = (parseInt(hStr) * 60 + parseInt(mStr)) * 60000;
             const end = start + (app.durationTotal || 60) * 60000;
             return { app, start, end };
@@ -1430,7 +1435,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     <div className="absolute top-0 right-0 h-full w-[60px] pointer-events-none z-50 flex flex-col items-end">
                         {layoutItems.filter((item: any) => item.index === 0 && item.totalCount > 2).map((item: any) => {
                             // Parse string directly to avoid Timezone shifts (User sees what is stored)
-                            const [hStr, mStr] = item.app.date.split('T')[1].split(':');
+                            if (!item.app.date) return null;
+                            const timePart = item.app.date.includes('T') ? item.app.date.split('T')[1] : '09:00';
+                            const [hStr, mStr] = timePart.split(':');
                             const startMin = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
                             const top = startMin * 2;
                             return (
@@ -1442,7 +1449,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     </div>
                     {layoutItems.map((item: any, idx) => {
                         const app = item.app;
-                        const [hStr, mStr] = app.date.split('T')[1].split(':');
+                        if (!app.date) return null;
+                        const timePart = app.date.includes('T') ? app.date.split('T')[1] : '09:00';
+                        const [hStr, mStr] = timePart.split(':');
                         const startMin = (parseInt(hStr) - 6) * 60 + parseInt(mStr);
                         const height = (app.durationTotal || 60) * 2;
                         const top = startMin * 2;
