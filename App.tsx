@@ -208,16 +208,31 @@ const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: st
                             const mainSvc = services.find(s => s.id === app.serviceId);
                             const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(s => s).map(s => s?.name).join(', ');
                             return (
-                                <div key={app.id} style={{ animationDelay: `${idx * 0.05}s` }} className="animate-scale-up-sm bg-white/60 hover:bg-white/80 backdrop-blur-md p-4 rounded-3xl shadow-sm border border-white/60 flex gap-4 hover:shadow-lg transition-all group relative overflow-hidden cursor-pointer active:scale-[0.98]" onClick={() => onAppointmentClick(app)}>
-                                    <div className="flex flex-col items-center justify-center min-w-[3.5rem] border-r border-gray-100/50 pr-4 pl-1">
-                                        <span className="text-xl font-black text-gray-800 tracking-tight">{time}</span>
-                                        <div className={`mt-1.5 w-2 h-2 rounded-full ring-2 ring-white ${app.status === 'concluido' ? 'bg-green-500' : app.status === 'cancelado' ? 'bg-red-500' : 'bg-brand-500'}`} />
+                                <div key={app.id} style={{ animationDelay: `${idx * 0.05}s` }} className="animate-scale-up-sm bg-white/40 hover:bg-white/60 active:bg-white/80 backdrop-blur-md p-3 rounded-2xl border border-white/40 flex items-center justify-between gap-3 shadow-sm mb-2 transition-all cursor-pointer" onClick={() => onAppointmentClick(app)}>
+                                    {/* Left: Avatar */}
+                                    <div className="relative w-12 h-12 flex-shrink-0">
+                                        <div className="w-12 h-12 rounded-full bg-gray-200 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                                            {/* In a real app we'd show the pet photo here. For now, initial. */}
+                                            <span className="text-lg font-bold text-gray-500">{pet?.name?.charAt(0).toUpperCase()}</span>
+                                        </div>
+                                        {/* Status Dot */}
+                                        <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${app.status === 'concluido' ? 'bg-green-500' : 'bg-brand-500'}`} />
                                     </div>
+
+                                    {/* Middle: Info */}
                                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                        <div className="flex justify-between items-start"><h4 className="font-bold text-gray-900 truncate text-base">{pet?.name}<span className="text-gray-400 font-medium text-xs ml-2 normal-case">do(a) {client?.name.split(' ')[0]}</span></h4></div>
-                                        <div className="flex flex-wrap items-center gap-1.5 mt-1"><span className="text-xs font-bold text-brand-700 bg-brand-50/80 px-2 py-0.5 rounded-lg border border-brand-100/50">{mainSvc?.name}</span>{addSvcs && <span className="text-[10px] font-bold text-gray-500 bg-gray-100/80 px-1.5 py-0.5 rounded-lg border border-gray-200/50">+ {addSvcs}</span>}</div>
+                                        <h4 className="font-bold text-gray-800 text-[15px] truncate leading-tight">
+                                            {pet?.name} <span className="font-normal text-gray-600">- {mainSvc?.name}</span>
+                                        </h4>
+                                        <p className="text-xs text-gray-500 font-medium truncate">
+                                            ({pet?.breed || 'Raça não inf.'})
+                                        </p>
                                     </div>
-                                    <div className="flex items-center text-gray-300 group-hover:text-brand-400 transition-colors bg-white/50 rounded-full p-1"><ChevronRight size={18} /></div>
+
+                                    {/* Right: Service Icon */}
+                                    <div className="p-2 bg-white/50 rounded-full text-gray-400 shadow-sm border border-white/50">
+                                        {mainSvc?.name?.toLowerCase().includes('tosa') ? <Scissors size={20} /> : <Sparkles size={20} />}
+                                    </div>
                                 </div>
                             );
                         })
