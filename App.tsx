@@ -528,7 +528,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         <div className="space-y-6 animate-fade-in pb-32" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
             {defaultTab === 'daily' ? null : (
                 <>
-                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Faturamento</h1></div>
+                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Resumo</h1></div>
                     <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner"><TabButton id="daily" label="Diário" icon={CalendarIcon} /><TabButton id="weekly" label="Semanal" icon={BarChart2} /><TabButton id="monthly" label="Mensal" icon={TrendingUp} /><TabButton id="yearly" label="Anual" icon={PieChartIcon} /></div>
                 </>
             )}

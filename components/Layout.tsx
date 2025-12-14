@@ -236,7 +236,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
 
       {/* Mobile Floating Tab Bar */}
       <div className="md:hidden fixed bottom-6 left-4 right-4 h-20 bg-white/90 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl glass-card flex justify-around items-center px-2 z-50 animate-slide-up">
-        <BottomNavItem view="home" current={currentView} icon={BarChart2} label="Diário" onClick={setView} />
+        <BottomNavItem view="home" current={currentView} icon={BarChart2} label="Resumo" onClick={setView} />
         <BottomNavItem view="payments" current={currentView} icon={Wallet} label="Pagto" onClick={setView} />
         <div className="relative -top-6">
           <button
