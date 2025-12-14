@@ -219,6 +219,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+    const [dailySearchTerm, setDailySearchTerm] = useState('');
+    const [isDailySearchOpen, setIsDailySearchOpen] = useState(false);
     const touchStart = useRef<number | null>(null);
 
     const handleTouchStart = (e: React.TouchEvent) => touchStart.current = e.touches[0].clientX;
