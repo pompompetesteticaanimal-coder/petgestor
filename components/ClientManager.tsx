@@ -258,11 +258,14 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                                                         <div className="flex items-center gap-3">
                                                                             <div className="w-10 h-10 bg-white rounded-xl flex flex-col items-center justify-center border border-gray-100 shadow-sm">
                                                                                 <span className="text-xs font-bold text-gray-400 uppercase">{new Date(app.date).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}</span>
-                                                                                <span className="text-sm font-black text-gray-800 leading-none">{new Date(app.date).getDate()}</span>
+                                                                                <span className="text-sm font-black text-gray-800 leading-none">{app.date.split('T')[0].split('-')[2]}</span>
                                                                             </div>
                                                                             <div>
                                                                                 <p className="font-bold text-gray-800 text-sm">
-                                                                                    {new Date(app.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} • {app.date.split('T')[1].slice(0, 5)}
+                                                                                    {(() => {
+                                                                                        const [y, m, d] = app.date.split('T')[0].split('-');
+                                                                                        return `${d}/${m}`;
+                                                                                    })()} • {app.date.split('T')[1].slice(0, 5)}
                                                                                 </p>
                                                                                 <p className="text-xs text-gray-500 font-medium">Agendado</p>
                                                                             </div>
@@ -282,7 +285,12 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                                                     <div className="flex items-center gap-3">
                                                                         <div className={`w-2 h-2 rounded-full ${app.rating ? 'bg-green-400' : 'bg-gray-300'}`} />
                                                                         <div>
-                                                                            <p className="font-bold text-gray-700 text-sm">{new Date(app.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
+                                                                            <p className="font-bold text-gray-700 text-sm">
+                                                                                {(() => {
+                                                                                    const [y, m, d] = app.date.split('T')[0].split('-');
+                                                                                    return `${d}/${m}/${y}`;
+                                                                                })()}
+                                                                            </p>
                                                                             <div className="flex items-center gap-1">
                                                                                 {app.rating && <Star size={10} className="fill-yellow-400 text-yellow-400" />}
                                                                                 <span className="text-xs text-gray-400 font-medium">{app.rating ? `${app.rating}.0` : 'Sem avaliação'}</span>
