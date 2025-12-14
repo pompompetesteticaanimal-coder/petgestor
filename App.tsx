@@ -1619,6 +1619,22 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 )}
             </div>
 
+            {/* Unified Day/Cluster Details Modal */}
+            {(selectedCluster || selectedDayForDetails) && (
+                <DayDetailsModal
+                    isOpen={true}
+                    onClose={() => { setSelectedCluster(null); setSelectedDayForDetails(null); }}
+                    date={selectedCluster ? (selectedCluster[0]?.date.split('T')[0] || currentDate.toISOString().split('T')[0]) : selectedDayForDetails!}
+                    appointments={selectedCluster || appointments.filter(a => {
+                        if (a.status === 'cancelado') return false;
+                        return a.date.startsWith(selectedDayForDetails!);
+                    }).sort((a, b) => a.date.localeCompare(b.date))}
+                    clients={clients}
+                    services={services}
+                    onAppointmentClick={(app) => { setSelectedCluster(null); setSelectedDayForDetails(null); setDetailsApp(app); }}
+                />
+            )}
+
             {detailsApp && createPortal((() => {
                 const client = clients.find(c => c.id === detailsApp.clientId);
                 const pet = client?.pets.find(p => p.id === detailsApp.petId);
@@ -2451,17 +2467,7 @@ const App: React.FC = () => {
             />
 
             {/* Cluster Sheet (Reusing DayDetailsModal for consistent UI) */}
-            {selectedCluster && (
-                <DayDetailsModal
-                    isOpen={true}
-                    onClose={() => setSelectedCluster(null)}
-                    date={selectedCluster[0]?.date.split('T')[0] || new Date().toISOString().split('T')[0]}
-                    appointments={selectedCluster}
-                    clients={clients}
-                    services={services}
-                    onAppointmentClick={(app) => { setSelectedCluster(null); setDetailsApp(app); }}
-                />
-            )}
+
         </HashRouter>
     );
 }
