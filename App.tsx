@@ -1316,10 +1316,70 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         return layoutResult;
     }, []);
 
-    // Updated Card with Stack Logic
+    // Updated Card with Stack Logic & Visuals
     const AppointmentCard = ({ app, style, onClick, onContext, stackIndex, stackTotal, isStack, clusterApps, onStackClick }: { app: Appointment, style: any, onClick: any, onContext: any, stackIndex?: number, stackTotal?: number, isStack?: boolean, clusterApps?: Appointment[], onStackClick?: (apps: Appointment[]) => void }) => {
         const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map((id: string) => services.find(s => s.id === id)).filter((x): x is Service => !!x) || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
 
+        // Stack Click Handler
+        const handleClick = (e: any) => {
+            e.stopPropagation();
+            if (isStack && onStackClick && clusterApps) {
+                onStackClick(clusterApps);
+            } else {
+                onClick(app);
+            }
+        };
+
+        // --- STACK VIEW (AVATAR SUMMARY) ---
+        if (isStack && clusterApps && clusterApps.length > 0) {
+            // Get avatars for the first few apps
+            const previewApps = clusterApps.slice(0, 3);
+            const remainder = clusterApps.length - 3;
+
+            return (
+                <div style={style} className="absolute rounded-2xl transition-all cursor-pointer hover:scale-105 z-30 group" onClick={handleClick} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                    {/* Deck Effect Layers */}
+                    <div className="absolute top-1 left-1 w-full h-full bg-brand-200 rounded-2xl shadow-sm -z-10" />
+                    <div className="absolute top-2 left-2 w-full h-full bg-brand-100 rounded-2xl shadow-sm -z-20" />
+
+                    {/* Main Stack Card */}
+                    <div className="w-full h-full bg-brand-500 border border-brand-400 shadow-md rounded-2xl p-1.5 flex flex-col items-center justify-center relative overflow-hidden">
+                        {/* Background Decoration */}
+                        <div className="absolute -right-4 -top-4 w-12 h-12 bg-white/10 rounded-full blur-md" />
+
+                        <div className="flex flex-wrap gap-1 justify-center items-center w-full h-full content-center">
+                            {previewApps.map(a => {
+                                const c = clients.find(cl => cl.id === a.clientId);
+                                const p = c?.pets.find(pt => pt.id === a.petId);
+                                const s = services.find(sv => sv.id === a.serviceId);
+                                const isGrooming = s?.name.toLowerCase().includes('tosa');
+
+                                return (
+                                    <div key={a.id} className="relative w-7 h-7">
+                                        <div className="w-7 h-7 rounded-full bg-white border-2 border-brand-300 shadow-sm flex items-center justify-center text-[10px] font-extrabold text-brand-600 overflow-hidden">
+                                            {/* Avatar Placeholder or Image if we had it */}
+                                            {p?.name.substring(0, 1).toUpperCase()}
+                                        </div>
+                                        {/* Tiny Service Icon Badge */}
+                                        <div className="absolute -bottom-1 -right-1 bg-brand-700 rounded-full p-0.5 border border-white">
+                                            {isGrooming ? <Scissors size={6} className="text-white" /> : <Sparkles size={6} className="text-white" />}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {remainder > 0 && (
+                                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold text-white border border-white/30">
+                                    +{remainder}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- NORMAL VIEW (TEXT CARD) ---
         // Service Color Mapping
         let colorClass = 'bg-blue-100 border-blue-200 text-blue-900';
         if (allServiceNames.includes('tosa normal')) colorClass = 'bg-orange-100 border-orange-200 text-orange-900';
@@ -1334,26 +1394,9 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         if (petApps.length > 0) starsValues = petApps.map(a => a.rating || 0);
         const avgRating = starsValues.length > 0 ? starsValues.reduce((a, b) => a + b, 0) / starsValues.length : 0;
 
-        const handleClick = (e: any) => {
-            e.stopPropagation();
-            if (isStack && onStackClick && clusterApps) {
-                onStackClick(clusterApps);
-            } else {
-                onClick(app);
-            }
-        };
-
         return (
-            <div style={style} className={`absolute rounded-xl transition-all flex flex-col justify-between leading-snug group ${isStack ? 'z-30' : ''}`} onClick={handleClick} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
-                {/* Stack Visual Effect (Cards behind) */}
-                {isStack && (
-                    <>
-                        <div className="absolute top-1 left-1 w-full h-full bg-white border border-gray-200 rounded-xl shadow-sm -z-10 transform translate-x-1 translate-y-1 block" />
-                        <div className="absolute top-2 left-2 w-full h-full bg-white border border-gray-100 rounded-xl shadow-sm -z-20 transform translate-x-2 translate-y-2 block" />
-                    </>
-                )}
-
-                <div className={`w-full h-full p-2 border shadow-sm rounded-xl overflow-hidden flex flex-col justify-between ${colorClass} ${isStack ? 'hover:scale-[1.02] cursor-pointer' : 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'} btn-spring`}>
+            <div style={style} className={`absolute rounded-xl transition-all flex flex-col justify-between leading-snug group z-10`} onClick={handleClick} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
+                <div className={`w-full h-full p-2 border shadow-sm rounded-xl overflow-hidden flex flex-col justify-between ${colorClass} cursor-pointer hover:shadow-lg hover:scale-[1.02] btn-spring`}>
                     <div className="flex flex-col w-full overflow-hidden">
                         <div className="flex justify-between items-start w-full mb-0.5">
                             <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{pet?.name}</span>
@@ -2398,36 +2441,46 @@ const App: React.FC = () => {
 
             {/* Cluster Sheet (Partial Modal) */}
             {selectedCluster && (
-                <div className="fixed inset-0 z-[200] flex justify-center items-end bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCluster(null)}>
-                    <div className="bg-white w-full max-w-md rounded-t-3xl shadow-2xl p-4 animate-slide-up max-h-[80vh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
-                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4" />
-                        <div className="flex justify-between items-center mb-4 px-2">
-                            <h3 className="text-lg font-bold text-gray-800">Agendamentos neste horário</h3>
-                            <button onClick={() => setSelectedCluster(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                <X size={20} className="text-gray-500" />
+                <div className="fixed inset-0 z-[200] flex justify-center items-end bg-black/5 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCluster(null)}>
+                    <div className="bg-white/85 backdrop-blur-2xl w-full max-w-md rounded-t-[32px] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] p-5 animate-slide-up max-h-[85vh] overflow-y-auto flex flex-col border-t border-white/50" onClick={e => e.stopPropagation()}>
+                        <div className="w-12 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-6" />
+
+                        <div className="flex justify-between items-center mb-6 px-1">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-800 tracking-tight">Agendamentos Simultâneos</h3>
+                                <div className="text-xs font-semibold text-gray-400 mt-0.5 uppercase tracking-wider">{selectedCluster[0]?.date.split('T')[1].substring(0, 5)} • {selectedCluster.length} PETS</div>
+                            </div>
+                            <button onClick={() => setSelectedCluster(null)} className="p-2 hover:bg-black/5 rounded-full transition-colors">
+                                <X size={24} className="text-gray-400" />
                             </button>
                         </div>
-                        <div className="flex flex-col gap-3 pb-6">
+
+                        <div className="flex flex-col gap-3 pb-8">
                             {selectedCluster.map((app) => {
                                 const client = clients.find(c => c.id === app.clientId);
                                 const pet = client?.pets.find(p => p.id === app.petId);
-                                const displayTime = app.date.split('T')[1].substring(0, 5);
+                                const srv = services.find(s => s.id === app.serviceId);
+
                                 return (
-                                    <div key={app.id} onClick={() => { setSelectedCluster(null); setDetailsApp(app); }} className="flex items-center gap-4 p-3 rounded-2xl border border-gray-100 shadow-sm bg-white hover:border-brand-200 hover:shadow-md transition-all cursor-pointer">
-                                        <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 font-bold text-lg">
+                                    <div key={app.id} onClick={() => { setSelectedCluster(null); setDetailsApp(app); }} className="flex items-center gap-4 p-4 rounded-3xl border border-white/60 shadow-sm bg-gradient-to-br from-white/80 to-white/40 hover:scale-[1.02] hover:shadow-md transition-all cursor-pointer relative overflow-hidden group">
+                                        <div className="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                                        <div className="w-14 h-14 rounded-2xl bg-brand-100/50 flex items-center justify-center text-brand-600 font-extrabold text-xl shadow-inner">
                                             {pet?.name.substring(0, 1).toUpperCase()}
                                         </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between">
-                                                <span className="font-extrabold text-gray-800">{pet?.name}</span>
-                                                <span className="text-xs font-semibold text-gray-500">{displayTime}</span>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="font-extrabold text-gray-800 text-lg truncate">{pet?.name}</span>
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 rounded-full text-gray-500">{client?.name.split(' ')[0]}</span>
                                             </div>
-                                            <div className="text-xs text-gray-500 font-medium">{client?.name}</div>
-                                            <div className="text-xs font-bold text-brand-600 mt-0.5">
-                                                {services.find(s => s.id === app.serviceId)?.name}
+                                            <div className="text-sm font-bold text-brand-600 mt-0.5 truncate flex items-center gap-1.5">
+                                                {srv?.name?.toLowerCase().includes('tosa') ? <Scissors size={12} /> : <Sparkles size={12} />}
+                                                {srv?.name}
                                             </div>
                                         </div>
-                                        <ChevronRight size={18} className="text-gray-300" />
+                                        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-300">
+                                            <ChevronRight size={18} />
+                                        </div>
                                     </div>
                                 )
                             })}
