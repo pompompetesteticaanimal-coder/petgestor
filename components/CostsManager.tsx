@@ -141,7 +141,10 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
             byMonth[d.getMonth()].value += c.amount;
         });
 
-        return { byCategory, byMonth };
+        // 2025-12-14: User requested to show only August onwards (Operations started in August)
+        const operationalMonths = byMonth.slice(7); // Index 7 is August
+
+        return { byCategory, byMonth: operationalMonths };
     }, [costs, filteredCosts, viewMode, selectedYear]);
 
     const COLORS = ['#e11d48', '#2563eb', '#9333ea', '#ea580c', '#16a34a', '#64748b'];
