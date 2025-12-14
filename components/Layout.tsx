@@ -66,7 +66,7 @@ const BottomNavItem = ({
   return (
     <button
       onClick={() => onClick(view)}
-      className={`flex flex-col items-center justify-center w-full py-1 transition-all duration-300 relative ${isActive ? 'text-brand-600 -translate-y-1' : 'text-gray-400 opacity-70'}`}
+      className={`flex flex-col items-center justify-center w-full py-1 transition-all duration-300 relative ios-touch ${isActive ? 'text-brand-600 -translate-y-1' : 'text-gray-400 opacity-70'}`}
     >
       <div className={`p-1.5 rounded-xl mb-0.5 transition-all ${isActive ? 'bg-brand-50' : 'bg-transparent'}`}>
         <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />

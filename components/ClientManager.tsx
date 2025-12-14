@@ -115,7 +115,7 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
             <div className="flex-1 overflow-y-auto min-h-0 pb-20 md:pb-0 px-1" onScroll={handleScroll}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {visibleClients.map((client, index) => (
-                        <div key={client.id} onClick={() => setSelectedClient(client)} style={{ animationDelay: `${index * 0.05}s` }} className="cursor-pointer animate-slide-up bg-white/70 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-white/50 hover:shadow-glass hover:-translate-y-1 transition-all group relative overflow-hidden">
+                        <div key={client.id} onClick={() => setSelectedClient(client)} style={{ animationDelay: `${index * 0.05}s` }} className="cursor-pointer animate-slide-up bg-white/70 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-white/50 hover:shadow-glass hover:-translate-y-1 transition-all group relative overflow-hidden ios-touch">
                             <div className="absolute top-0 right-0 p-8 bg-brand-50/50 rounded-bl-[40px] -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform duration-500" />
                             <div className="flex justify-between items-start mb-4 relative z-10">
                                 <div className="min-w-0 pr-2">

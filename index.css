@@ -302,3 +302,34 @@ body {
   font-size: 1.2em;
   color: #666;
 }
+
+/* iOS Native Polish */
+.ios-touch {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ios-touch:active {
+  transform: scale(0.96);
+  opacity: 0.8;
+}
+
+/* Smooth Page Transitions */
+.page-enter {
+  animation: pageEnter 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* Selection Ring Animation */
+.ring-selection {
+  box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
+/* Glassmorphism Helper */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}

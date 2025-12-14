@@ -1402,7 +1402,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const avgRating = starsValues.length > 0 ? starsValues.reduce((a, b) => a + b, 0) / starsValues.length : 0;
 
         return (
-            <div style={style} className={`absolute rounded-xl transition-all flex flex-col justify-between leading-snug group z-10`} onClick={handleClick} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
+            <div style={style} className={`absolute rounded-xl transition-all flex flex-col justify-between leading-snug group z-10 ios-touch`} onClick={handleClick} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
                 <div className={`w-full h-full p-2 border shadow-sm rounded-xl overflow-hidden flex flex-col justify-between ${colorClass} cursor-pointer hover:shadow-lg hover:scale-[1.02] btn-spring`}>
                     <div className="flex flex-col w-full overflow-hidden">
                         <div className="flex justify-between items-start w-full mb-0.5">
