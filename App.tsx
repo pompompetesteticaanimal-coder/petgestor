@@ -155,22 +155,12 @@ const CustomXAxisTick = ({ x, y, payload, data }: any) => {
 };
 
 const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: string; appointments: Appointment[]; clients: Client[]; services: Service[]; onAppointmentClick: (app: Appointment) => void }> = ({ isOpen, onClose, date, appointments, clients, services, onAppointmentClick }) => {
-    const [isClosing, setIsClosing] = useState(false);
+    if (!isOpen) return null;
 
     useEffect(() => {
-        if (isOpen) {
-            setIsClosing(false);
-            document.body.style.overflow = 'hidden';
-        }
+        document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = 'unset'; };
-    }, [isOpen]);
-
-    const handleClose = () => {
-        setIsClosing(true);
-        setTimeout(onClose, 300);
-    };
-
-    if (!isOpen && !isClosing) return null;
+    }, []);
 
     const [y, m, d] = date.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
@@ -182,12 +172,12 @@ const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: st
 
     return (
         <div
-            className="fixed inset-0 z-[100] flex items-end justify-center backdrop-blur-[2px] transition-all duration-500"
+            className="fixed inset-0 z-[100] flex items-end justify-center backdrop-blur-[2px] transition-all duration-300 animate-fade-in"
             style={{ background: 'rgba(0,0,0,0.2)' }}
-            onClick={handleClose}
+            onClick={onClose}
         >
             <div
-                className={`w-full max-w-md bg-white/85 shadow-2xl overflow-hidden flex flex-col transition-transform duration-500 cubic-bezier(0.2, 0.8, 0.2, 1) ${!isOpen || isClosing ? 'translate-y-[100%]' : 'translate-y-0'}`}
+                className="w-full max-w-md bg-white/85 shadow-2xl overflow-hidden flex flex-col animate-slide-up-ios"
                 style={{
                     borderTopLeftRadius: '24px',
                     borderTopRightRadius: '24px',
@@ -1272,77 +1262,69 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM (Exact Start Time Stacking) ---
     const getLayout = useCallback((dayApps: Appointment[]) => {
         // 1. Group by Exact Start Time
-        const groups: { [time: string]: Appointment[] } = {};
+        // Cascading "Staircase" Layout Algorithm
+        if (dayApps.length === 0) return [];
 
-        dayApps.forEach(app => {
-            const time = app.date.includes('T') ? app.date.split('T')[1] : '09:00';
-            if (!groups[time]) groups[time] = [];
-            groups[time].push(app);
+        const nodes = dayApps.map(app => {
+            const timePart = app.date.split('T')[1];
+            const [h, m] = timePart.split(':').map(Number);
+            const start = (h - 6) * 60 + m;
+            const dur = app.durationTotal || 60;
+            return { app, start, end: start + dur };
         });
 
-        // 2. Create Nodes (Stacks or Singles)
-        // If a time slot has > 1 app, it becomes a Single Node (represented by the stack leader)
-        // If it has 1 app, it's a Single Node.
-        const nodes: { app: Appointment, start: number, end: number, isStack: boolean, cluster: Appointment[] }[] = [];
-
-        Object.values(groups).forEach(group => {
-            const leader = group[0];
-            const timePart = leader.date.includes('T') ? leader.date.split('T')[1] : '09:00';
-            const [hStr, mStr] = timePart.split(':');
-            const start = (parseInt(hStr) * 60 + parseInt(mStr)) * 60000;
-
-            // For a stack, we use the MAX duration of the group to define the block height
-            const maxDuration = Math.max(...group.map(a => a.durationTotal || 60));
-            const end = start + maxDuration * 60000;
-
-            if (group.length > 1) {
-                nodes.push({ app: leader, start, end, isStack: true, cluster: group });
-            } else {
-                nodes.push({ app: leader, start, end, isStack: false, cluster: [leader] });
-            }
-        });
-
-        // Sort nodes by start time
+        // Sort by start time, then duration (longer first to look better as background?) -> standard: start time
         nodes.sort((a, b) => a.start - b.start);
-
-        // 3. Normal Column Layout Algorithm on these Nodes
-        // (Same algorithm as before, but operating on 'nodes' which might be stacks)
-        const clusters: typeof nodes[] = [];
-        if (nodes.length > 0) {
-            let currentCluster = [nodes[0]];
-            let clusterEnd = nodes[0].end;
-            for (let i = 1; i < nodes.length; i++) {
-                if (nodes[i].start < clusterEnd) {
-                    currentCluster.push(nodes[i]);
-                    clusterEnd = Math.max(clusterEnd, nodes[i].end);
-                } else {
-                    clusters.push(currentCluster);
-                    currentCluster = [nodes[i]];
-                    clusterEnd = nodes[i].end;
-                }
-            }
-            clusters.push(currentCluster);
-        }
 
         const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number, index: number, totalCount: number, isStack?: boolean, hidden?: boolean, cluster?: Appointment[] }[] = [];
 
-        clusters.forEach(cluster => {
-            const width = 100 / cluster.length;
-            cluster.forEach((node, i) => {
-                layoutResult.push({
-                    app: node.app,
-                    left: `${i * width}%`,
-                    width: `${width}%`,
-                    zIndex: 10 + i,
-                    topOffset: 0,
-                    index: i,
-                    totalCount: cluster.length, // This count is "columns", not "stack depth"
-                    isStack: node.isStack,
-                    hidden: false,
-                    cluster: node.cluster
-                });
+        // For each node, calculate overlap with previously placed nodes that are still active
+        // "Active" means their 'end' time is > current 'start' time
+        // We can just iterate and check all previous j < i
+
+        for (let i = 0; i < nodes.length; i++) {
+            const current = nodes[i];
+
+            // Find overlaps with *previous* nodes in the sorted list to determine indentation
+            let overlapCount = 0;
+            for (let j = 0; j < i; j++) {
+                const prev = nodes[j];
+                // Overlap condition: Prev Starts before Current Ends AND Prev Ends after Current Starts
+                // Since sorted by start, prev.start <= current.start is guaranteed.
+                // So check if prev.end > current.start
+                if (prev.end > current.start) {
+                    overlapCount++;
+                }
+            }
+
+            // Indentation logic
+            // Max indentation: 4 levels? Then reset? Or keep cascading?
+            // User asked for "cobrindo 70% do anterior" -> means 30% visible.
+            // Let's use 15% offset steps.
+            // Width: 85%?
+
+            const indentLevel = overlapCount;
+            const offsetPerLevel = 10; // 10% shift
+            const left = Math.min(indentLevel * offsetPerLevel, 60); // Cap at 60%
+            const width = 100 - left; // Or fixed 90%? User: "Cobrindo 70%".
+            // If card is 90% width. Left 0.
+            // Next is Left 20. Overlaps 70% (20 to 90 = 70 range? No)
+
+            // Let's just do nice separate cards.
+            const w = 90 - (indentLevel * 5); // Slightly shrink width too?
+
+            layoutResult.push({
+                app: current.app,
+                left: `${left}%`,
+                width: `${90}%`, // Fixed width for cleaner look
+                zIndex: 10 + i, // Later ones on top
+                topOffset: 0,
+                index: i,
+                totalCount: 1,
+                isStack: false, // FORCE INDIVIDUAL CARDS
+                cluster: [current.app]
             });
-        });
+        }
 
         return layoutResult;
     }, []);
@@ -1354,73 +1336,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         // Stack Click Handler
         const handleClick = (e: any) => {
             e.stopPropagation();
-            if (isStack && onStackClick && clusterApps) {
-                onStackClick(clusterApps);
-            } else {
-                onClick(app);
-            }
+            onClick(app);
         };
-
-        // --- STACK VIEW (CSS 3D Deck) ---
-        if (isStack && clusterApps && clusterApps.length > 0) {
-            // We render the top 3 cards to create the stack effect
-            // The logic: 
-            // - The container is the click target (for interaction)
-            // - The children are absolutely positioned to create the stack
-
-            const count = clusterApps.length;
-            const topApp = clusterApps[0];
-            const client = clients.find(c => c.id === topApp.clientId);
-            const pet = client?.pets.find(p => p.id === topApp.petId);
-            const mainSvc = services.find(s => s.id === topApp.serviceId);
-            const isGrooming = mainSvc?.name?.toLowerCase().includes('tosa') || false;
-
-            return (
-                <div
-                    style={style}
-                    className="absolute z-30 group cursor-pointer transition-transform active:scale-95"
-                    onClick={handleClick}
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                >
-                    {/* Visual Stack Cards (Pure CSS Logic) */}
-                    <div className="relative w-full h-full">
-                        {/* Card 3 (Bottom) - Shifted Down & Right */}
-                        {count > 2 && (
-                            <div className="absolute top-0 left-0 w-full h-full bg-brand-200 rounded-2xl shadow-sm transform translate-x-2.5 translate-y-2.5 z-0 transition-all duration-300 group-hover:translate-x-3 group-hover:translate-y-3" />
-                        )}
-                        {/* Card 2 (Middle) - Shifted Down & Right */}
-                        {count > 1 && (
-                            <div className="absolute top-0 left-0 w-full h-full bg-brand-300 rounded-2xl shadow-sm transform translate-x-1.5 translate-y-1.5 z-10 transition-all duration-300 group-hover:translate-x-2 group-hover:translate-y-2" />
-                        )}
-                        {/* Card 1 (Top / Main Content) */}
-                        <div className="absolute top-0 left-0 w-full h-full bg-brand-500 border border-brand-400 rounded-2xl shadow-md z-20 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 group-hover:-translate-y-0.5">
-                            {/* Content */}
-                            <div className="flex gap-2 items-center justify-center p-1">
-                                {/* Avatar */}
-                                <div className="w-8 h-8 rounded-full bg-white border-2 border-brand-200 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0">
-                                    <span className="text-xs font-bold text-gray-500">{pet?.name?.charAt(0).toUpperCase()}</span>
-                                </div>
-
-                                {/* Text + Badge */}
-                                <div className="flex flex-col items-start min-w-0">
-                                    <span className="text-[10px] font-bold text-white truncate max-w-[60px] leading-tight">{pet?.name}</span>
-                                    {count > 1 && (
-                                        <div className="bg-white/20 px-1 py-0.5 rounded text-[8px] font-bold text-white truncate flex items-center gap-0.5">
-                                            +{count - 1} <span className="opacity-70">mais</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Service Icon Badge */}
-                            <div className="absolute bottom-1 right-1 bg-white/20 p-0.5 rounded-full backdrop-blur-sm">
-                                {isGrooming ? <Scissors size={8} className="text-white" /> : <Sparkles size={8} className="text-white" />}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
 
         // --- NORMAL VIEW (TEXT CARD) ---
         // Service Color Mapping
