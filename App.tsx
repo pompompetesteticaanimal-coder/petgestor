@@ -182,22 +182,22 @@ const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: st
 
     return (
         <div className={`fixed inset-0 z-[100] flex items-end justify-center pointer-events-none ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto transition-opacity" onClick={handleClose} />
-            <div className={`bg-white w-full max-w-2xl rounded-t-[2.5rem] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] flex flex-col max-h-[85vh] pointer-events-auto relative transform transition-transform duration-300 ${isClosing ? 'translate-y-full' : 'animate-slide-up-mobile'}`} onClick={e => e.stopPropagation()}>
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm pointer-events-auto transition-opacity" onClick={handleClose} />
+            <div className={`bg-white/90 backdrop-blur-xl w-full max-w-2xl rounded-t-[2.5rem] shadow-[0_-10px_60px_-15px_rgba(0,0,0,0.3)] border-t border-white/50 flex flex-col max-h-[85vh] pointer-events-auto relative transform transition-transform duration-300 ease-out ${isClosing ? 'translate-y-full' : 'animate-slide-up-mobile'}`} onClick={e => e.stopPropagation()}>
                 <div className="w-full h-8 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing" onClick={handleClose}>
-                    <div className="w-16 h-1.5 bg-gray-300 rounded-full" />
+                    <div className="w-12 h-1.5 bg-gray-300/50 rounded-full backdrop-blur-md" />
                 </div>
-                <div className="px-6 pb-4 flex justify-between items-end border-b border-gray-100 mb-2">
+                <div className="px-6 pb-4 flex justify-between items-end border-b border-gray-100/50 mb-2">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <div className="p-2 bg-brand-100 text-brand-600 rounded-xl"><CalendarIcon size={20} /></div>
+                            <div className="p-2.5 bg-brand-100/50 text-brand-600 rounded-2xl backdrop-blur-sm"><CalendarIcon size={22} /></div>
                             <h3 className="font-bold text-2xl text-gray-900 tracking-tight capitalize">{dateObj.toLocaleDateString('pt-BR', { weekday: 'long' })}</h3>
                         </div>
                         <p className="text-gray-500 font-medium pl-1 text-sm">{dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</p>
                     </div>
-                    <button onClick={handleClose} className="bg-gray-100 hover:bg-gray-200 text-gray-600 p-2.5 rounded-full transition-all mb-1"><X size={20} /></button>
+                    <button onClick={handleClose} className="bg-gray-100/50 hover:bg-gray-200/50 text-gray-600 p-2.5 rounded-full transition-all mb-1 backdrop-blur-sm"><X size={20} /></button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-transparent">
                     {sortedApps.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-gray-400"><CalendarIcon size={48} className="mb-4 opacity-30" /><p className="font-medium">Nenhum agendamento para este dia.</p></div>
                     ) : (
@@ -208,16 +208,16 @@ const DayDetailsModal: React.FC<{ isOpen: boolean; onClose: () => void; date: st
                             const mainSvc = services.find(s => s.id === app.serviceId);
                             const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter(s => s).map(s => s?.name).join(', ');
                             return (
-                                <div key={app.id} style={{ animationDelay: `${idx * 0.05}s` }} className="animate-scale-up-sm bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 hover:border-brand-300 transition-colors group relative overflow-hidden">
-                                    <div className="flex flex-col items-center justify-center min-w-[3.5rem] border-r border-gray-100 pr-4 pl-1">
-                                        <span className="text-lg font-black text-gray-800 tracking-tight">{time}</span>
-                                        <div className={`mt-1 w-2 h-2 rounded-full ${app.status === 'concluido' ? 'bg-green-500' : app.status === 'cancelado' ? 'bg-red-500' : 'bg-brand-500'}`} />
+                                <div key={app.id} style={{ animationDelay: `${idx * 0.05}s` }} className="animate-scale-up-sm bg-white/60 hover:bg-white/80 backdrop-blur-md p-4 rounded-3xl shadow-sm border border-white/60 flex gap-4 hover:shadow-lg transition-all group relative overflow-hidden cursor-pointer active:scale-[0.98]" onClick={() => setDetailsApp(app)}>
+                                    <div className="flex flex-col items-center justify-center min-w-[3.5rem] border-r border-gray-100/50 pr-4 pl-1">
+                                        <span className="text-xl font-black text-gray-800 tracking-tight">{time}</span>
+                                        <div className={`mt-1.5 w-2 h-2 rounded-full ring-2 ring-white ${app.status === 'concluido' ? 'bg-green-500' : app.status === 'cancelado' ? 'bg-red-500' : 'bg-brand-500'}`} />
                                     </div>
                                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                                         <div className="flex justify-between items-start"><h4 className="font-bold text-gray-900 truncate text-base">{pet?.name}<span className="text-gray-400 font-medium text-xs ml-2 normal-case">do(a) {client?.name.split(' ')[0]}</span></h4></div>
-                                        <div className="flex flex-wrap items-center gap-1.5 mt-1"><span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-100">{mainSvc?.name}</span>{addSvcs && <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md border border-gray-200">+ {addSvcs}</span>}</div>
+                                        <div className="flex flex-wrap items-center gap-1.5 mt-1"><span className="text-xs font-bold text-brand-700 bg-brand-50/80 px-2 py-0.5 rounded-lg border border-brand-100/50">{mainSvc?.name}</span>{addSvcs && <span className="text-[10px] font-bold text-gray-500 bg-gray-100/80 px-1.5 py-0.5 rounded-lg border border-gray-200/50">+ {addSvcs}</span>}</div>
                                     </div>
-                                    <div className="flex items-center text-gray-300 group-hover:text-brand-400 transition-colors"><ChevronRight size={20} /></div>
+                                    <div className="flex items-center text-gray-300 group-hover:text-brand-400 transition-colors bg-white/50 rounded-full p-1"><ChevronRight size={18} /></div>
                                 </div>
                             );
                         })
@@ -1533,45 +1533,17 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                         key={mainApp.id}
                                         style={{ top: `${top}px`, height: `${height}px`, width: '110%', left: '-5%' }}
                                         className="absolute z-10 transition-all hover:z-20 group"
-                                        onClick={(e) => {
-                                            if (count > 1) {
-                                                e.stopPropagation();
-                                                setSelectedDayForDetails(dateStr);
-                                            }
-                                        }}
                                     >
                                         <AppointmentCard
                                             app={mainApp}
                                             style={{ width: '90%', height: '100%', marginLeft: '5%' }}
-                                            onClick={(app) => {
-                                                if (count > 1) {
-                                                    setSelectedDayForDetails(dateStr);
-                                                } else {
-                                                    setDetailsApp(app);
-                                                }
-                                            }}
+                                            onClick={setDetailsApp}
                                             onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })}
+                                            isStack={count > 1}
+                                            clusterApps={cluster.apps}
+                                            stackTotal={count}
+                                            onStackClick={() => setSelectedDayForDetails(dateStr)}
                                         />
-                                        {count > 1 && (
-                                            <div
-                                                className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-white border-2 border-brand-500 shadow-md rounded-full px-3 py-1 z-50 flex items-center gap-1 cursor-pointer hover:scale-110 transition-transform btn-spring"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedDayForDetails(dateStr);
-                                                }}
-                                            >
-                                                <div className="flex -space-x-1.5">
-                                                    {cluster.apps.slice(0, 3).map(a => (<div key={a.id} className="w-4 h-4 rounded-full bg-brand-200 border border-white" />))}
-                                                </div>
-                                                <span className="text-[10px] font-extrabold text-brand-700 whitespace-nowrap">Ver +{count - 1}</span>
-                                            </div>
-                                        )}
-                                        {count > 1 && (
-                                            <>
-                                                <div className="absolute top-1 right-1 w-full h-full bg-black/5 rounded-xl border border-black/5 -z-10 translate-x-1 translate-y-1" />
-                                                <div className="absolute top-2 right-2 w-full h-full bg-black/5 rounded-xl border border-black/5 -z-20 translate-x-2 translate-y-2" />
-                                            </>
-                                        )}
                                     </div>
                                 );
                             })}
