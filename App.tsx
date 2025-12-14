@@ -966,11 +966,97 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
 
 // ServiceManager has been moved to components/ServiceManager.tsx
 
+const AppointmentDetailsModal: React.FC<{
+    app: Appointment | null;
+    isOpen: boolean;
+    onClose: () => void;
+    onEdit: (app: Appointment) => void;
+    onDelete: (id: string) => void;
+    clients: Client[];
+    services: Service[];
+}> = ({ app, isOpen, onClose, onEdit, onDelete, clients, services }) => {
+    if (!isOpen || !app) return null;
+
+    const client = clients.find(c => c.id === app.clientId);
+    const pet = client?.pets.find(p => p.id === app.petId);
+    const mainSvc = services.find(s => s.id === app.serviceId);
+    const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter((x): x is Service => !!x) || [];
+    const total = calculateTotal(app, services);
+
+    // Format date/time locally using string split to avoid timezone madness
+    // app.date is "YYYY-MM-DDTHH:MM:SS"
+    const datePart = app.date.split('T')[0];
+    const timePart = app.date.split('T')[1].substring(0, 5);
+    // Format date nicely: DD/MM/YYYY
+    const [y, m, d] = datePart.split('-');
+    const formattedDate = `${d}/${m}/${y}`;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+            {/* z-[110] to be above Bottom Sheet (z-999? No, sheet is z-999. Modal needs to be higher or close sheet first) */}
+            <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative animate-scale-up border border-gray-100" onClick={e => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute right-4 top-4 p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"><X size={20} /></button>
+
+                <div className="text-center mb-6">
+                    <div className="w-20 h-20 bg-brand-50 rounded-full mx-auto flex items-center justify-center text-4xl mb-3 shadow-inner border border-brand-100">
+                        🐶
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900">{pet?.name}</h2>
+                    <p className="text-gray-500 font-medium">{client?.name}</p>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <Calendar className="text-brand-500" size={20} />
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase">Data e Hora</p>
+                            <p className="font-bold text-gray-800">{formattedDate} às {timePart}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <Scissors className="text-purple-500" size={20} />
+                        <div className="flex-1">
+                            <p className="text-xs font-bold text-gray-400 uppercase">Serviços</p>
+                            <p className="font-bold text-gray-800">{mainSvc?.name}</p>
+                            {addSvcs.length > 0 && <p className="text-xs text-gray-500 mt-0.5">+ {addSvcs.map(s => s.name).join(', ')}</p>}
+                        </div>
+                        <div className="text-right">
+                            <p className="text-lg font-black text-gray-900">R$ {total.toFixed(0)}</p>
+                        </div>
+                    </div>
+                    {app.notes && (
+                        <div className="p-3 bg-yellow-50 rounded-xl border border-yellow-100 text-sm text-gray-700 italic">
+                            "{app.notes}"
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        onClick={() => { if (confirm('Tem certeza que deseja excluir?')) { onDelete(app.id); onClose(); } }}
+                        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100 transition-colors"
+                    >
+                        <Trash2 size={18} /> Excluir
+                    </button>
+                    <button
+                        onClick={() => { onEdit(app); onClose(); }}
+                        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-brand-600 text-white font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-200"
+                    >
+                        <Edit2 size={18} /> Editar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; isOpen: boolean; onClose: () => void; onOpen: () => void; onLog: (a: string, d: string) => void; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete, isOpen, onClose, onOpen, onLog }) => {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
     const [currentDate, setCurrentDate] = useState(new Date());
     // const [isModalOpen, setIsModalOpen] = useState(false); // LIFTED UP
     const [detailsApp, setDetailsApp] = useState<Appointment | null>(null);
+    const [viewingApp, setViewingApp] = useState<Appointment | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, appId: string } | null>(null);
 
     // App Form State
@@ -1362,7 +1448,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                 key={app.id}
                                 app={app}
                                 style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }}
-                                onClick={setDetailsApp}
+                                onClick={setViewingApp}
                                 onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })}
                                 isStack={item.isStack}
                                 clusterApps={item.cluster}
@@ -1417,7 +1503,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                         key={app.id}
                                         app={app}
                                         style={{ top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }}
-                                        onClick={setDetailsApp}
+                                        onClick={setViewingApp}
                                         onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })}
                                     />
                                 );
@@ -1856,12 +1942,153 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 </div>,
                 document.body
             )}
-            {/* Day Details Modal */}
+            {/* Unified Bottom Sheet Logic */}
+            {(selectedCluster || selectedDayForDetails || detailsApp) && createPortal((() => {
+                let appsToShow: Appointment[] = [];
+                let label = '';
+
+                if (selectedDayForDetails && !selectedCluster && !detailsApp) {
+                    // Day Click (Space) - Open Sheet
+                    appsToShow = appointments.filter(a => a.date.startsWith(selectedDayForDetails)).sort((a, b) => a.date.localeCompare(b.date));
+                    label = new Date(selectedDayForDetails).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                } else if (selectedCluster) {
+                    // Stack Click - Open Sheet
+                    appsToShow = selectedCluster;
+                    label = selectedCluster[0]?.date.split('T')[1].slice(0, 5) || 'Grupo';
+                } else if (detailsApp) {
+                    // Fallback if detailsApp set?
+                    // If we use viewingApp for single clicks, detailsApp here is only used if we trigger it some other way?
+                    // Or maybe we KEEP detailsApp for something?
+                    // Assuming detailsApp handles legacy or complex overlapping?
+                    // Let's keep the logic just in case, but viewingApp takes precedence for direct clicks.
+                    const d = detailsApp.date.split('T')[0];
+                    const t = detailsApp.date.split('T')[1];
+                    appsToShow = appointments.filter(a => a.date.startsWith(d) && a.date.includes(t));
+                    label = t.slice(0, 5);
+                }
+
+                return (
+                    <BottomSheetList
+                        isOpen={true}
+                        onClose={() => { setDetailsApp(null); setSelectedCluster(null); setSelectedDayForDetails(null); }}
+                        timeSlot={label}
+                        appointments={appsToShow}
+                        clients={clients}
+                        services={services}
+                        onEdit={(app: Appointment) => {
+                            // Clicking item in sheet -> Open Modal
+                            setDetailsApp(null);
+                            setSelectedCluster(null);
+                            setSelectedDayForDetails(null);
+                            setViewingApp(app);
+                        }}
+                    />
+                );
+            })(), document.body)}
+
+            {/* SUMMARY MODAL */}
+            {viewingApp && createPortal(
+                <AppointmentDetailsModal
+                    app={viewingApp}
+                    isOpen={!!viewingApp}
+                    onClose={() => setViewingApp(null)}
+                    onEdit={handleStartEdit}
+                    onDelete={onDelete}
+                    clients={clients}
+                    services={services}
+                />,
+                document.body
+            )}
 
         </div>
     );
 };
 
+
+const AppointmentDetailsModal: React.FC<{
+    app: Appointment | null;
+    isOpen: boolean;
+    onClose: () => void;
+    onEdit: (app: Appointment) => void;
+    onDelete: (id: string) => void;
+    clients: Client[];
+    services: Service[];
+}> = ({ app, isOpen, onClose, onEdit, onDelete, clients, services }) => {
+    if (!isOpen || !app) return null;
+
+    const client = clients.find(c => c.id === app.clientId);
+    const pet = client?.pets.find(p => p.id === app.petId);
+    const mainSvc = services.find(s => s.id === app.serviceId);
+    const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter((x): x is Service => !!x) || [];
+    const total = calculateTotal(app, services);
+
+    // Format date/time locally using string split to avoid timezone madness
+    // app.date is "YYYY-MM-DDTHH:MM:SS"
+    const datePart = app.date.split('T')[0];
+    const timePart = app.date.split('T')[1].substring(0, 5);
+    // Format date nicely: DD/MM/YYYY
+    const [y, m, d] = datePart.split('-');
+    const formattedDate = `${d}/${m}/${y}`;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+            {/* z-[110] to be above Bottom Sheet (z-999? No, sheet is z-999. Modal needs to be higher or close sheet first) */}
+            <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl relative animate-scale-up border border-gray-100" onClick={e => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute right-4 top-4 p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"><X size={20} /></button>
+
+                <div className="text-center mb-6">
+                    <div className="w-20 h-20 bg-brand-50 rounded-full mx-auto flex items-center justify-center text-4xl mb-3 shadow-inner border border-brand-100">
+                        🐶
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900">{pet?.name}</h2>
+                    <p className="text-gray-500 font-medium">{client?.name}</p>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <Calendar className="text-brand-500" size={20} />
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase">Data e Hora</p>
+                            <p className="font-bold text-gray-800">{formattedDate} às {timePart}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <Scissors className="text-purple-500" size={20} />
+                        <div className="flex-1">
+                            <p className="text-xs font-bold text-gray-400 uppercase">Serviços</p>
+                            <p className="font-bold text-gray-800">{mainSvc?.name}</p>
+                            {addSvcs.length > 0 && <p className="text-xs text-gray-500 mt-0.5">+ {addSvcs.map(s => s.name).join(', ')}</p>}
+                        </div>
+                        <div className="text-right">
+                            <p className="text-lg font-black text-gray-900">R$ {total.toFixed(0)}</p>
+                        </div>
+                    </div>
+                    {app.notes && (
+                        <div className="p-3 bg-yellow-50 rounded-xl border border-yellow-100 text-sm text-gray-700 italic">
+                            "{app.notes}"
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        onClick={() => { if (confirm('Tem certeza que deseja excluir?')) { onDelete(app.id); onClose(); } }}
+                        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100 transition-colors"
+                    >
+                        <Trash2 size={18} /> Excluir
+                    </button>
+                    <button
+                        onClick={() => { onEdit(app); onClose(); }}
+                        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-brand-600 text-white font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-200"
+                    >
+                        <Edit2 size={18} /> Editar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- APP COMPONENT ---
 const App: React.FC = () => {
@@ -1892,6 +2119,7 @@ const App: React.FC = () => {
     const [petDetailsData, setPetDetailsData] = useState<{ pet: Pet, client: Client } | null>(null);
     const [selectedCluster, setSelectedCluster] = useState<Appointment[] | null>(null);
     const [detailsApp, setDetailsApp] = useState<Appointment | null>(null);
+
 
     // --- DARK MODE EFFECT ---
     useEffect(() => {
@@ -2312,7 +2540,7 @@ const App: React.FC = () => {
                 appointments={appointments}
             />
 
-            {/* Cluster Sheet (Reusing DayDetailsModal for consistent UI) */}
+            {/* Cluster Sheet logic removed from here (moved to ScheduleManager) */}
 
         </HashRouter>
     );
