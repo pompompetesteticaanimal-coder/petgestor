@@ -4,7 +4,7 @@ import {
     Plus, Trash2, Phone, Search, Star, MapPin, PawPrint, Check, X,
     Settings, Clock, Activity, Edit2
 } from 'lucide-react';
-import { Client, Appointment, Pet } from '../types';
+import { Client, Appointment, Pet, BRAZIL_DOG_BREEDS, getBreedEmoji } from '../types';
 import { ClientFormModal } from './ClientFormModal';
 
 interface ClientManagerProps {
@@ -289,7 +289,7 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                                                         <button onClick={() => startEditingPet(pet)} className="text-gray-300 hover:text-brand-500 transition-colors p-1"><Settings size={16} /></button>
                                                                     </div>
                                                                     <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 font-medium">
-                                                                        <span>{pet.breed}</span>
+                                                                        <span>{getBreedEmoji(pet.breed)} {pet.breed}</span>
                                                                         {pet.age && <span className="flex items-center gap-0.5"><Clock size={10} /> {pet.age}</span>}
                                                                         {pet.size && <span className="flex items-center gap-0.5"><Activity size={10} /> {pet.size}</span>}
                                                                         {pet.coat && <span>Pelagem {pet.coat}</span>}

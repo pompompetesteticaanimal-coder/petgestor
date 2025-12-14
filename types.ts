@@ -103,4 +103,30 @@ export const BRAZIL_DOG_BREEDS = [
   'Cocker Spaniel',
   'Pastor Alemão',
   'Outra'
-];
+
+export const BREED_EMOJI_MAP: Record<string, string> = {
+  'SRD (Vira-lata)': '🐕',
+  'Shih Tzu': '🐶',
+  'Yorkshire Terrier': '🐕‍🦺',
+  'Poodle': '🐩',
+  'Lhasa Apso': '🐕',
+  'Buldogue Francês': '🐶',
+  'Golden Retriever': '🦮',
+  'Labrador': '🦮',
+  'Maltês': '🐶',
+  'Pug': '🐶',
+  'Spitz Alemão': '🦊',
+  'Pinscher': '🐕',
+  'Schnauzer': '🧔',
+  'Beagle': '🐶',
+  'Border Collie': '🐕‍🦺',
+  'Daschund (Salsicha)': '🌭',
+  'Rottweiler': '🐕',
+  'Pit Bull': '🐕',
+  'Chow Chow': '🦁',
+  'Cocker Spaniel': '🐶',
+  'Pastor Alemão': '🐺',
+  'Outra': '🐾'
+};
+
+export const getBreedEmoji = (breed: string) => BREED_EMOJI_MAP[breed] || '🐾';

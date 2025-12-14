@@ -1406,7 +1406,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 <div className={`w-full h-full p-2 border shadow-sm rounded-xl overflow-hidden flex flex-col justify-between ${colorClass} cursor-pointer hover:shadow-lg hover:scale-[1.02] btn-spring`}>
                     <div className="flex flex-col w-full overflow-hidden">
                         <div className="flex justify-between items-start w-full mb-0.5">
-                            <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{pet?.name || 'Pet'}</span>
+                            <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{getBreedEmoji(pet?.breed || '')} {pet?.name || 'Pet'}</span>
                             {avgRating > 0 && (
                                 <div className="flex bg-white/60 px-1 py-0.5 rounded-md items-center ml-1 shadow-sm gap-0.5">
                                     {[1, 2, 3, 4, 5].map(s => (
