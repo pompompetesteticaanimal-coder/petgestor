@@ -1542,7 +1542,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                             isStack={count > 1}
                                             clusterApps={cluster.apps}
                                             stackTotal={count}
-                                            onStackClick={() => setSelectedDayForDetails(dateStr)}
+                                            onStackClick={() => setSelectedCluster(cluster.apps)}
                                         />
                                     </div>
                                 );
@@ -2457,56 +2457,16 @@ const App: React.FC = () => {
                 appointments={appointments}
             />
 
-            {/* Cluster Sheet (Partial Modal) */}
+            {/* Cluster Sheet (Reusing DayDetailsModal for consistent UI) */}
             {selectedCluster && (
-                <div className="fixed inset-0 z-[200] flex justify-center items-end bg-black/5 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCluster(null)}>
-                    <div className="bg-white/85 backdrop-blur-2xl w-full max-w-md rounded-t-[32px] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] p-5 animate-slide-up max-h-[85vh] overflow-y-auto flex flex-col border-t border-white/50" onClick={e => e.stopPropagation()}>
-                        <div className="w-12 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-6" />
-
-                        <div className="flex justify-between items-center mb-6 px-1">
-                            <div>
-                                <h3 className="text-xl font-black text-gray-800 tracking-tight">Agendamentos Simultâneos</h3>
-                                <div className="text-xs font-semibold text-gray-400 mt-0.5 uppercase tracking-wider">
-                                    {selectedCluster[0]?.date ? selectedCluster[0].date.split('T')[1].substring(0, 5) : '--:--'} • {selectedCluster.length} PETS
-                                </div>
-                            </div>
-                            <button onClick={() => setSelectedCluster(null)} className="p-2 hover:bg-black/5 rounded-full transition-colors">
-                                <X size={24} className="text-gray-400" />
-                            </button>
-                        </div>
-
-                        <div className="flex flex-col gap-3 pb-8">
-                            {selectedCluster.map((app) => {
-                                const client = clients.find(c => c.id === app.clientId);
-                                const pet = client?.pets.find(p => p.id === app.petId);
-                                const srv = services.find(s => s.id === app.serviceId);
-
-                                return (
-                                    <div key={app.id} onClick={() => { setSelectedCluster(null); setDetailsApp(app); }} className="flex items-center gap-4 p-4 rounded-3xl border border-white/60 shadow-sm bg-gradient-to-br from-white/80 to-white/40 hover:scale-[1.02] hover:shadow-md transition-all cursor-pointer relative overflow-hidden group">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                                        <div className="w-14 h-14 rounded-2xl bg-brand-100/50 flex items-center justify-center text-brand-600 font-extrabold text-xl shadow-inner">
-                                            {pet?.name ? pet.name.substring(0, 1).toUpperCase() : '?'}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-baseline">
-                                                <span className="font-extrabold text-gray-800 text-lg truncate">{pet?.name || 'Pet'}</span>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 rounded-full text-gray-500">{client?.name ? client.name.split(' ')[0] : 'Client'}</span>
-                                            </div>
-                                            <div className="text-sm font-bold text-brand-600 mt-0.5 truncate flex items-center gap-1.5">
-                                                {srv?.name?.toLowerCase().includes('tosa') ? <Scissors size={12} /> : <Sparkles size={12} />}
-                                                {srv?.name || 'Serviço'}
-                                            </div>
-                                        </div>
-                                        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-300">
-                                            <ChevronRight size={18} />
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                </div>
+                <DayDetailsModal
+                    isOpen={true}
+                    onClose={() => setSelectedCluster(null)}
+                    date={selectedCluster[0]?.date.split('T')[0] || new Date().toISOString().split('T')[0]}
+                    appointments={selectedCluster}
+                    clients={clients}
+                    services={services}
+                />
             )}
         </HashRouter>
     );
