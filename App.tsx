@@ -1287,21 +1287,30 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         const avgRating = starsValues.length > 0 ? starsValues.reduce((a, b) => a + b, 0) / starsValues.length : 0;
 
         return (
-            <div style={style} className={`animate-pop absolute rounded-lg p-1.5 border shadow-sm ${colorClass} text-xs cursor-pointer btn-spring hover:shadow-md hover:scale-[1.05] hover:z-[100] transition-all overflow-hidden flex flex-col justify-start leading-none group min-w-[200px]`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
-                {/* Header: Client & Pet */}
-                <div className="flex justify-between items-center mb-1 w-full">
-                    <span className="font-bold truncate text-[11px] flex-1">{client?.name.split(' ')[0]} - {pet?.name}</span>
-                    {avgRating > 0 && <div className="flex bg-white/60 px-1 rounded-md items-center ml-1"><Star size={8} className="fill-yellow-500 text-yellow-500" /><span className="text-[9px] font-bold ml-0.5 text-yellow-700">{avgRating.toFixed(1)}</span></div>}
-                </div>
+            <div style={style} className={`animate-pop absolute rounded-xl p-2 border shadow-sm ${colorClass} cursor-pointer btn-spring hover:shadow-lg hover:scale-[1.02] hover:z-[100] transition-all overflow-hidden flex flex-col justify-between leading-snug group`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
+                <div className="flex flex-col w-full overflow-hidden">
+                    {/* Top Row: Pet Name (Prominent) */}
+                    <div className="flex justify-between items-start w-full mb-0.5">
+                        <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{pet?.name}</span>
+                        {avgRating > 0 && <div className="flex bg-white/60 px-1 py-0.5 rounded-md items-center ml-1 shadow-sm"><Star size={8} className="fill-yellow-500 text-yellow-500" /><span className="text-[9px] font-bold ml-0.5 text-yellow-700">{avgRating.toFixed(1)}</span></div>}
+                    </div>
 
-                {/* Body: Services */}
-                <div className="flex flex-col gap-0.5 opacity-90 w-full">
-                    {mainSvc && <div className="truncate font-semibold text-[10px]">{mainSvc.name}</div>}
-                    {addSvcs.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                            {addSvcs.map((s, i) => <span key={i} className="bg-white/40 px-1 rounded-[3px] text-[8px] truncate max-w-[80px]">{s.name}</span>)}
-                        </div>
-                    )}
+                    {/* Second Row: Client Name (Subtle) */}
+                    {/* <div className="text-[10px] font-medium opacity-80 truncate mb-1.5">{client?.name.split(' ')[0]}</div> */}
+                    <div className="flex items-center gap-1 text-[10px] font-semibold opacity-70 truncate mb-1">
+                        <User size={10} />
+                        {client?.name.split(' ')[0]}
+                    </div>
+
+                    {/* Third Row: Service (Clear) */}
+                    <div className="flex flex-col w-full mt-auto">
+                        {mainSvc && <div className="truncate font-bold text-[11px] leading-3 mb-0.5">{mainSvc.name}</div>}
+                        {addSvcs.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                                {addSvcs.map((s, i) => <span key={i} className="bg-white/50 border border-black/5 px-1 rounded-[4px] text-[9px] font-bold truncate max-w-[100%]">{s.name}</span>)}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         );
