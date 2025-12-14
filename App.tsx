@@ -1000,7 +1000,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const [notes, setNotes] = useState('');
 
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
-    const [nowMinutes, setNowMinutes] = useState(0);
+    const [selectedCluster, setSelectedCluster] = useState<Appointment[] | null>(null);
 
     useEffect(() => {
         const updateNow = () => {
@@ -1231,7 +1231,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
     // --- SIDE-BY-SIDE LAYOUT ALGORITHM ---
-    // --- SIDE-BY-SIDE LAYOUT ALGORITHM (GRID) ---
+    // --- SIDE-BY-SIDE LAYOUT ALGORITHM (GRID + STACK) ---
     const getLayout = useCallback((dayApps: Appointment[]) => {
         // Sort by time (Timezone Agnostic)
         const sorted = [...dayApps].sort((a, b) => {
@@ -1264,68 +1264,112 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
             clusters.push(currentCluster);
         }
 
-        const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number, index: number, totalCount: number }[] = [];
+        const layoutResult: { app: Appointment, left: string, width: string, zIndex: number, topOffset: number, index: number, totalCount: number, isStack?: boolean, hidden?: boolean, cluster?: Appointment[] }[] = [];
         clusters.forEach(cluster => {
             const count = cluster.length;
-            const widthPercent = 98 / count; // Slightly less than 100% for gap
+
+            // Logic: Max 2 columns. If > 2, the 2nd column is a Stack.
+            // Col 1: Index 0
+            // Col 2: Index 1 (Stack if count > 2)
+            // Hidden: Index 2+
 
             cluster.forEach((node, index) => {
-                layoutResult.push({
-                    app: node.app,
-                    left: `${index * widthPercent}%`,
-                    width: `${widthPercent}%`,
-                    zIndex: 10 + index,
-                    topOffset: 0,
-                    index: index,
-                    totalCount: count
-                });
+                let left = '0%';
+                let width = '100%';
+                let isStack = false;
+                let hidden = false;
+
+                if (count === 1) {
+                    left = '0%'; width = '100%';
+                } else if (count === 2) {
+                    width = '49%'; // 50% with gap
+                    left = index === 0 ? '0%' : '51%';
+                } else {
+                    // Count > 2: Stack Mode
+                    if (index === 0) {
+                        width = '49%'; left = '0%';
+                    } else if (index === 1) {
+                        width = '49%'; left = '51%';
+                        isStack = true;
+                    } else {
+                        hidden = true;
+                    }
+                }
+
+                if (!hidden) {
+                    layoutResult.push({
+                        app: node.app,
+                        left,
+                        width,
+                        zIndex: 10 + index,
+                        topOffset: 0,
+                        index: index,
+                        totalCount: count,
+                        isStack: isStack,
+                        hidden: false,
+                        cluster: isStack ? cluster.map(n => n.app) : undefined
+                    });
+                }
             });
         });
         return layoutResult;
     }, []);
 
-    // Updated Card with full requested info
-    const AppointmentCard = ({ app, style, onClick, onContext, stackIndex, stackTotal }: { app: Appointment, style: any, onClick: any, onContext: any, stackIndex?: number, stackTotal?: number }) => {
+    // Updated Card with Stack Logic
+    const AppointmentCard = ({ app, style, onClick, onContext, stackIndex, stackTotal, isStack, clusterApps, onStackClick }: { app: Appointment, style: any, onClick: any, onContext: any, stackIndex?: number, stackTotal?: number, isStack?: boolean, clusterApps?: Appointment[], onStackClick?: (apps: Appointment[]) => void }) => {
         const client = clients.find(c => c.id === app.clientId); const pet = client?.pets.find(p => p.id === app.petId); const mainSvc = services.find(srv => srv.id === app.serviceId); const addSvcs = app.additionalServiceIds?.map((id: string) => services.find(s => s.id === id)).filter((x): x is Service => !!x) || []; const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
 
-        // WARNING: DO NOT CHANGE COLORS - Service Color Mapping (Fixed by User Request)
-        let colorClass = 'bg-blue-100 border-blue-200 text-blue-900'; // Default / Banho
+        // Service Color Mapping
+        let colorClass = 'bg-blue-100 border-blue-200 text-blue-900';
         if (allServiceNames.includes('tosa normal')) colorClass = 'bg-orange-100 border-orange-200 text-orange-900';
         else if (allServiceNames.includes('tosa higi') || allServiceNames.includes('tosa higienica') || allServiceNames.includes('higi')) colorClass = 'bg-yellow-100 border-yellow-200 text-yellow-900';
         else if (allServiceNames.includes('tesoura')) colorClass = 'bg-pink-100 border-pink-200 text-pink-900';
         else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) colorClass = 'bg-indigo-100 border-indigo-200 text-indigo-900';
         else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) colorClass = 'bg-purple-100 border-purple-200 text-purple-900';
 
-        // Calc Rating
+        // Rating
         let starsValues: number[] = [];
         const petApps = appointments.filter(a => a.petId === app.petId && a.rating);
         if (petApps.length > 0) starsValues = petApps.map(a => a.rating || 0);
         const avgRating = starsValues.length > 0 ? starsValues.reduce((a, b) => a + b, 0) / starsValues.length : 0;
 
+        const handleClick = (e: any) => {
+            e.stopPropagation();
+            if (isStack && onStackClick && clusterApps) {
+                onStackClick(clusterApps);
+            } else {
+                onClick(app);
+            }
+        };
+
         return (
-            <div style={style} className={`animate-pop absolute rounded-xl p-2 border shadow-sm ${colorClass} cursor-pointer btn-spring hover:shadow-lg hover:scale-[1.02] hover:z-[100] transition-all overflow-hidden flex flex-col justify-between leading-snug group`} onClick={(e) => { e.stopPropagation(); onClick(app); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
-                <div className="flex flex-col w-full overflow-hidden">
-                    {/* Top Row: Pet Name (Prominent) */}
-                    <div className="flex justify-between items-start w-full mb-0.5">
-                        <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{pet?.name}</span>
-                        {avgRating > 0 && <div className="flex bg-white/60 px-1 py-0.5 rounded-md items-center ml-1 shadow-sm"><Star size={8} className="fill-yellow-500 text-yellow-500" /><span className="text-[9px] font-bold ml-0.5 text-yellow-700">{avgRating.toFixed(1)}</span></div>}
-                    </div>
+            <div style={style} className={`absolute rounded-xl transition-all flex flex-col justify-between leading-snug group ${isStack ? 'z-30' : ''}`} onClick={handleClick} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContext(e, app.id); }}>
+                {/* Stack Visual Effect (Cards behind) */}
+                {isStack && (
+                    <>
+                        <div className="absolute top-1 left-1 w-full h-full bg-white border border-gray-200 rounded-xl shadow-sm -z-10 transform translate-x-1 translate-y-1 block" />
+                        <div className="absolute top-2 left-2 w-full h-full bg-white border border-gray-100 rounded-xl shadow-sm -z-20 transform translate-x-2 translate-y-2 block" />
+                    </>
+                )}
 
-                    {/* Second Row: Client Name (Subtle) */}
-                    {/* <div className="text-[10px] font-medium opacity-80 truncate mb-1.5">{client?.name.split(' ')[0]}</div> */}
-                    <div className="flex items-center gap-1 text-[10px] font-semibold opacity-70 truncate mb-1">
-                        <User size={10} />
-                        {client?.name.split(' ')[0]}
-                    </div>
-
-                    {/* Third Row: Service (Clear) */}
-                    <div className="flex flex-col w-full mt-auto">
-                        {mainSvc && <div className="truncate font-bold text-[11px] leading-3 mb-0.5">{mainSvc.name}</div>}
-                        {addSvcs.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-0.5">
-                                {addSvcs.map((s, i) => <span key={i} className="bg-white/50 border border-black/5 px-1 rounded-[4px] text-[9px] font-bold truncate max-w-[100%]">{s.name}</span>)}
-                            </div>
-                        )}
+                <div className={`w-full h-full p-2 border shadow-sm rounded-xl overflow-hidden flex flex-col justify-between ${colorClass} ${isStack ? 'hover:scale-[1.02] cursor-pointer' : 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'} btn-spring`}>
+                    <div className="flex flex-col w-full overflow-hidden">
+                        <div className="flex justify-between items-start w-full mb-0.5">
+                            <span className="font-extrabold truncate text-[12px] flex-1 tracking-tight">{pet?.name}</span>
+                            {avgRating > 0 && <div className="flex bg-white/60 px-1 py-0.5 rounded-md items-center ml-1 shadow-sm"><Star size={8} className="fill-yellow-500 text-yellow-500" /><span className="text-[9px] font-bold ml-0.5 text-yellow-700">{avgRating.toFixed(1)}</span></div>}
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-semibold opacity-70 truncate mb-1">
+                            <User size={10} />
+                            {client?.name.split(' ')[0]}
+                        </div>
+                        <div className="flex flex-col w-full mt-auto">
+                            {mainSvc && <div className="truncate font-bold text-[11px] leading-3 mb-0.5">{mainSvc.name}</div>}
+                            {addSvcs.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                    {addSvcs.map((s, i) => <span key={i} className="bg-white/50 border border-black/5 px-1 rounded-[4px] text-[9px] font-bold truncate max-w-[100%]">{s.name}</span>)}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1360,7 +1404,18 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                         const height = (app.durationTotal || 60) * 2;
                         const top = startMin * 2;
 
-                        return (<AppointmentCard key={app.id} app={app} style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }} onClick={setDetailsApp} onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })} />);
+                        return (
+                            <AppointmentCard
+                                key={app.id}
+                                app={app}
+                                style={{ animationDelay: `${idx * 0.02}s`, top: `${top}px`, height: `${height}px`, left: item.left, width: item.width, zIndex: item.zIndex }}
+                                onClick={setDetailsApp}
+                                onContext={(e: any, id: string) => setContextMenu({ x: e.clientX, y: e.clientY, appId: id })}
+                                isStack={item.isStack}
+                                clusterApps={item.cluster}
+                                onStackClick={setSelectedCluster}
+                            />
+                        );
                     })}
                     {/* Current Time Indicator */}
                     {nowMinutes >= 0 && nowMinutes <= 840 && ( // 14h * 60 = 840
@@ -2340,7 +2395,50 @@ const App: React.FC = () => {
                 appointments={appointments}
             />
         </HashRouter>
+        {/* Cluster Sheet (Partial Modal) */ }
+    {
+        selectedCluster && (
+            <div className="fixed inset-0 z-[200] flex justify-center items-end bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCluster(null)}>
+                <div className="bg-white w-full max-w-md rounded-t-3xl shadow-2xl p-4 animate-slide-up max-h-[80vh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
+                    <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4" />
+                    <div className="flex justify-between items-center mb-4 px-2">
+                        <h3 className="text-lg font-bold text-gray-800">Agendamentos neste horário</h3>
+                        <button onClick={() => setSelectedCluster(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                            <X size={20} className="text-gray-500" />
+                        </button>
+                    </div>
+                    <div className="flex flex-col gap-3 pb-6">
+                        {selectedCluster.map((app) => {
+                            // Reuse AppointmentCard logic or simplified? simplified list item.
+                            const client = clients.find(c => c.id === app.clientId);
+                            const pet = client?.pets.find(p => p.id === app.petId);
+                            const displayTime = app.date.split('T')[1].substring(0, 5);
+                            return (
+                                <div key={app.id} onClick={() => { setSelectedCluster(null); setDetailsApp(app); }} className="flex items-center gap-4 p-3 rounded-2xl border border-gray-100 shadow-sm bg-white hover:border-brand-200 hover:shadow-md transition-all cursor-pointer">
+                                    <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 font-bold text-lg">
+                                        {pet?.name.substring(0, 1).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between">
+                                            <span className="font-extrabold text-gray-800">{pet?.name}</span>
+                                            <span className="text-xs font-semibold text-gray-500">{displayTime}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500 font-medium">{client?.name}</div>
+                                        <div className="text-xs font-bold text-brand-600 mt-0.5">
+                                            {services.find(s => s.id === app.serviceId)?.name}
+                                        </div>
+                                    </div>
+                                    <ChevronRight size={18} className="text-gray-300" />
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            </div>
+        )
+    }
     );
 }
 
 export default App;
+```
