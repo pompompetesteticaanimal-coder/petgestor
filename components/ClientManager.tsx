@@ -183,10 +183,10 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
             {
                 selectedClient && createPortal(
                     <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedClient(null)}>
-                        <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden animate-scale-up relative ring-1 ring-white/50" onClick={e => e.stopPropagation()}>
+                        <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden animate-scale-up relative ring-1 ring-white/50 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-400 via-rose-500 to-purple-600" />
 
-                            <div className="p-8">
+                            <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
                                 {!isEditing ? (
                                     <>
                                         <div className="flex justify-between items-start mb-8">

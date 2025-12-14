@@ -333,7 +333,16 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     }, [selectedYear, appointments, services]);
 
     const dailyApps = useMemo(() => appointments.filter(a => a.date && a.date.startsWith(selectedDate)), [appointments, selectedDate]);
-    const dailyStats = useMemo(() => calculateStats(dailyApps), [dailyApps, services]);
+    const filteredDailyApps = useMemo(() => {
+        if (!dailySearchTerm) return dailyApps;
+        const term = dailySearchTerm.toLowerCase();
+        return dailyApps.filter(app => {
+            const c = clients.find(cl => cl.id === app.clientId);
+            const p = c?.pets.find(pt => pt.id === app.petId);
+            return c?.name.toLowerCase().includes(term) || p?.name.toLowerCase().includes(term);
+        });
+    }, [dailyApps, dailySearchTerm, clients]);
+    const dailyStats = useMemo(() => calculateStats(filteredDailyApps), [filteredDailyApps, services]);
     const weeklyChartData = useMemo(() => getWeeklyChartData(), [getWeeklyChartData]);
 
     // Calculate weeklyStats
@@ -557,20 +566,10 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                             </div>
                         )}
                         <div className="p-4 space-y-3">
-                            {(() => {
-                                const filteredDailyApps = dailyApps.filter(app => {
-                                    if (!dailySearchTerm) return true;
-                                    const c = clients.find(cl => cl.id === app.clientId);
-                                    const p = c?.pets.find(pt => pt.id === app.petId);
-                                    const term = dailySearchTerm.toLowerCase();
-                                    return c?.name.toLowerCase().includes(term) || p?.name.toLowerCase().includes(term);
-                                });
-
-                                if (filteredDailyApps.length === 0) {
-                                    return <div className="p-8 text-center text-gray-400 font-medium">Nenhum agendamento encontrado.</div>;
-                                }
-
-                                return filteredDailyApps.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((app, index) => {
+                            {filteredDailyApps.length === 0 ? (
+                                <div className="p-8 text-center text-gray-400 font-medium">{dailySearchTerm ? 'Nenhum agendamento encontrado.' : 'Nenhum agendamento neste dia.'}</div>
+                            ) : (
+                                filteredDailyApps.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((app, index) => {
                                     const client = clients.find(c => c.id === app.clientId);
                                     const pet = client?.pets.find(p => p.id === app.petId);
                                     const mainSvc = services.find(s => s.id === app.serviceId);
@@ -635,7 +634,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                         </div>
                                     );
                                 })
-                            })()}
+                            )}
                         </div>
                     </div>
                 </section>
