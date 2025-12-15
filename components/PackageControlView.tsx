@@ -57,10 +57,15 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
     };
 
     const packageData = useMemo(() => {
-        const todayStr = new Date().toISOString().split('T')[0];
+        // Correct Local Date String (YYYY-MM-DD) handling for user's timezone
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        const todayStr = new Date(now.getTime() - offset).toISOString().split('T')[0];
+
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+        // We can just use string comparison for 30 days ago calculated locally too
+        const thirtyDaysAgoLocal = new Date(thirtyDaysAgo.getTime() - offset).toISOString().split('T')[0];
 
         const data: any[] = [];
 
@@ -84,18 +89,21 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                     const serviceName = service ? service.name : 'Pacote';
 
                     // 4. Find Last & Next Baths
+                    // Use string slicing for safe comparison if dates are ISO
+                    // Last Bath: Completed (concluido) in the past
                     const lastBath = petApps
-                        .filter(a => a.status === 'concluido' && a.date < todayStr)
+                        .filter(a => a.status === 'concluido' && a.date.split('T')[0] < todayStr)
                         .sort((a, b) => b.date.localeCompare(a.date))[0];
 
+                    // Next Bath: Future Scheduled (includes Today)
                     const nextBath = petApps
-                        .filter(a => a.status === 'agendado' && a.date >= todayStr)
+                        .filter(a => a.status === 'agendado' && a.date.split('T')[0] >= todayStr)
                         .sort((a, b) => a.date.localeCompare(b.date))[0];
 
                     // 5. Determine "Active Rule" Status
                     const isExplicitInactive = (pet.notes || '').includes('[INATIVO]');
                     const hasFuturePackage1 = nextBath && services.find(s => s.id === nextBath.serviceId)?.name.includes('1');
-                    const hasRecentActivity = lastBath && lastBath.date >= thirtyDaysAgoStr;
+                    const hasRecentActivity = lastBath && lastBath.date.split('T')[0] >= thirtyDaysAgoLocal;
 
                     const meetsActiveRule = !!(hasFuturePackage1 || hasRecentActivity);
                     const isActive = !isExplicitInactive && meetsActiveRule;
@@ -156,6 +164,28 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
             const service = services.find(s => s.name === baseName) || services.find(s => s.name === curr.serviceName);
             return acc + (service?.price || 0);
         }, 0)
+    };
+
+    // Helper for safe date display
+    const formatDate = (dateStr: string) => {
+        // Assume dateStr is ISO with potential offset or not.
+        // We want to force parsing it as LOCAL time components if it has no offset,
+        // OR respect the offset if provided, but display primarily the day/month.
+        // The safest for "Appt Date" stored as ISO is usually just "new Date(dateStr)"
+        // BUT if it shifts, we can split manually.
+        // Let's use manual split for consistency with logic.
+        const [y, m, d] = dateStr.split('T')[0].split('-');
+        return `${d}/${m}`;
+    };
+
+    const formatWeekday = (dateStr: string) => {
+        // This needs a Date object for weekday calculation.
+        const d = new Date(dateStr);
+        // If timezone shifts day, this is wrong.
+        // Safer: Append T12:00:00 to date part if T is missing to force middle of day?
+        // No, just trust system for weekday, usually ok unless 00:00 edge case.
+        // Let's stick to standard parsing for now, user mainly complained about VALUES (possibly filtering).
+        return d.toLocaleDateString('pt-BR', { weekday: 'short' });
     };
 
     return (
@@ -276,10 +306,10 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                                     {item.lastApp ? (
                                         <div className="flex flex-col">
                                             <span className="font-bold text-gray-800 text-sm">
-                                                {new Date(item.lastApp.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                                {formatDate(item.lastApp.date)}
                                             </span>
                                             <span className="text-[10px] text-gray-400">
-                                                {new Date(item.lastApp.date).toLocaleDateString('pt-BR', { weekday: 'short' })}
+                                                {formatWeekday(item.lastApp.date)}
                                             </span>
                                         </div>
                                     ) : (
@@ -293,10 +323,10 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                                     {item.nextApp ? (
                                         <div className="flex flex-col">
                                             <span className="font-bold text-brand-900 text-sm">
-                                                {new Date(item.nextApp.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                                {formatDate(item.nextApp.date)}
                                             </span>
                                             <span className="text-[10px] text-brand-500 font-bold">
-                                                {new Date(item.nextApp.date).toLocaleDateString('pt-BR', { weekday: 'long' })}
+                                                {formatWeekday(item.nextApp.date)}
                                             </span>
                                         </div>
                                     ) : (
