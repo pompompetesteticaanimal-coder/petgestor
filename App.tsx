@@ -27,6 +27,7 @@ import {
     Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon,
     ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft, Star, Moon, UserX
 } from 'lucide-react';
+import { useNotificationScheduler } from './hooks/useNotificationScheduler';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
     LineChart, Line, CartesianGrid, Legend, ComposedChart, LabelList, PieChart, Pie, AreaChart, Area
@@ -2502,6 +2503,9 @@ const App: React.FC = () => {
     // --- PIN LOGIC Handlers ---
     const handlePinUnlock = (input: string) => { if (input === pin) { setIsPinUnlocked(true); return true; } return false; };
     const handleSetPin = (newPin: string) => { localStorage.setItem('petgestor_pin', newPin); setPin(newPin); setIsPinUnlocked(true); };
+
+    // --- NOTIFICATION HANDLER ---
+    useNotificationScheduler(appointments, services);
 
 
     // --- RENDER ---
