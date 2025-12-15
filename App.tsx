@@ -747,10 +747,10 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                     <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                        <StatCard title="Total de Pets" value={metricData.petCount} icon={PawPrint} colorClass="bg-blue-500" />
-                        <StatCard title="Total Tosas" value={metricData.tosaCount} icon={Scissors} colorClass="bg-orange-500" subValue="Banhos e Tosas" />
-                        <StatCard title="Faturamento" value={`R$ ${metricData.revenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-green-500" growth={metricData.growth} />
-                        <StatCard title="Ticket Médio" value={`R$ ${metricData.ticket.toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" />
+                        <StatCard title="Total de Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-blue-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                        <StatCard title="Total Tosas" value={metricData.current.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Banhos e Tosas" />
+                        <StatCard title="Faturamento" value={`R$ ${metricData.current.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                        <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
                     </div>
 
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
