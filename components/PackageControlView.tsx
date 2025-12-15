@@ -59,10 +59,13 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
     const packageData = useMemo(() => {
         const todayStr = new Date().toISOString().split('T')[0];
         const data: any[] = [];
+        const processedPetIds = new Set<string>();
 
         clients.forEach(client => {
             client.pets.forEach(pet => {
                 const petId = pet.id;
+
+                if (processedPetIds.has(petId)) return; // Prevent duplicates
 
                 // 1. Get all compatible appointments
                 const petApps = appointments.filter(a => a.clientId === client.id && a.petId === petId && a.status !== 'cancelado');
@@ -74,6 +77,8 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                 });
 
                 if (packageApps.length > 0) {
+                    processedPetIds.add(petId);
+
                     // 3. Determine Ref Service (Latest Package Appointment)
                     const lastPackageApp = [...packageApps].sort((a, b) => b.date.localeCompare(a.date))[0];
                     const service = services.find(s => s.id === lastPackageApp.serviceId);
@@ -126,8 +131,11 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
         return true;
     });
 
-    const activePackages = allFilteredData.filter(item => !inactivePetIds.includes(item.pet.id));
-    const inactivePackages = allFilteredData.filter(item => inactivePetIds.includes(item.pet.id));
+    // Active: Not manually inactive AND has future appointment
+    const activePackages = allFilteredData.filter(item => !inactivePetIds.includes(item.pet.id) && item.nextApp !== undefined);
+
+    // Inactive: Manually inactive OR no future appointment
+    const inactivePackages = allFilteredData.filter(item => inactivePetIds.includes(item.pet.id) || item.nextApp === undefined);
 
     const stats = {
         total: activePackages.length,
