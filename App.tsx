@@ -421,7 +421,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     const metricData = useMemo(() => {
         // Current Date Reference
         const currDate = new Date(selectedDate);
-        if (activeTab === 'weekly') {
+        if (activeTab === 'weekly' || activeTab === 'weekly_list') {
             const getWeekRange = (date: Date) => {
                 const day = date.getDay();
                 const start = new Date(date); start.setDate(date.getDate() - day); start.setHours(0, 0, 0, 0);
