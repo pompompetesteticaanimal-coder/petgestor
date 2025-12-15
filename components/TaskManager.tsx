@@ -198,7 +198,7 @@ export const TaskManager: React.FC = () => {
             {/* Add Task Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in" style={{ zIndex: 9999 }}>
-                    <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-slide-up sm:animate-bounce-soft relative max-h-[90vh] overflow-y-auto">
+                    <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl animate-fade-in relative mx-auto">
                         <button
                             onClick={() => setIsModalOpen(false)}
                             className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
@@ -206,9 +206,9 @@ export const TaskManager: React.FC = () => {
                             <X size={24} />
                         </button>
 
-                        <h2 className="text-xl font-bold text-gray-900 mb-6">Nova Tarefa</h2>
+                        <h2 className="text-xl font-bold text-gray-900 mb-4">Nova Tarefa</h2>
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Título</label>
                                 <input
@@ -218,7 +218,7 @@ export const TaskManager: React.FC = () => {
                                     value={newTaskTitle}
                                     onChange={e => setNewTaskTitle(e.target.value)}
                                     // onKeyDown={e => e.key === 'Enter' && addTask()} // Prevent submit on simple enter to allow other fields? Optional.
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:ring-2 ring-brand-200 transition-all"
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:ring-2 ring-brand-200 transition-all"
                                 />
                             </div>
 
