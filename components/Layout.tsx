@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { ViewState, AppSettings } from '../types';
-import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronLeft, TrendingUp, TrendingDown, Lock, Settings, Home, Menu, BarChart2, Package, CalendarPlus } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Scissors, LogIn, LogOut, Wallet, ChevronLeft, TrendingUp, TrendingDown, Lock, Settings, Home, Menu, BarChart2, Package, CalendarPlus, ClipboardList } from 'lucide-react';
 import { PullToRefresh } from './PullToRefresh';
 
 interface LayoutProps {
@@ -135,6 +135,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         <div className="space-y-1">
           <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={setView} />
           <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={setView} />
+          <NavItem view="tasks" current={currentView} icon={ClipboardList} label="Tarefas" onClick={setView} />
         </div>
       </div>
     ),

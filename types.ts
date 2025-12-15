@@ -78,7 +78,16 @@ export interface ActivityLog {
   device?: string; // User Agent or Device ID
 }
 
-export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu' | 'inactive_clients' | 'packages' | 'activity_log';
+export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu' | 'inactive_clients' | 'packages' | 'activity_log' | 'tasks';
+
+export interface Task {
+  id: string;
+  title: string;
+  completed: boolean;
+  category: 'Banho & Tosa' | 'Limpeza' | 'Administrativo' | 'Outros';
+  priority: 'Baixa' | 'Média' | 'Alta';
+  createdAt: string;
+}
 
 export const BRAZIL_DOG_BREEDS = [
   'SRD (Vira-lata)',
