@@ -197,8 +197,8 @@ export const TaskManager: React.FC = () => {
 
             {/* Add Task Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in" style={{ zIndex: 9999 }}>
-                    <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-slide-up sm:animate-bounce-soft relative">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in" style={{ zIndex: 9999 }}>
+                    <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-slide-up sm:animate-bounce-soft relative max-h-[90vh] overflow-y-auto">
                         <button
                             onClick={() => setIsModalOpen(false)}
                             className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
