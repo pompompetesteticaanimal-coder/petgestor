@@ -221,9 +221,9 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                         {/* New Stats & History Section */}
                                         {(() => {
                                             const clientApps = appointments.filter(a => a.clientId === selectedClient!.id);
-                                            const pastApps = clientApps.filter(a => a.status === 'concluido').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                                             const todayStr = new Date().toISOString().split('T')[0];
                                             const futureApps = clientApps.filter(a => a.status === 'agendado' && a.date >= todayStr).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                            const pastApps = clientApps.filter(a => !futureApps.includes(a)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                                             const ratedApps = pastApps.filter(a => a.rating);
                                             const avgRating = ratedApps.length > 0 ? ratedApps.reduce((acc, curr) => acc + (curr.rating || 0), 0) / ratedApps.length : 0;
 
@@ -281,26 +281,45 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                                     <div>
                                                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Clock size={14} /> Histórico ({pastApps.length})</h3>
                                                         <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
-                                                            {pastApps.map(app => (
-                                                                <div key={app.id} className="flex justify-between items-center p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className={`w-2 h-2 rounded-full ${app.rating ? 'bg-green-400' : 'bg-gray-300'}`} />
-                                                                        <div>
-                                                                            <p className="font-bold text-gray-700 text-sm">
-                                                                                {(() => {
-                                                                                    const [y, m, d] = app.date.split('T')[0].split('-');
-                                                                                    return `${d}/${m}/${y}`;
-                                                                                })()}
-                                                                            </p>
-                                                                            <div className="flex items-center gap-1">
-                                                                                {app.rating && <Star size={10} className="fill-yellow-400 text-yellow-400" />}
-                                                                                <span className="text-xs text-gray-400 font-medium">{app.rating ? `${app.rating}.0` : 'Sem avaliação'}</span>
+                                                            {pastApps.map(app => {
+                                                                let statusColor = 'bg-gray-300';
+                                                                let statusText = '';
+
+                                                                if (app.status === 'concluido') {
+                                                                    statusColor = 'bg-green-400';
+                                                                } else if (app.status === 'cancelado') {
+                                                                    statusColor = 'bg-red-400';
+                                                                    statusText = 'Cancelado';
+                                                                } else if (app.status === 'nao_veio') {
+                                                                    statusColor = 'bg-orange-400';
+                                                                    statusText = 'Não Veio';
+                                                                } else if (app.status === 'agendado' && app.date < todayStr) {
+                                                                    statusColor = 'bg-yellow-400';
+                                                                    statusText = 'Pendente';
+                                                                }
+
+                                                                return (
+                                                                    <div key={app.id} className="flex justify-between items-center p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className={`w-2 h-2 rounded-full ${statusColor}`} title={statusText || 'Concluído'} />
+                                                                            <div>
+                                                                                <p className="font-bold text-gray-700 text-sm">
+                                                                                    {(() => {
+                                                                                        const [y, m, d] = app.date.split('T')[0].split('-');
+                                                                                        return `${d}/${m}/${y}`;
+                                                                                    })()}
+                                                                                    {statusText && <span className="text-[10px] font-normal text-gray-400 ml-2">({statusText})</span>}
+                                                                                </p>
+                                                                                <div className="flex items-center gap-1">
+                                                                                    {app.rating && <Star size={10} className="fill-yellow-400 text-yellow-400" />}
+                                                                                    <span className="text-xs text-gray-400 font-medium">{app.rating ? `${app.rating}.0` : (statusText || 'Sem avaliação')}</span>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
+                                                                        <span className="text-xs font-bold text-gray-400">{app.paidAmount ? `R$ ${app.paidAmount}` : '-'}</span>
                                                                     </div>
-                                                                    <span className="text-xs font-bold text-gray-400">{app.paidAmount ? `R$ ${app.paidAmount}` : '-'}</span>
-                                                                </div>
-                                                            ))}
+                                                                );
+                                                            })}
                                                             {pastApps.length === 0 && <p className="text-center text-xs text-gray-400 py-4 italic">Nenhuma visita anterior.</p>}
                                                         </div>
                                                     </div>
