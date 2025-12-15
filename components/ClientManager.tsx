@@ -221,13 +221,9 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                         {/* New Stats & History Section */}
                                         {(() => {
                                             const clientApps = appointments.filter(a => a.clientId === selectedClient!.id);
-                                            // Correct Local Date String (YYYY-MM-DD) handling for user's timezone
-                                            const now = new Date();
-                                            const offset = now.getTimezoneOffset() * 60000;
-                                            const todayStr = new Date(now.getTime() - offset).toISOString().split('T')[0];
-
-                                            const futureApps = clientApps.filter(a => a.status === 'agendado' && a.date.split('T')[0] >= todayStr).sort((a, b) => a.date.localeCompare(b.date));
-                                            const pastApps = clientApps.filter(a => !futureApps.includes(a)).sort((a, b) => b.date.localeCompare(a.date));
+                                            const todayStr = new Date().toISOString().split('T')[0];
+                                            const futureApps = clientApps.filter(a => a.status === 'agendado' && a.date >= todayStr).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                            const pastApps = clientApps.filter(a => !futureApps.includes(a)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                                             const ratedApps = pastApps.filter(a => a.rating);
                                             const avgRating = ratedApps.length > 0 ? ratedApps.reduce((acc, curr) => acc + (curr.rating || 0), 0) / ratedApps.length : 0;
 
@@ -297,7 +293,7 @@ export const ClientManager: React.FC<ClientManagerProps> = ({ clients, appointme
                                                                 } else if (app.status === 'nao_veio') {
                                                                     statusColor = 'bg-orange-400';
                                                                     statusText = 'Não Veio';
-                                                                } else if (app.status === 'agendado' && app.date.split('T')[0] < todayStr) {
+                                                                } else if (app.status === 'agendado' && app.date < todayStr) {
                                                                     statusColor = 'bg-yellow-400';
                                                                     statusText = 'Pendente';
                                                                 }
