@@ -8,11 +8,12 @@ interface PackageControlViewProps {
     appointments: Appointment[];
     services: Service[];
     onViewPet?: (pet: Pet, client: Client) => void;
+    onUpdateClient?: (client: Client) => void;
 }
 
-const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appointments, services, onViewPet }) => {
+const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appointments, services, onViewPet, onUpdateClient }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState<'all' | 'monthly' | 'fortnightly' | 'renewal'>('all');
+    const [filterType, setFilterType] = useState<'all' | 'monthly' | 'fortnightly' | 'renewal' | 'inactive'>('all');
 
     // Helper to check if a service is a package
     const isPackageService = (serviceName: string) => {
@@ -24,7 +25,27 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
     const isRenewal = (serviceName: string) => {
         // Checks for "1" bounded by word boundaries or implicit logic
         // Assuming "Pacote Mensal 1" or "Pacote Quinzenal 1"
-        return serviceName.includes('1');
+        return serviceName.includes('1 ') || serviceName.endsWith('1') || serviceName.includes('1°');
+    };
+
+    const handleToggleInactive = (client: Client, pet: Pet, isCurrentlyInactive: boolean) => {
+        if (!onUpdateClient) return;
+        const newNote = isCurrentlyInactive
+            ? pet.notes.replace('[INATIVO]', '').trim()
+            : `[INATIVO] ${pet.notes || ''}`.trim();
+
+        const updatedPet = { ...pet, notes: newNote };
+        const updatedClient = {
+            ...client,
+            pets: client.pets.map(p => p.id === pet.id ? updatedPet : p)
+        };
+        onUpdateClient(updatedClient);
+    };
+
+    const handleWhatsApp = (phone: string, clientName: string) => {
+        const cleanPhone = phone.replace(/\D/g, '');
+        const url = `https://wa.me/55${cleanPhone}?text=Olá ${clientName}, tudo bem? Gostaria de falar sobre o pacote do seu pet.`;
+        window.open(url, '_blank');
     };
 
     // Helper to get package type
@@ -37,6 +58,10 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
 
     const packageData = useMemo(() => {
         const todayStr = new Date().toISOString().split('T')[0];
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
         const data: any[] = [];
 
         clients.forEach(client => {
@@ -58,34 +83,45 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                     const service = services.find(s => s.id === lastPackageApp.serviceId);
                     const serviceName = service ? service.name : 'Pacote';
 
-                    // 4. Find Last & Next Baths (Any service, not just package)
-                    // Last Bath: Completed (concluido) in the past
+                    // 4. Find Last & Next Baths
                     const lastBath = petApps
                         .filter(a => a.status === 'concluido' && a.date < todayStr)
                         .sort((a, b) => b.date.localeCompare(a.date))[0];
 
-                    // Next Bath: Future Scheduled
                     const nextBath = petApps
                         .filter(a => a.status === 'agendado' && a.date >= todayStr)
                         .sort((a, b) => a.date.localeCompare(b.date))[0];
 
+                    // 5. Determine "Active Rule" Status
+                    const isExplicitInactive = (pet.notes || '').includes('[INATIVO]');
+                    const hasFuturePackage1 = nextBath && services.find(s => s.id === nextBath.serviceId)?.name.includes('1');
+                    const hasRecentActivity = lastBath && lastBath.date >= thirtyDaysAgoStr;
+
+                    const meetsActiveRule = !!(hasFuturePackage1 || hasRecentActivity);
+                    const isActive = !isExplicitInactive && meetsActiveRule;
+
                     data.push({
                         client,
                         pet,
-                        nextApp: nextBath, // Can be undefined
-                        lastApp: lastBath, // Can be undefined
+                        nextApp: nextBath,
+                        lastApp: lastBath,
                         serviceName,
                         isRenewal: isRenewal(serviceName),
+                        isNextRenewal: nextBath && services.find(s => s.id === nextBath.serviceId) && isRenewal(services.find(s => s.id === nextBath.serviceId)!.name),
                         type: getPackageType(serviceName),
                         petName: pet.name,
-                        id: pet.id
+                        id: pet.id,
+                        isActive,
+                        isExplicitInactive
                     });
                 }
             });
         });
 
-        // Sort by Next Date (nearest first), then those without dates
+        // Sort: Active first, then by date
         return data.sort((a, b) => {
+            if (a.isActive && !b.isActive) return -1;
+            if (!a.isActive && b.isActive) return 1;
             const dateA = a.nextApp ? a.nextApp.date : '9999-99-99';
             const dateB = b.nextApp ? b.nextApp.date : '9999-99-99';
             return dateA.localeCompare(dateB);
@@ -98,22 +134,24 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
 
         if (!matchesSearch) return false;
 
-        if (filterType === 'monthly') return item.type === 'Mensal';
-        if (filterType === 'fortnightly') return item.type === 'Quinzenal';
-        if (filterType === 'renewal') return item.isRenewal;
+        if (filterType === 'monthly') return item.type === 'Mensal' && !item.isExplicitInactive;
+        if (filterType === 'fortnightly') return item.type === 'Quinzenal' && !item.isExplicitInactive;
+        if (filterType === 'renewal') return item.isRenewal && !item.isExplicitInactive;
+        if (filterType === 'inactive') return item.isExplicitInactive;
+        if (filterType === 'all') return !item.isExplicitInactive;
 
         return true;
     });
 
+    // Stats count ONLY isActive (Rule met + Not Inactive)
+    const activeItems = packageData.filter(i => i.isActive);
+
     const stats = {
-        total: packageData.length,
-        monthly: packageData.filter(i => i.type === 'Mensal').length,
-        fortnightly: packageData.filter(i => i.type === 'Quinzenal').length,
-        renewals: packageData.filter(i => i.isRenewal).length,
-        revenue: packageData.reduce((acc, curr) => {
-            // Logic: Always sum the price of the FIRST package (e.g. "Pacote Mensal 1") 
-            // because subsequent packages might be $0 or pro-rated.
-            // Heuristic: Replace the first digit found in the name with '1'.
+        total: activeItems.length,
+        monthly: activeItems.filter(i => i.type === 'Mensal').length,
+        fortnightly: activeItems.filter(i => i.type === 'Quinzenal').length,
+        renewals: activeItems.filter(i => i.isNextRenewal || i.isRenewal).length,
+        revenue: activeItems.reduce((acc, curr) => {
             const baseName = curr.serviceName.replace(/\d+/, '1');
             const service = services.find(s => s.name === baseName) || services.find(s => s.name === curr.serviceName);
             return acc + (service?.price || 0);
@@ -172,6 +210,10 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                         <span className="text-2xl font-bold">{stats.fortnightly}</span>
                     </div>
                     <p className={`text-xs font-bold uppercase tracking-wider ${filterType === 'fortnightly' ? 'text-purple-100' : 'text-gray-400'}`}>Quinzenais</p>
+                </div>
+
+                <div onClick={() => setFilterType('inactive')} className={`col-span-2 md:col-span-4 lg:col-span-4 p-3 rounded-2xl border border-dashed cursor-pointer transition-all flex items-center justify-center gap-2 ${filterType === 'inactive' ? 'bg-gray-100 border-gray-300' : 'bg-transparent border-gray-200 hover:bg-gray-50'}`}>
+                    <span className="text-sm font-bold text-gray-400 uppercase">Ver Inativos ({packageData.filter(i => i.isExplicitInactive).length})</span>
                 </div>
             </div>
 
@@ -263,9 +305,28 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-white border border-gray-100 px-3 py-2 rounded-lg self-start">
-                                <Package size={14} className={item.isRenewal ? 'text-orange-500' : 'text-brand-500'} />
-                                <span className={item.isRenewal ? 'text-orange-700 font-bold' : ''}>{item.serviceName}</span>
+                            <div className="flex justify-between items-center mt-2">
+                                <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-white border border-gray-100 px-3 py-2 rounded-lg">
+                                    <Package size={14} className={item.isRenewal ? 'text-orange-500' : 'text-brand-500'} />
+                                    <span className={item.isRenewal ? 'text-orange-700 font-bold' : ''}>{item.serviceName}</span>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleToggleInactive(item.client, item.pet, item.isExplicitInactive); }}
+                                        className={`p-2 rounded-xl transition-colors ${item.isExplicitInactive ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
+                                        title={item.isExplicitInactive ? "Ativar Pacote" : "Desativar Pacote"}
+                                    >
+                                        <Package size={18} className={item.isExplicitInactive ? "opacity-50" : ""} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleWhatsApp(item.client.phone, item.client.name); }}
+                                        className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors"
+                                        title="Contatar via WhatsApp"
+                                    >
+                                        <Phone size={18} />
+                                    </button>
+                                </div>
                             </div>
 
                         </div>
