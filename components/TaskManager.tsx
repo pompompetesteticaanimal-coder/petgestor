@@ -197,39 +197,38 @@ export const TaskManager: React.FC = () => {
 
             {/* Add Task Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in" style={{ zIndex: 9999 }}>
-                    <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl animate-fade-in relative mx-auto">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" style={{ zIndex: 9999 }}>
+                    <div className="bg-white w-full max-w-sm rounded-[2rem] p-5 shadow-2xl animate-bounce-soft relative mx-auto flex flex-col gap-4">
                         <button
                             onClick={() => setIsModalOpen(false)}
-                            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                            className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
                         >
-                            <X size={24} />
+                            <X size={20} />
                         </button>
 
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">Nova Tarefa</h2>
+                        <h2 className="text-lg font-extrabold text-gray-900 mt-1">Nova Tarefa</h2>
 
                         <div className="space-y-3">
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Título</label>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Título</label>
                                 <input
                                     type="text"
                                     placeholder="O que precisa ser feito?"
                                     autoFocus
                                     value={newTaskTitle}
                                     onChange={e => setNewTaskTitle(e.target.value)}
-                                    // onKeyDown={e => e.key === 'Enter' && addTask()} // Prevent submit on simple enter to allow other fields? Optional.
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:ring-2 ring-brand-200 transition-all"
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-semibold outline-none focus:ring-2 ring-brand-200 transition-all placeholder:font-normal"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Categoria</label>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Categoria</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(['Banho & Tosa', 'Limpeza', 'Administrativo', 'Outros'] as const).map(cat => (
                                         <button
                                             key={cat}
                                             onClick={() => setNewTaskCategory(cat)}
-                                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${newTaskCategory === cat ? 'bg-brand-50 border-brand-500 text-brand-700 ring-1 ring-brand-500' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                            className={`px-2 py-2 rounded-xl text-[11px] font-bold transition-all border flex items-center justify-center gap-1.5 ${newTaskCategory === cat ? 'bg-brand-50 border-brand-500 text-brand-700 ring-1 ring-brand-500 shadow-sm' : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'}`}
                                         >
                                             {categoryIcon[cat]} {cat}
                                         </button>
@@ -238,15 +237,15 @@ export const TaskManager: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Prioridade</label>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Prioridade</label>
                                 <div className="flex gap-2">
                                     {(['Baixa', 'Média', 'Alta'] as const).map(prio => (
                                         <button
                                             key={prio}
                                             onClick={() => setNewTaskPriority(prio)}
-                                            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${newTaskPriority === prio ?
-                                                (prio === 'Alta' ? 'bg-red-50 border-red-500 text-red-700' : prio === 'Média' ? 'bg-yellow-50 border-yellow-500 text-yellow-700' : 'bg-blue-50 border-blue-500 text-blue-700')
-                                                : 'bg-white border-gray-200 text-gray-400 hover:bg-gray-50'}`}
+                                            className={`flex-1 py-2 rounded-xl text-[11px] font-bold transition-all border ${newTaskPriority === prio ?
+                                                (prio === 'Alta' ? 'bg-red-50 border-red-500 text-red-700 shadow-sm' : prio === 'Média' ? 'bg-yellow-50 border-yellow-500 text-yellow-700 shadow-sm' : 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm')
+                                                : 'bg-white border-gray-100 text-gray-400 hover:bg-gray-50'}`}
                                         >
                                             {prio}
                                         </button>
@@ -257,7 +256,7 @@ export const TaskManager: React.FC = () => {
                             <button
                                 onClick={addTask}
                                 disabled={!newTaskTitle.trim()}
-                                className="w-full bg-brand-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-brand-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                                className="w-full bg-brand-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-brand-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2 text-sm"
                             >
                                 Adicionar Tarefa
                             </button>
