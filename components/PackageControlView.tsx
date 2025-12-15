@@ -36,50 +36,60 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
     };
 
     const packageData = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
+        const todayStr = new Date().toISOString().split('T')[0];
         const data: any[] = [];
-        const processedPets = new Set<string>();
 
         clients.forEach(client => {
-            // Iterate through each PET of the client
             client.pets.forEach(pet => {
                 const petId = pet.id;
 
-                // Find next appointment FOR THIS PET
-                const petApps = appointments
-                    .filter(a => a.clientId === client.id && a.petId === petId && a.status !== 'cancelado')
-                    .sort((a, b) => a.date.localeCompare(b.date));
+                // 1. Get all compatible appointments
+                const petApps = appointments.filter(a => a.clientId === client.id && a.petId === petId && a.status !== 'cancelado');
 
-                const futureApps = petApps.filter(a => new Date(a.date) >= today);
+                // 2. Check if this pet is a "Package Pet" (has ANY package appointment history or future)
+                const packageApps = petApps.filter(a => {
+                    const s = services.find(srv => srv.id === a.serviceId);
+                    return s && isPackageService(s.name);
+                });
 
-                // If has future apps, check if the NEXT one is a package
-                if (futureApps.length > 0) {
-                    const nextApp = futureApps[0];
-                    const service = services.find(s => s.id === nextApp.serviceId);
-                    const serviceName = service ? service.name : 'Unknown';
+                if (packageApps.length > 0) {
+                    // 3. Determine Ref Service (Latest Package Appointment)
+                    const lastPackageApp = [...packageApps].sort((a, b) => b.date.localeCompare(a.date))[0];
+                    const service = services.find(s => s.id === lastPackageApp.serviceId);
+                    const serviceName = service ? service.name : 'Pacote';
 
-                    if (isPackageService(serviceName)) {
-                        data.push({
-                            client,
-                            pet,
-                            nextApp,
-                            serviceName,
-                            isRenewal: isRenewal(serviceName),
-                            type: getPackageType(serviceName),
-                            petName: pet.name,
-                            status: 'active'
-                        });
-                        processedPets.add(petId);
-                    }
+                    // 4. Find Last & Next Baths (Any service, not just package)
+                    // Last Bath: Completed (concluido) in the past
+                    const lastBath = petApps
+                        .filter(a => a.status === 'concluido' && a.date < todayStr)
+                        .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+                    // Next Bath: Future Scheduled
+                    const nextBath = petApps
+                        .filter(a => a.status === 'agendado' && a.date >= todayStr)
+                        .sort((a, b) => a.date.localeCompare(b.date))[0];
+
+                    data.push({
+                        client,
+                        pet,
+                        nextApp: nextBath, // Can be undefined
+                        lastApp: lastBath, // Can be undefined
+                        serviceName,
+                        isRenewal: isRenewal(serviceName),
+                        type: getPackageType(serviceName),
+                        petName: pet.name,
+                        id: pet.id
+                    });
                 }
-                // Logic for past apps (expired/needs renewal) could go here if requested, 
-                // but sticking to active future packages for now as per previous logic.
             });
         });
 
-        return data.sort((a, b) => a.nextApp.date.localeCompare(b.nextApp.date));
+        // Sort by Next Date (nearest first), then those without dates
+        return data.sort((a, b) => {
+            const dateA = a.nextApp ? a.nextApp.date : '9999-99-99';
+            const dateB = b.nextApp ? b.nextApp.date : '9999-99-99';
+            return dateA.localeCompare(dateB);
+        });
     }, [clients, appointments, services]);
 
     const filteredData = packageData.filter(item => {
@@ -184,7 +194,7 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                 ) : (
                     filteredData.map((item, index) => (
                         <div
-                            key={item.nextApp.id}
+                            key={item.id}
                             onClick={() => item.pet && onViewPet?.(item.pet, item.client)}
                             className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4 animate-slide-up cursor-pointer hover:shadow-md hover:border-brand-200 transition-all active:scale-[0.99]"
                             style={{ animationDelay: `${index * 0.05}s` }}
@@ -216,17 +226,40 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                                 </div>
                             </div>
 
-                            {/* Service & Date Info */}
-                            <div className="bg-gray-50 rounded-xl p-4 flex justify-between items-center border border-gray-100">
-                                <div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Próximo Banho</p>
-                                    <div className="flex items-center gap-2">
-                                        <Calendar size={16} className="text-gray-400" />
-                                        <span className="font-bold text-gray-800">
-                                            {new Date(item.nextApp.date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
-                                        </span>
-                                        <span className="text-gray-400">as {new Date(item.nextApp.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                    </div>
+                            {/* Dates Grid */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {/* Last Bath */}
+                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><CheckCircle size={10} /> Último Banho</p>
+                                    {item.lastApp ? (
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-gray-800 text-sm">
+                                                {new Date(item.lastApp.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400">
+                                                {new Date(item.lastApp.date).toLocaleDateString('pt-BR', { weekday: 'short' })}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-gray-400 italic">--</span>
+                                    )}
+                                </div>
+
+                                {/* Next Bath */}
+                                <div className={`rounded-xl p-3 border ${item.nextApp ? 'bg-brand-50 border-brand-100' : 'bg-gray-50 border-gray-100'}`}>
+                                    <p className={`text-[10px] font-bold uppercase mb-1 flex items-center gap-1 ${item.nextApp ? 'text-brand-600' : 'text-gray-400'}`}><Calendar size={10} /> Próximo Banho</p>
+                                    {item.nextApp ? (
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-brand-900 text-sm">
+                                                {new Date(item.nextApp.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                            </span>
+                                            <span className="text-[10px] text-brand-500 font-bold">
+                                                {new Date(item.nextApp.date).toLocaleDateString('pt-BR', { weekday: 'long' })}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-brand-400 font-bold italic">Agendar</span>
+                                    )}
                                 </div>
                             </div>
 
