@@ -1,6 +1,6 @@
 
-import React, { useMemo, useState } from 'react';
-import { User, Calendar, AlertCircle, CheckCircle, Package, Search, Phone, MapPin, ChevronRight, Filter } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { User, Calendar, AlertCircle, CheckCircle, Package, Search, Phone, MapPin, ChevronRight, Filter, MessageCircle, Archive, RefreshCw } from 'lucide-react';
 import { Client, Appointment, Service, Pet } from '../types';
 
 interface PackageControlViewProps {
@@ -13,6 +13,27 @@ interface PackageControlViewProps {
 const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appointments, services, onViewPet }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'monthly' | 'fortnightly' | 'renewal'>('all');
+    const [inactivePetIds, setInactivePetIds] = useState<string[]>([]);
+    const [showInactive, setShowInactive] = useState(false);
+
+    // Initialize inactive list from localStorage
+    useEffect(() => {
+        const stored = localStorage.getItem('inactive_package_pets');
+        if (stored) {
+            setInactivePetIds(JSON.parse(stored));
+        }
+    }, []);
+
+    const toggleInactive = (petId: string, event: React.MouseEvent) => {
+        event.stopPropagation();
+        setInactivePetIds(prev => {
+            const newVal = prev.includes(petId)
+                ? prev.filter(id => id !== petId)
+                : [...prev, petId];
+            localStorage.setItem('inactive_package_pets', JSON.stringify(newVal));
+            return newVal;
+        });
+    };
 
     // Helper to check if a service is a package
     const isPackageService = (serviceName: string) => {
@@ -92,7 +113,7 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
         });
     }, [clients, appointments, services]);
 
-    const filteredData = packageData.filter(item => {
+    const allFilteredData = packageData.filter(item => {
         const matchesSearch = item.client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.petName.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -105,12 +126,15 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
         return true;
     });
 
+    const activePackages = allFilteredData.filter(item => !inactivePetIds.includes(item.pet.id));
+    const inactivePackages = allFilteredData.filter(item => inactivePetIds.includes(item.pet.id));
+
     const stats = {
-        total: packageData.length,
-        monthly: packageData.filter(i => i.type === 'Mensal').length,
-        fortnightly: packageData.filter(i => i.type === 'Quinzenal').length,
-        renewals: packageData.filter(i => i.isRenewal).length,
-        revenue: packageData.reduce((acc, curr) => {
+        total: activePackages.length,
+        monthly: activePackages.filter(i => i.type === 'Mensal').length,
+        fortnightly: activePackages.filter(i => i.type === 'Quinzenal').length,
+        renewals: activePackages.filter(i => i.isRenewal).length,
+        revenue: activePackages.reduce((acc, curr) => {
             // Logic: Always sum the price of the FIRST package (e.g. "Pacote Mensal 1") 
             // because subsequent packages might be $0 or pro-rated.
             // Heuristic: Replace the first digit found in the name with '1'.
@@ -189,10 +213,10 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
 
             {/* List */}
             <div className="space-y-4">
-                {filteredData.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400">Nenhum pacote encontrado.</div>
+                {activePackages.length === 0 ? (
+                    <div className="text-center py-10 text-gray-400">Nenhum pacote ativo encontrado.</div>
                 ) : (
-                    filteredData.map((item, index) => (
+                    activePackages.map((item, index) => (
                         <div
                             key={item.id}
                             onClick={() => item.pet && onViewPet?.(item.pet, item.client)}
@@ -219,7 +243,7 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                                         </div>
                                     </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right flex flex-col items-end gap-2">
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${item.type === 'Mensal' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
                                         {item.type}
                                     </span>
@@ -263,15 +287,74 @@ const PackageControlView: React.FC<PackageControlViewProps> = ({ clients, appoin
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-white border border-gray-100 px-3 py-2 rounded-lg self-start">
-                                <Package size={14} className={item.isRenewal ? 'text-orange-500' : 'text-brand-500'} />
-                                <span className={item.isRenewal ? 'text-orange-700 font-bold' : ''}>{item.serviceName}</span>
+                            {/* Actions */}
+                            <div className="flex items-center justify-between mt-1 pt-3 border-t border-gray-100">
+                                <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+                                    <Package size={14} className={item.isRenewal ? 'text-orange-500' : 'text-brand-500'} />
+                                    <span className={item.isRenewal ? 'text-orange-700 font-bold' : ''}>{item.serviceName}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); window.open(`https://wa.me/55${item.client.phone.replace(/\D/g, '')}`, '_blank'); }}
+                                        className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 border border-green-100 transition-colors shadow-sm"
+                                        title="Contatar no WhatsApp"
+                                    >
+                                        <MessageCircle size={18} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => toggleInactive(item.pet.id, e)}
+                                        className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl hover:bg-gray-200 border border-gray-200 text-xs font-bold transition-colors shadow-sm flex items-center gap-1"
+                                    >
+                                        <Archive size={14} /> Inativar
+                                    </button>
+                                </div>
                             </div>
 
                         </div>
                     ))
                 )}
             </div>
+
+            {/* Inactive Section */}
+            {inactivePackages.length > 0 && (
+                <div className="mt-12 pt-8 border-t border-gray-200">
+                    <button
+                        onClick={() => setShowInactive(!showInactive)}
+                        className="flex items-center gap-2 text-gray-400 font-bold uppercase tracking-widest text-xs hover:text-gray-600 transition-colors mb-6 w-full"
+                    >
+                        <Archive size={14} />
+                        Pacotes Inativos ({inactivePackages.length})
+                        <ChevronRight size={14} className={`transition-transform ${showInactive ? 'rotate-90' : ''}`} />
+                    </button>
+
+                    {showInactive && (
+                        <div className="space-y-4 opacity-75">
+                            {inactivePackages.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="bg-gray-50 p-4 rounded-2xl border border-gray-200 flex items-center justify-between"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-gray-200 text-gray-400 rounded-xl flex items-center justify-center grayscale">
+                                            <Package size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-600 text-base">{item.petName}</h3>
+                                            <p className="text-xs text-gray-400">{item.client.name}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={(e) => toggleInactive(item.pet.id, e)}
+                                        className="px-3 py-2 bg-white text-brand-600 rounded-xl hover:bg-brand-50 border border-brand-100 text-xs font-bold transition-colors shadow-sm flex items-center gap-1"
+                                    >
+                                        <RefreshCw size={14} /> Reativar
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
