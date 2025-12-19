@@ -28,6 +28,7 @@ import {
     ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft, Star, Moon, UserX
 } from 'lucide-react';
 import { useNotificationScheduler } from './hooks/useNotificationScheduler';
+import { parseDateLocal, getTodayString } from './utils/dateHelpers';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
     LineChart, Line, CartesianGrid, Legend, ComposedChart, LabelList, PieChart, Pie, AreaChart, Area
@@ -215,9 +216,9 @@ const BottomSheetList: React.FC<{ isOpen: boolean; onClose: () => void; timeSlot
     );
 };
 
-const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; clients: Client[]; costs: CostItem[]; defaultTab?: 'daily' | 'weekly' | 'monthly' | 'yearly'; onRemovePayment: (app: Appointment) => void; onNoShow?: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void }> = ({ appointments, services, clients, costs, defaultTab = 'daily', onRemovePayment, onNoShow, onViewPet }) => {
-    const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>(defaultTab);
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; clients: Client[]; costs: CostItem[]; defaultTab?: 'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'yearly'; onRemovePayment: (app: Appointment) => void; onNoShow?: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void, isSummaryOnly?: boolean }> = ({ appointments, services, clients, costs, defaultTab = 'daily', onRemovePayment, onNoShow, onViewPet, isSummaryOnly = false }) => {
+    const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'yearly'>(defaultTab);
+    const [selectedDate, setSelectedDate] = useState(getTodayString());
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
@@ -254,25 +255,38 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
     };
 
     const calculateStats = (apps: Appointment[]) => {
-        let totalPets = 0; let totalTosas = 0; let paidRevenue = 0; let pendingRevenue = 0;
+        let totalPets = 0; let totalTosas = 0; let totalHygienic = 0; let paidRevenue = 0; let pendingRevenue = 0;
         apps.forEach(app => {
             if (app.status === 'cancelado' || app.status === 'nao_veio') return;
-            // ... (rest of logic same)
             totalPets++;
-            const isTargetTosa = (name?: string) => { if (!name) return false; const n = name.toLowerCase(); return n.includes('tosa normal') || n.includes('tosa tesoura'); };
+
+            const isNormalTosa = (name?: string) => { if (!name) return false; const n = name.toLowerCase(); return n.includes('tosa normal') || n.includes('tosa tesoura') || n.includes('máquina') || n.includes('maquina'); };
+            const isHygienicTosa = (name?: string) => { if (!name) return false; const n = name.toLowerCase(); return n.includes('higi') || n.includes('higienica'); };
+
             const mainSvc = services.find(s => s.id === app.serviceId);
-            let hasTosa = isTargetTosa(mainSvc?.name);
-            if (!hasTosa && app.additionalServiceIds) { app.additionalServiceIds.forEach(id => { const s = services.find(srv => srv.id === id); if (s && isTargetTosa(s.name)) hasTosa = true; }); }
-            if (hasTosa) totalTosas++;
+            let hasNormalTosa = isNormalTosa(mainSvc?.name);
+            let hasHygienicTosa = isHygienicTosa(mainSvc?.name);
+
+            if (app.additionalServiceIds) {
+                app.additionalServiceIds.forEach(id => {
+                    const s = services.find(srv => srv.id === id);
+                    if (s) {
+                        if (isNormalTosa(s.name)) hasNormalTosa = true;
+                        if (isHygienicTosa(s.name)) hasHygienicTosa = true;
+                    }
+                });
+            }
+
+            if (hasNormalTosa) totalTosas++;
+            if (hasHygienicTosa) totalHygienic++;
+
             const gross = calculateTotal(app, services);
-            // Strict Payment Check: Payment Method is MANDATORY.
-            // Relaxed: If Payment Method exists (Col R), we consider it PAID even if Amount is 0/missing.
             const isPaid = !!app.paymentMethod && app.paymentMethod.trim() !== '';
             if (isPaid) paidRevenue += gross; else pendingRevenue += gross;
         });
         const grossRevenue = paidRevenue + pendingRevenue;
         const averageTicket = totalPets > 0 ? grossRevenue / totalPets : 0;
-        return { totalPets, totalTosas, paidRevenue, pendingRevenue, grossRevenue, averageTicket };
+        return { totalPets, totalTosas, totalHygienic, paidRevenue, pendingRevenue, grossRevenue, averageTicket };
     };
 
     const getWeeklyChartData = useCallback(() => {
@@ -287,7 +301,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const current = new Date(startOfWeek); current.setDate(startOfWeek.getDate() + dayIndex);
             const cYear = current.getFullYear(); const cMonth = String(current.getMonth() + 1).padStart(2, '0'); const cDay = String(current.getDate()).padStart(2, '0');
             const targetDateStr = `${cYear}-${cMonth}-${cDay}`;
-            const dailyApps = appointments.filter(a => { if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false; const aDate = new Date(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
+            const dailyApps = appointments.filter(a => { if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false; const aDate = parseDateLocal(a.date); const aYear = aDate.getFullYear(); const aMonth = String(aDate.getMonth() + 1).padStart(2, '0'); const aDay = String(aDate.getDate()).padStart(2, '0'); return `${aYear}-${aMonth}-${aDay}` === targetDateStr; });
             const totalRevenue = dailyApps.reduce((acc, app) => acc + calculateTotal(app, services), 0);
             const formattedDate = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'short' });
             let growth = 0; if (data.length > 0) { const prev = data[data.length - 1]; if (prev.faturamento > 0) growth = ((totalRevenue - prev.faturamento) / prev.faturamento) * 100; }
@@ -303,7 +317,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const getWeekData = (targetYear: number, targetWeek: number) => {
             const apps = appointments.filter(app => {
                 if (!app.date || app.status === 'cancelado' || app.status === 'nao_veio') return false;
-                const d = new Date(app.date);
+                const d = parseDateLocal(app.date);
                 return getISOWeek(d) === targetWeek && d.getFullYear() === targetYear;
             });
             const rev = apps.reduce((acc, app) => acc + calculateTotal(app, services), 0);
@@ -326,9 +340,9 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const data: any[] = []; const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const startMonth = selectedYear === 2025 ? 7 : 0;
         for (let i = startMonth; i < 12; i++) {
-            const monthApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === i && a.status !== 'cancelado' && a.status !== 'nao_veio'; });
+            const monthApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d.getFullYear() === selectedYear && d.getMonth() === i && a.status !== 'cancelado' && a.status !== 'nao_veio'; });
             const stats = calculateStats(monthApps);
-            let revGrowth = 0; if (i > startMonth) { const prevApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d.getFullYear() === selectedYear && d.getMonth() === (i - 1) && a.status !== 'cancelado' && a.status !== 'nao_veio'; }); const prevStats = calculateStats(prevApps); if (prevStats.grossRevenue > 0) revGrowth = ((stats.grossRevenue - prevStats.grossRevenue) / prevStats.grossRevenue) * 100; }
+            let revGrowth = 0; if (i > startMonth) { const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d.getFullYear() === selectedYear && d.getMonth() === (i - 1) && a.status !== 'cancelado' && a.status !== 'nao_veio'; }); const prevStats = calculateStats(prevApps); if (prevStats.grossRevenue > 0) revGrowth = ((stats.grossRevenue - prevStats.grossRevenue) / prevStats.grossRevenue) * 100; }
             data.push({ name: monthNames[i], faturamento: stats.grossRevenue, rawRevenue: stats.grossRevenue, pets: stats.totalPets, revGrowth, });
         }
         return data;
@@ -356,7 +370,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
         return appointments.filter(a => {
             if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false;
-            const ad = new Date(a.date);
+            const ad = parseDateLocal(a.date);
             return ad >= startOfWeek && ad <= endOfWeek;
         }).sort((a, b) => a.date.localeCompare(b.date));
     }, [selectedDate, appointments]);
@@ -370,7 +384,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
     const monthlyApps = appointments.filter(a => a.date && a.date.startsWith(selectedMonth));
     const monthlyStats = calculateStats(monthlyApps);
-    const yearlyApps = appointments.filter(a => a.date && new Date(a.date).getFullYear() === selectedYear);
+    const yearlyApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
     const yearlyStats = calculateStats(yearlyApps);
 
     // --- NEW STATS LOGIC ---
@@ -414,7 +428,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const m = date.getMonth();
         const y = date.getFullYear();
         return costs.filter(c => {
-            const cDate = new Date(c.date);
+            const cDate = parseDateLocal(c.date);
             return cDate.getMonth() === m && cDate.getFullYear() === y && isOperationalCost(c);
         }).reduce((acc, c) => acc + c.amount, 0);
     };
@@ -434,12 +448,11 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const prevStart = new Date(curr.start); prevStart.setDate(prevStart.getDate() - 7);
             const prev = getWeekRange(prevStart);
 
-            const currApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d >= curr.start && d <= curr.end; });
-            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d >= prev.start && d <= prev.end; });
-
+            const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= curr.start && d <= curr.end; });
+            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prev.start && d <= prev.end; });
             // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
             // Let's use precise dates if possible, or fallback to pro-rated.
-            const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = new Date(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
+            const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = parseDateLocal(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
 
             const cDays = countBusinessDays(curr.start, curr.end);
             const pDays = countBusinessDays(prev.start, prev.end);
@@ -455,8 +468,8 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
             const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
 
-            const currApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d >= currStart && d <= currEnd; });
-            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = new Date(a.date); return d >= prevStart && d <= prevEnd; });
+            const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= currStart && d <= currEnd; });
+            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prevStart && d <= prevEnd; });
 
             const cDays = countBusinessDays(currStart, currEnd);
             const pDays = countBusinessDays(prevStart, prevEnd);
@@ -470,11 +483,11 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
         }
         else if (activeTab === 'yearly') {
-            const currApps = appointments.filter(a => a.date && new Date(a.date).getFullYear() === selectedYear);
-            const prevApps = appointments.filter(a => a.date && new Date(a.date).getFullYear() === selectedYear - 1);
+            const currApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
+            const prevApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear - 1);
 
             // Yearly Cost
-            const getYearCost = (year: number) => costs.filter(c => new Date(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
+            const getYearCost = (year: number) => costs.filter(c => parseDateLocal(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
 
             // Count biz days in year
             const countYearBizDays = (year: number) => {
@@ -565,7 +578,18 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                             />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6"><StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" /><StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Normal e Tesoura" /><StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" /><StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" /></div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                        <StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" />
+                        <StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Máquina e Tesoura" />
+                        {isSummaryOnly ? (
+                            <StatCard title="Tosa Higiênica" value={dailyStats.totalHygienic} icon={Sparkles} colorClass="bg-purple-500" />
+                        ) : (
+                            <>
+                                <StatCard title="Caixa Pago" value={`R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" />
+                                <StatCard title="A Receber" value={`R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                            </>
+                        )}
+                    </div>
                     <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
                         <div className="p-5 border-b border-gray-100/50 dark:border-gray-700/50 flex justify-between items-center">
                             <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento do Dia</h3>
@@ -628,7 +652,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client?.name}</p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>
+                                                        {!isSummaryOnly && <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>}
                                                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                                                             {isPaid ? 'Pago' : app.status === 'nao_veio' ? 'Não Veio' : 'Pendente'}
                                                         </span>
@@ -664,9 +688,15 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                         <StatCard title="Total de Pets" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" />
-                        <StatCard title="Total de Tosas" value={weeklyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Normal e Tesoura" />
-                        <StatCard title="Caixa Pago" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" />
-                        <StatCard title="A Receber" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                        <StatCard title="Total de Tosas" value={weeklyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Máquina e Tesoura" />
+                        {isSummaryOnly ? (
+                            <StatCard title="Tosa Higiênica" value={weeklyStats.totalHygienic} icon={Sparkles} colorClass="bg-purple-500" />
+                        ) : (
+                            <>
+                                <StatCard title="Caixa Pago" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" />
+                                <StatCard title="A Receber" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                            </>
+                        )}
                     </div>
 
                     <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
@@ -675,7 +705,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                             {(() => {
                                 const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
                                 const grouped = weeklyApps.reduce((acc, app) => {
-                                    const day = new Date(app.date).getDay();
+                                    const day = parseDateLocal(app.date).getDay();
                                     if (!acc[day]) acc[day] = [];
                                     acc[day].push(app);
                                     return acc;
@@ -715,7 +745,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                                                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client?.name}</p>
                                                                     </div>
                                                                     <div className="text-right">
-                                                                        <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>
+                                                                        {!isSummaryOnly && <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>}
                                                                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                                                                             {isPaid ? 'Pago' : app.status === 'nao_veio' ? 'Não Veio' : 'Pendente'}
                                                                         </span>
@@ -1126,7 +1156,8 @@ const AppointmentDetailsModal: React.FC<{
     onDelete: (id: string) => void;
     clients: Client[];
     services: Service[];
-}> = ({ app, isOpen, onClose, onEdit, onDelete, clients, services }) => {
+    hidePrice?: boolean;
+}> = ({ app, isOpen, onClose, onEdit, onDelete, clients, services, hidePrice }) => {
     if (!isOpen || !app) return null;
 
     const client = clients.find(c => c.id === app.clientId);
@@ -1173,9 +1204,11 @@ const AppointmentDetailsModal: React.FC<{
                             <p className="font-bold text-gray-800">{mainSvc?.name}</p>
                             {addSvcs.length > 0 && <p className="text-xs text-gray-500 mt-0.5">+ {addSvcs.map(s => s.name).join(', ')}</p>}
                         </div>
-                        <div className="text-right">
-                            <p className="text-lg font-black text-gray-900">R$ {total.toFixed(0)}</p>
-                        </div>
+                        {!hidePrice && (
+                            <div className="text-right">
+                                <p className="text-lg font-black text-gray-900">R$ {total.toFixed(0)}</p>
+                            </div>
+                        )}
                     </div>
                     {app.notes && (
                         <div className="p-3 bg-yellow-50 rounded-xl border border-yellow-100 text-sm text-gray-700 italic">
@@ -1203,7 +1236,7 @@ const AppointmentDetailsModal: React.FC<{
     );
 };
 
-const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; isOpen: boolean; onClose: () => void; onOpen: () => void; onLog: (a: string, d: string) => void; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete, isOpen, onClose, onOpen, onLog }) => {
+const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onAdd: (app: Appointment | Appointment[], client: Client, pet: Pet, services: Service[], duration: number) => void; onEdit: (app: Appointment, client: Client, pet: Pet, services: Service[], duration: number) => void; onUpdateStatus: (id: string, status: Appointment['status']) => void; onDelete: (id: string) => void; isOpen: boolean; onClose: () => void; onOpen: () => void; onLog: (a: string, d: string) => void; hidePrice?: boolean; }> = ({ appointments, clients, services, onAdd, onEdit, onUpdateStatus, onDelete, isOpen, onClose, onOpen, onLog, hidePrice }) => {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
     const [currentDate, setCurrentDate] = useState(new Date());
     // const [isModalOpen, setIsModalOpen] = useState(false); // LIFTED UP
@@ -2154,6 +2187,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     onDelete={onDelete}
                     clients={clients}
                     services={services}
+                    hidePrice={hidePrice}
                 />,
                 document.body
             )}
@@ -2554,8 +2588,8 @@ const App: React.FC = () => {
                 onManualRefresh={async () => { await loadDataFromSupabase(); }}
                 onAddAppointment={() => setIsScheduleModalOpen(true)}
             >
-                {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
-                {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
+                {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} isSummaryOnly={true} />}
+                {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} isSummaryOnly={false} />}
                 {currentView === 'costs' && <CostsManager costs={costs} onAddCost={handleAddCost} onUpdateCost={handleUpdateCost} onDeleteCost={handleDeleteCost} />}
                 {currentView === 'activity_log' && <ActivityLogView logs={logs} onBack={() => setCurrentView('menu')} />}
                 {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services}
@@ -2576,12 +2610,12 @@ const App: React.FC = () => {
                         <ServiceManager services={services} onAddService={handleAddService} onDeleteService={handleDeleteService} onSyncServices={() => { }} />
                     </ErrorBoundary>
                 )}
-                {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} onOpen={() => setIsScheduleModalOpen(true)} onLog={logAction} />}
+                {currentView === 'schedule' && <ScheduleManager appointments={appointments} clients={clients} services={services} onAdd={handleAddAppointment} onEdit={handleEditAppointment} onUpdateStatus={handleUpdateStatus} onDelete={handleDeleteAppointment} isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} onOpen={() => setIsScheduleModalOpen(true)} onLog={logAction} hidePrice={false} />}
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} />}
                 {currentView === 'tasks' && <TaskManager />}
-                {currentView === 'activity_log' && <ActivityLogView logs={activityLogs} onBack={() => setCurrentView('menu')} />}
+                {currentView === 'activity_log' && <ActivityLogView logs={logs} onBack={() => setCurrentView('menu')} />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }}
                 onSync={async (type) => {
