@@ -21,7 +21,7 @@ import { supabase } from './services/supabaseClient';
 import {
     Plus, Trash2, Check, X,
     Sparkles, DollarSign, Calendar as CalendarIcon, MapPin,
-    ExternalLink, Settings, PawPrint, LogIn, ShieldAlert, Lock, Copy,
+    ExternalLink, Settings, PawPrint, LogIn, ShieldAlert, Lock, Copy, Eye, EyeOff,
     ChevronDown, ChevronRight, Search, AlertTriangle, ChevronLeft, Phone, Clock, FileText,
     Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
     Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon,
@@ -914,6 +914,58 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const touchStart = useRef<number | null>(null);
     const getAppLocalDateStr = (dateStr: string) => { const d = new Date(dateStr); return getLocalISODate(d); };
+    const [isPrivacyActive, setIsPrivacyActive] = useState(() => localStorage.getItem('payment_privacy_active') === 'true');
+
+    const handleTogglePrivacy = async () => {
+        if (!isPrivacyActive) {
+            setIsPrivacyActive(true);
+            localStorage.setItem('payment_privacy_active', 'true');
+        } else {
+            // Unhiding: requires Biometrics/ScreenLock
+            try {
+                if (!window.isSecureContext) {
+                    // Fail gracefully if not in HTTPS/Secure context (WebAuthn requirement)
+                    const confirmed = confirm("Para desocultar os valores, confirme seu acesso. Deseja prosseguir?");
+                    if (confirmed) {
+                        setIsPrivacyActive(false);
+                        localStorage.setItem('payment_privacy_active', 'false');
+                    }
+                    return;
+                }
+
+                if (window.PublicKeyCredential) {
+                    const challenge = new Uint8Array(32);
+                    window.crypto.getRandomValues(challenge);
+
+                    const options: CredentialCreationOptions = {
+                        publicKey: {
+                            challenge,
+                            rp: { name: "PetGestor" },
+                            user: {
+                                id: new Uint8Array(16),
+                                name: "petgestor@user",
+                                displayName: "Usuário PetGestor"
+                            },
+                            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+                            timeout: 60000,
+                            authenticatorSelection: { userVerification: "required" }
+                        }
+                    };
+
+                    // This triggers the native FaceID/Fingerprint/PIN prompt
+                    await navigator.credentials.create(options);
+                    setIsPrivacyActive(false);
+                    localStorage.setItem('payment_privacy_active', 'false');
+                } else {
+                    setIsPrivacyActive(false);
+                    localStorage.setItem('payment_privacy_active', 'false');
+                }
+            } catch (err) {
+                console.error("Biometric error:", err);
+                // If user cancels or it fails, keep hidden
+            }
+        }
+    };
 
     // Filters
     const dailyApps = appointments.filter(a => getAppLocalDateStr(a.date) === selectedDate && a.status !== 'cancelado');
@@ -1043,7 +1095,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                         <div className="text-[10px] text-gray-400 mt-2 flex items-center gap-1.5 font-mono bg-white/50 w-fit px-2 py-1 rounded-lg"> <Clock size={12} className="text-brand-400" /> {app.date.split('T')[1].substring(0, 5)} </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                        <div className="text-xl font-black text-gray-800 tracking-tight">R$ {expected.toFixed(2)}</div>
+                        <div className={`text-xl font-black text-gray-800 tracking-tight transition-all duration-300 ${isPrivacyActive ? 'blur-[6px] select-none scale-95 opacity-50' : ''}`}>R$ {expected.toFixed(2)}</div>
                         {isPaid ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-green-700 border border-green-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> {app.paymentMethod} </div>) :
                             isNoShow ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-gray-500 border border-gray-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Não Veio </div>) :
                                 (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-red-500 border border-red-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Pendente </div>)}
@@ -1075,8 +1127,17 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
     };
 
     return (<div className="space-y-4 h-full flex flex-col pt-2" onClick={() => setContextMenu(null)} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-4 rounded-3xl border border-white/40 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight self-start md:self-center">Pagamentos</h2>
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-4 rounded-3xl border border-white/40 shadow-sm relative">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Pagamentos</h2>
+                <button
+                    onClick={handleTogglePrivacy}
+                    className={`p-2.5 rounded-2xl transition-all duration-300 ${isPrivacyActive ? 'bg-brand-50 text-brand-600 shadow-inner' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                    title={isPrivacyActive ? "Mostrar Valores" : "Ocultar Valores"}
+                >
+                    {isPrivacyActive ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+            </div>
             <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 flex-shrink-0">
                 <button onClick={() => navigateDate(-1)} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronLeft size={18} /></button>
                 <button onClick={goToToday} className="flex-1 px-4 py-2 bg-white text-brand-600 font-bold rounded-xl text-xs shadow-sm border border-gray-100 hover:bg-gray-50 transition-all">Hoje</button>
@@ -1097,9 +1158,9 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         </div>
 
         <div className="flex p-1.5 bg-gray-200/50 rounded-2xl overflow-x-auto gap-1">
-            <button onClick={() => setActiveTab('toReceive')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'toReceive' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">A Receber</span> <span className="text-lg">{toReceiveApps.length}</span> </button>
-            <button onClick={() => setActiveTab('pending')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'pending' ? 'bg-white shadow-md text-red-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pendentes</span> <span className="text-lg">{pendingApps.length}</span> </button>
-            <button onClick={() => setActiveTab('paid')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'paid' ? 'bg-white shadow-md text-green-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pagos</span> <span className="text-lg">{paidApps.length}</span> </button>
+            <button onClick={() => setActiveTab('toReceive')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'toReceive' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">A Receber</span> <span className={`text-lg transition-all duration-300 ${isPrivacyActive ? 'blur-[4px] opacity-50' : ''}`}>{toReceiveApps.length}</span> </button>
+            <button onClick={() => setActiveTab('pending')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'pending' ? 'bg-white shadow-md text-red-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pendentes</span> <span className={`text-lg transition-all duration-300 ${isPrivacyActive ? 'blur-[4px] opacity-50' : ''}`}>{pendingApps.length}</span> </button>
+            <button onClick={() => setActiveTab('paid')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'paid' ? 'bg-white shadow-md text-green-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pagos</span> <span className={`text-lg transition-all duration-300 ${isPrivacyActive ? 'blur-[4px] opacity-50' : ''}`}>{paidApps.length}</span> </button>
             <button onClick={() => setActiveTab('noShow')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === 'noShow' ? 'bg-white shadow-md text-gray-500' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Não Veio</span> <span className="text-lg">{noShowApps.length}</span> </button>
         </div>
 
