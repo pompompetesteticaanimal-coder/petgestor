@@ -349,7 +349,14 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         return data;
     }, [selectedYear, appointments, services]);
 
-    const dailyApps = useMemo(() => appointments.filter(a => a.date && a.date.startsWith(selectedDate)), [appointments, selectedDate]);
+    const dailyApps = useMemo(() => appointments.filter(a => {
+        if (!a.date) return false;
+        const appDate = parseDateLocal(a.date);
+        const selDate = parseDateLocal(selectedDate);
+        return appDate.getFullYear() === selDate.getFullYear() &&
+            appDate.getMonth() === selDate.getMonth() &&
+            appDate.getDate() === selDate.getDate();
+    }), [appointments, selectedDate]);
     const filteredDailyApps = useMemo(() => {
         if (!dailySearchTerm) return dailyApps;
         const term = dailySearchTerm.toLowerCase();
@@ -982,14 +989,30 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
     const [rescheduleDate, setRescheduleDate] = useState('');
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const touchStart = useRef<number | null>(null);
-    const getAppLocalDateStr = (dateStr: string) => { const d = new Date(dateStr); return getLocalISODate(d); };
+    const getAppLocalDateStr = (dateStr: string) => parseDateLocal(dateStr).toISOString().split('T')[0];
 
     // Filters
-    const dailyApps = appointments.filter(a => getAppLocalDateStr(a.date) === selectedDate && a.status !== 'cancelado');
-    const noShowApps = dailyApps.filter(a => a.status === 'nao_veio');
-    const toReceiveApps = dailyApps.filter(a => (!a.paymentMethod || a.paymentMethod.trim() === '') && a.status !== 'nao_veio');
-    const paidApps = dailyApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== '');
-    const pendingApps = appointments.filter(a => { const appDate = getAppLocalDateStr(a.date); const isPast = appDate < getLocalISODate(); const isUnpaid = (!a.paymentMethod || a.paymentMethod.trim() === ''); return isPast && isUnpaid && a.status !== 'nao_veio' && a.status !== 'cancelado'; }).sort((a, b) => b.date.localeCompare(a.date));
+    const dailyApps = useMemo(() => appointments.filter(a => {
+        if (!a.date || a.status === 'cancelado') return false;
+        const appDate = parseDateLocal(a.date);
+        const selDate = parseDateLocal(selectedDate);
+        return appDate.getFullYear() === selDate.getFullYear() &&
+            appDate.getMonth() === selDate.getMonth() &&
+            appDate.getDate() === selDate.getDate();
+    }), [appointments, selectedDate]);
+
+    const noShowApps = useMemo(() => dailyApps.filter(a => a.status === 'nao_veio'), [dailyApps]);
+    const toReceiveApps = useMemo(() => dailyApps.filter(a => (!a.paymentMethod || a.paymentMethod.trim() === '') && a.status !== 'nao_veio'), [dailyApps]);
+    const paidApps = useMemo(() => dailyApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== ''), [dailyApps]);
+    const pendingApps = useMemo(() => appointments.filter(a => {
+        if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false;
+        const appDate = parseDateLocal(a.date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isPast = appDate < today;
+        const isUnpaid = (!a.paymentMethod || a.paymentMethod.trim() === '');
+        return isPast && isUnpaid;
+    }).sort((a, b) => b.date.localeCompare(a.date)), [appointments]);
 
     const navigateDate = (days: number) => {
         setSlideDirection(days > 0 ? 'right' : 'left');
@@ -1341,6 +1364,7 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const [nowMinutes, setNowMinutes] = useState(0);
     const [selectedCluster, setSelectedCluster] = useState<Appointment[] | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         const updateNow = () => {
@@ -1379,129 +1403,134 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         setDetailsApp(null); setContextMenu(null);
     };
 
-    const handleSave = () => {
-        if (!selectedClient || selectedPetIds.length === 0 || !selectedService || !date || !time) return;
-        const client = selectedClient;
-        const mainSvc = services.find(s => s.id === selectedService);
-        const addSvcs = selectedAddServices.map(id => services.find(s => s.id === id)).filter(s => s) as Service[];
+    const handleSave = async () => {
+        if (!selectedClient || selectedPetIds.length === 0 || !selectedService || !date || !time || isSaving) return;
+        setIsSaving(true);
+        try {
+            const client = selectedClient;
+            const mainSvc = services.find(s => s.id === selectedService);
+            const addSvcs = selectedAddServices.map(id => services.find(s => s.id === id)).filter(s => s) as Service[];
 
-        if (client && mainSvc) {
-            const allAppsToCreate: Appointment[] = [];
+            if (client && mainSvc) {
+                const allAppsToCreate: Appointment[] = [];
 
-            // Iterate over ALL selected pets
-            selectedPetIds.forEach(petId => {
-                const pet = client.pets.find(p => p.id === petId);
-                if (!pet) return;
-
-                const newApp: Appointment = {
-                    id: editingAppId && selectedPetIds.length === 1 ? editingAppId : `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    clientId: client.id,
-                    petId: pet.id,
-                    serviceId: mainSvc.id,
-                    additionalServiceIds: selectedAddServices,
-                    date: `${date}T${time}:00`,
-                    status: 'agendado',
-                    notes: notes,
-                    googleEventId: editingAppId ? appointments.find(a => a.id === editingAppId)?.googleEventId : undefined
-                };
-
-                // Check Package Automation for THIS pet
-                const serviceNameLower = mainSvc.name.toLowerCase();
-                const isPackage = serviceNameLower.includes('pacote');
-
-                if (isPackage && !editingAppId) { // Only do automation on new creation, or careful on edit? Assuming new for now.
-                    let iterations = 0;
-                    let intervalDays = 0;
-
-                    if (serviceNameLower.includes('pacote mensal') && (serviceNameLower.includes('1°') || serviceNameLower.includes('1 '))) {
-                        iterations = 3;
-                        intervalDays = 7;
-                    } else if (serviceNameLower.includes('pacote quinzenal 1')) {
-                        iterations = 1;
-                        intervalDays = 14;
-                    }
-
-                    allAppsToCreate.push(newApp);
-
-                    if (iterations > 0) {
-                        const baseDate = new Date(newApp.date);
-                        for (let i = 1; i <= iterations; i++) {
-                            const nextDate = new Date(baseDate);
-                            nextDate.setDate(baseDate.getDate() + (i * intervalDays));
-                            const isoDate = nextDate.toISOString().split('T')[0] + 'T' + time + ':00';
-
-                            // Sequential Service Logic
-                            let nextServiceId = newApp.serviceId;
-                            if (iterations === 3) {
-                                // Mensal logic: 1° -> 2°, etc.
-                                const targetName = mainSvc.name.replace('1°', `${i + 1}°`).replace('1 ', `${i + 1} `);
-                                const nextSvc = services.find(s => s.name.toLowerCase() === targetName.toLowerCase());
-                                if (nextSvc) nextServiceId = nextSvc.id;
-                            } else if (iterations === 1) {
-                                // Quinzenal logic: 1 -> 2
-                                const targetName = mainSvc.name.replace('1', '2');
-                                const nextSvc = services.find(s => s.name.toLowerCase() === targetName.toLowerCase());
-                                if (nextSvc) nextServiceId = nextSvc.id;
-                            }
-
-                            allAppsToCreate.push({
-                                ...newApp,
-                                id: `local_${Date.now()}_ recur_${Math.random()}_${i}`,
-                                date: isoDate,
-                                serviceId: nextServiceId,
-                                googleEventId: undefined
-                            });
-                        }
-                    }
-                } else {
-                    allAppsToCreate.push(newApp);
-                }
-            });
-
-            if (editingAppId && selectedPetIds.length === 1) {
-                // Single Edit Legacy Mode
-                const appToEdit = allAppsToCreate[0];
-                const original = appointments.find(a => a.id === editingAppId);
-                appToEdit.paidAmount = original?.paidAmount;
-                appToEdit.paymentMethod = original?.paymentMethod;
-                const pet = client.pets.find(p => p.id === appToEdit.petId)!;
-                onEdit(appToEdit, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration as string));
-                onLog('Editar Agendamento', `Pet: ${pet.name}, Cliente: ${client.name}, Data: ${appToEdit.date}`);
-            } else {
-                // Batch Add / Multi-Add
-                // We pass the FIRST pet for the notification logic inside onAdd, but onAdd handles array now so it iterates.
-                // We need to pass A pet for the signature, but handleAddAppointment uses the pet inside the app object loop if we changed logic?
-                // Actually handleAddAppointment (onAdd) signature is: (appOrApps, client, pet, services, duration).
-                // It uses 'pet' arg for Google Event Summary "Banho/Tosa: ${pet.name}".
-                // If we pass an array of apps for DIFFERENT pets, that 'pet' arg is insufficient/wrong for the batch description if they differ.
-                // FIX: We rely on handleAddAppointment to use app.petId to find the pet? 
-                // handleAddAppointment uses the PASSED 'pet' object.
-                // We should probably call onAdd multiple times if the pets differ, or update onAdd to look up pet from ID.
-                // OR, since my onAdd refactor loops `appsToAdd`, I can change onAdd to look up the pet for EACH app if I want correct descriptions.
-                // BUT `handleAddAppointment` code I wrote uses `pet.name` from the argument.
-
-                // RE-READ handleAddAppointment:
-                // const handleAddAppointment = async (appOrApps: ... , pet: Pet ...)
-                // for (const app of appsToAdd) { ... summary: `Banho/Tosa: ${pet.name}` ... }
-                // It uses the SAME pet name for all. This is WRONG for multi-pet.
-
-                // STRATEGY ADJUSTMENT:
-                // Instead of calling onAdd once with Mixed Pets, I should call onAdd ONCE PER PET with that pet's package-generated appointments.
-                // This ensures the `pet` argument matches the appointments.
-
+                // Iterate over ALL selected pets
                 selectedPetIds.forEach(petId => {
                     const pet = client.pets.find(p => p.id === petId);
                     if (!pet) return;
 
-                    // Filter the apps for this pet
-                    const appsForThisPet = allAppsToCreate.filter(a => a.petId === petId);
-                    if (appsForThisPet.length > 0) {
-                        onAdd(appsForThisPet, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration as string));
-                        onLog('Criar Agendamento', `Pet: ${pet.name}, Cliente: ${client.name}, Data: ${appsForThisPet[0].date}`);
+                    const newApp: Appointment = {
+                        id: editingAppId && selectedPetIds.length === 1 ? editingAppId : `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        clientId: client.id,
+                        petId: pet.id,
+                        serviceId: mainSvc.id,
+                        additionalServiceIds: selectedAddServices,
+                        date: `${date}T${time}:00`,
+                        status: 'agendado',
+                        notes: notes,
+                        googleEventId: editingAppId ? appointments.find(a => a.id === editingAppId)?.googleEventId : undefined
+                    };
+
+                    // Check Package Automation for THIS pet
+                    const serviceNameLower = mainSvc.name.toLowerCase();
+                    const isPackage = serviceNameLower.includes('pacote');
+
+                    if (isPackage && !editingAppId) { // Only do automation on new creation, or careful on edit? Assuming new for now.
+                        let iterations = 0;
+                        let intervalDays = 0;
+
+                        if (serviceNameLower.includes('pacote mensal') && (serviceNameLower.includes('1°') || serviceNameLower.includes('1 '))) {
+                            iterations = 3;
+                            intervalDays = 7;
+                        } else if (serviceNameLower.includes('pacote quinzenal 1')) {
+                            iterations = 1;
+                            intervalDays = 14;
+                        }
+
+                        allAppsToCreate.push(newApp);
+
+                        if (iterations > 0) {
+                            const baseDate = new Date(newApp.date);
+                            for (let i = 1; i <= iterations; i++) {
+                                const nextDate = new Date(baseDate);
+                                nextDate.setDate(baseDate.getDate() + (i * intervalDays));
+                                const isoDate = nextDate.toISOString().split('T')[0] + 'T' + time + ':00';
+
+                                // Sequential Service Logic
+                                let nextServiceId = newApp.serviceId;
+                                if (iterations === 3) {
+                                    // Mensal logic: 1° -> 2°, etc.
+                                    const targetName = mainSvc.name.replace('1°', `${i + 1}°`).replace('1 ', `${i + 1} `);
+                                    const nextSvc = services.find(s => s.name.toLowerCase() === targetName.toLowerCase());
+                                    if (nextSvc) nextServiceId = nextSvc.id;
+                                } else if (iterations === 1) {
+                                    // Quinzenal logic: 1 -> 2
+                                    const targetName = mainSvc.name.replace('1', '2');
+                                    const nextSvc = services.find(s => s.name.toLowerCase() === targetName.toLowerCase());
+                                    if (nextSvc) nextServiceId = nextSvc.id;
+                                }
+
+                                allAppsToCreate.push({
+                                    ...newApp,
+                                    id: `local_${Date.now()}_ recur_${Math.random()}_${i}`,
+                                    date: isoDate,
+                                    serviceId: nextServiceId,
+                                    googleEventId: undefined
+                                });
+                            }
+                        }
+                    } else {
+                        allAppsToCreate.push(newApp);
                     }
                 });
+
+                if (editingAppId && selectedPetIds.length === 1) {
+                    // Single Edit Legacy Mode
+                    const appToEdit = allAppsToCreate[0];
+                    const original = appointments.find(a => a.id === editingAppId);
+                    appToEdit.paidAmount = original?.paidAmount;
+                    appToEdit.paymentMethod = original?.paymentMethod;
+                    const pet = client.pets.find(p => p.id === appToEdit.petId)!;
+                    onEdit(appToEdit, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration as string));
+                    onLog('Editar Agendamento', `Pet: ${pet.name}, Cliente: ${client.name}, Data: ${appToEdit.date}`);
+                } else {
+                    // Batch Add / Multi-Add
+                    // We pass the FIRST pet for the notification logic inside onAdd, but onAdd handles array now so it iterates.
+                    // We need to pass A pet for the signature, but handleAddAppointment uses the pet inside the app object loop if we changed logic?
+                    // Actually handleAddAppointment (onAdd) signature is: (appOrApps, client, pet, services, duration).
+                    // It uses 'pet' arg for Google Event Summary "Banho/Tosa: ${pet.name}".
+                    // If we pass an array of apps for DIFFERENT pets, that 'pet' arg is insufficient/wrong for the batch description if they differ.
+                    // FIX: We rely on handleAddAppointment to use app.petId to find the pet? 
+                    // handleAddAppointment uses the PASSED 'pet' object.
+                    // We should probably call onAdd multiple times if the pets differ, or update onAdd to look up pet from ID.
+                    // OR, since my onAdd refactor loops `appsToAdd`, I can change onAdd to look up the pet for EACH app if I want correct descriptions.
+                    // BUT `handleAddAppointment` code I wrote uses `pet.name` from the argument.
+
+                    // RE-READ handleAddAppointment:
+                    // const handleAddAppointment = async (appOrApps: ... , pet: Pet ...)
+                    // for (const app of appsToAdd) { ... summary: `Banho/Tosa: ${pet.name}` ... }
+                    // It uses the SAME pet name for all. This is WRONG for multi-pet.
+
+                    // STRATEGY ADJUSTMENT:
+                    // Instead of calling onAdd once with Mixed Pets, I should call onAdd ONCE PER PET with that pet's package-generated appointments.
+                    // This ensures the `pet` argument matches the appointments.
+
+                    selectedPetIds.forEach(petId => {
+                        const pet = client.pets.find(p => p.id === petId);
+                        if (!pet) return;
+
+                        // Filter the apps for this pet
+                        const appsForThisPet = allAppsToCreate.filter(a => a.petId === petId);
+                        if (appsForThisPet.length > 0) {
+                            onAdd(appsForThisPet, client, pet, [mainSvc, ...addSvcs], parseInt(manualDuration as string));
+                            onLog('Criar Agendamento', `Pet: ${pet.name}, Cliente: ${client.name}, Data: ${appsForThisPet[0].date}`);
+                        }
+                    });
+                }
+                resetForm();
             }
-            resetForm();
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -1699,9 +1728,17 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
     };
     const renderDayView = () => {
         const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
-        const dateStr = currentDate.toISOString().split('T')[0]; const dayApps = appointments.filter(a => a.date.startsWith(dateStr) && a.status !== 'cancelado'); const layoutItems = getLayout(dayApps);
+        const selDate = parseDateLocal(currentDate.toISOString().split('T')[0]);
+        const dayApps = appointments.filter(a => {
+            if (!a.date || a.status === 'cancelado') return false;
+            const appDate = parseDateLocal(a.date);
+            return appDate.getFullYear() === selDate.getFullYear() &&
+                appDate.getMonth() === selDate.getMonth() &&
+                appDate.getDate() === selDate.getDate();
+        });
+        const layoutItems = getLayout(dayApps);
         return (
-            <div key={dateStr} className={`relative h-[1680px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`}>
+            <div key={currentDate.toISOString()} className={`relative h-[1680px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden flex mx-1 ${animationClass}`}>
                 <div className="w-14 bg-gray-50/50 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 sticky left-0 z-10 flex flex-col"> {Array.from({ length: 14 }, (_, i) => i + 6).map(h => (<div key={h} className="flex-1 border-b border-gray-100 text-[10px] text-gray-400 font-bold p-2 text-right relative"> <span className="-top-2.5 relative">{h}:00</span> </div>))} </div>
                 <div className="flex-1 relative bg-[repeating-linear-gradient(0deg,transparent,transparent_119px,rgba(243,244,246,0.6)_120px)] overflow-x-auto"> {Array.from({ length: 84 }, (_, i) => i).map(i => <div key={i} className="absolute w-full border-t border-gray-50" style={{ top: i * 20 }} />)}
 
@@ -2201,11 +2238,11 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                                 <button onClick={() => { resetForm(); onClose(); }} className="flex-1 md:flex-none px-8 py-4 rounded-xl text-gray-500 font-bold hover:bg-gray-100 transition-colors text-sm">Cancelar</button>
                                 <button
                                     onClick={handleSave}
-                                    disabled={!selectedClient || selectedPetIds.length === 0 || !selectedService}
+                                    disabled={!selectedClient || selectedPetIds.length === 0 || !selectedService || isSaving}
                                     className="flex-1 md:flex-none px-10 py-4 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-brand-200 hover:shadow-brand-300 hover:scale-[1.02] active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
                                 >
-                                    <Check size={20} strokeWidth={3} />
-                                    Confirmar
+                                    {isSaving ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} strokeWidth={3} />}
+                                    {isSaving ? 'Salvando...' : 'Confirmar'}
                                 </button>
                             </div>
                         </div>
@@ -2220,7 +2257,13 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
 
                 if (selectedDayForDetails && !selectedCluster && !detailsApp) {
                     // Day Click (Space) - Open Sheet
-                    appsToShow = appointments.filter(a => a.date.startsWith(selectedDayForDetails)).sort((a, b) => a.date.localeCompare(b.date));
+                    const selDate = parseDateLocal(selectedDayForDetails);
+                    appsToShow = appointments.filter(a => {
+                        const appDate = parseDateLocal(a.date);
+                        return appDate.getFullYear() === selDate.getFullYear() &&
+                            appDate.getMonth() === selDate.getMonth() &&
+                            appDate.getDate() === selDate.getDate();
+                    }).sort((a, b) => a.date.localeCompare(b.date));
                     label = new Date(selectedDayForDetails).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
                 } else if (selectedCluster) {
                     // Stack Click - Open Sheet
@@ -2518,10 +2561,12 @@ const App: React.FC = () => {
             supabaseService.upsertAppointment(appReady).catch(console.error);
         }
 
-        // 4. Update Local State
-        const updatedApps = [...appointments, ...newAppsWithFinalData];
-        setAppointments(updatedApps);
-        db.saveAppointments(updatedApps);
+        // 4. Update Local State using functional update to prevent race conditions
+        setAppointments(prev => {
+            const updated = [...prev, ...newAppsWithFinalData];
+            db.saveAppointments(updated);
+            return updated;
+        });
     };
 
     const handleEditAppointment = async (app: Appointment, client: Client, pet: Pet, appServices: Service[], manualDuration: number) => {
