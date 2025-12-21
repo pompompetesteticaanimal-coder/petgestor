@@ -1901,20 +1901,32 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 let label = '';
 
                 if (selectedDayForDetails && !selectedCluster && !detailsApp) {
-                    // Day Click
-                    appsToShow = appointments.filter(a => a.date.startsWith(selectedDayForDetails)).sort((a, b) => a.date.localeCompare(b.date));
+                    // Day Click (Space) - Open Sheet
+                    const selDate = parseDateLocal(selectedDayForDetails);
+                    appsToShow = appointments.filter(a => {
+                        if (a.status === 'cancelado') return false;
+                        const appDate = parseDateLocal(a.date);
+                        return appDate.getFullYear() === selDate.getFullYear() &&
+                            appDate.getMonth() === selDate.getMonth() &&
+                            appDate.getDate() === selDate.getDate();
+                    }).sort((a, b) => a.date.localeCompare(b.date));
                     label = new Date(selectedDayForDetails).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
                 } else if (selectedCluster) {
                     // Stack Click
                     appsToShow = selectedCluster;
                     label = selectedCluster[0]?.date.split('T')[1].slice(0, 5) || 'Grupo';
                 } else if (detailsApp) {
-                    // Single App Click - Show context (others at same time?) or just it?
-                    // User said: Clicking opens the sheet.
-                    // Let's find overlapping apps for that time to populate the list "Apple style"
-                    const d = detailsApp.date.split('T')[0];
+                    // Single App Click
                     const t = detailsApp.date.split('T')[1];
-                    appsToShow = appointments.filter(a => a.date.startsWith(d) && a.date.includes(t));
+                    const selDate = parseDateLocal(detailsApp.date);
+                    appsToShow = appointments.filter(a => {
+                        if (a.status === 'cancelado') return false;
+                        const appDate = parseDateLocal(a.date);
+                        return appDate.getFullYear() === selDate.getFullYear() &&
+                            appDate.getMonth() === selDate.getMonth() &&
+                            appDate.getDate() === selDate.getDate() &&
+                            a.date.split('T')[1] === t;
+                    });
                     label = t.slice(0, 5);
                 }
 
@@ -1927,15 +1939,15 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                         clients={clients}
                         services={services}
                         onEdit={(app) => {
-                            // When clicking an item in the sheet, close sheet and open "Edit Mode"
                             setDetailsApp(null);
                             setSelectedCluster(null);
                             setSelectedDayForDetails(null);
-                            handleStartEdit(app); // Opens the big edit drawer/modal
+                            handleStartEdit(app);
                         }}
                     />
                 );
             })(), document.body)}
+
             {/* NEW/EDIT MODAL - Controlled by Props */}
             {isOpen && createPortal(
                 <div className="fixed inset-0 bg-black/60 z-[60] flex items-end md:items-center justify-center md:p-6 backdrop-blur-sm animate-fade-in">
@@ -2250,55 +2262,6 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                 </div>,
                 document.body
             )}
-            {/* Unified Bottom Sheet Logic */}
-            {(selectedCluster || selectedDayForDetails || detailsApp) && createPortal((() => {
-                let appsToShow: Appointment[] = [];
-                let label = '';
-
-                if (selectedDayForDetails && !selectedCluster && !detailsApp) {
-                    // Day Click (Space) - Open Sheet
-                    const selDate = parseDateLocal(selectedDayForDetails);
-                    appsToShow = appointments.filter(a => {
-                        const appDate = parseDateLocal(a.date);
-                        return appDate.getFullYear() === selDate.getFullYear() &&
-                            appDate.getMonth() === selDate.getMonth() &&
-                            appDate.getDate() === selDate.getDate();
-                    }).sort((a, b) => a.date.localeCompare(b.date));
-                    label = new Date(selectedDayForDetails).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                } else if (selectedCluster) {
-                    // Stack Click - Open Sheet
-                    appsToShow = selectedCluster;
-                    label = selectedCluster[0]?.date.split('T')[1].slice(0, 5) || 'Grupo';
-                } else if (detailsApp) {
-                    // Fallback if detailsApp set?
-                    // If we use viewingApp for single clicks, detailsApp here is only used if we trigger it some other way?
-                    // Or maybe we KEEP detailsApp for something?
-                    // Assuming detailsApp handles legacy or complex overlapping?
-                    // Let's keep the logic just in case, but viewingApp takes precedence for direct clicks.
-                    const d = detailsApp.date.split('T')[0];
-                    const t = detailsApp.date.split('T')[1];
-                    appsToShow = appointments.filter(a => a.date.startsWith(d) && a.date.includes(t));
-                    label = t.slice(0, 5);
-                }
-
-                return (
-                    <BottomSheetList
-                        isOpen={true}
-                        onClose={() => { setDetailsApp(null); setSelectedCluster(null); setSelectedDayForDetails(null); }}
-                        timeSlot={label}
-                        appointments={appsToShow}
-                        clients={clients}
-                        services={services}
-                        onEdit={(app: Appointment) => {
-                            // Clicking item in sheet -> Open Modal
-                            setDetailsApp(null);
-                            setSelectedCluster(null);
-                            setSelectedDayForDetails(null);
-                            setViewingApp(app);
-                        }}
-                    />
-                );
-            })(), document.body)}
 
             {/* SUMMARY MODAL */}
             {viewingApp && createPortal(
@@ -2306,7 +2269,10 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
                     app={viewingApp}
                     isOpen={!!viewingApp}
                     onClose={() => setViewingApp(null)}
-                    onEdit={handleStartEdit}
+                    onEdit={(app) => {
+                        setViewingApp(null);
+                        handleStartEdit(app);
+                    }}
                     onDelete={onDelete}
                     clients={clients}
                     services={services}
@@ -2318,8 +2284,8 @@ const ScheduleManager: React.FC<{ appointments: Appointment[]; clients: Client[]
         </div>
     );
 };
-const App: React.FC = () => {
 
+const App: React.FC = () => {
     // --- AUTH STATE ---
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isInitializing, setIsInitializing] = useState(true); // NEW: Splash Screen State
@@ -2330,7 +2296,7 @@ const App: React.FC = () => {
         // Short timeout to let the app "breathe" and show splash, or just sync checks
         setTimeout(() => setIsInitializing(false), 800);
     }, []);
-    // home is now used as a redirect or default view, but bimport { RevenueView } from './components/RevenueView'; // Assuming this is extracted or defined elsewhere if not in snippet
+
     // ... (App state)
     const [currentView, setCurrentView] = useState<ViewState>('home');
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false); // NEW STATE
@@ -2740,7 +2706,6 @@ const App: React.FC = () => {
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} />}
                 {currentView === 'tasks' && <TaskManager />}
-                {currentView === 'activity_log' && <ActivityLogView logs={logs} onBack={() => setCurrentView('menu')} />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }}
                 onSync={async (type) => {
