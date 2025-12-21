@@ -1,0 +1,22 @@
+﻿Total appointments in DB for 2025-12-20: 21
+1. [2025-12-20T09:00:00+00:00] Pet: Woody | Client: Priscilla Couto | Status: agendado
+2. [2025-12-20T09:00:00+00:00] Pet: Mailo | Client: Priscilla Couto | Status: agendado
+3. [2025-12-20T09:00:00+00:00] Pet: Jake | Client: Simone Souza | Status: agendado
+4. [2025-12-20T09:00:00+00:00] Pet: Maggie | Client: Simone Souza | Status: agendado
+5. [2025-12-20T09:00:00+00:00] Pet: Chewbacca | Client: Jessica | Status: agendado
+6. [2025-12-20T09:00:00+00:00] Pet: L├®o | Client: Emilly Silva | Status: agendado
+7. [2025-12-20T09:00:00+00:00] Pet: Anakin | Client: Jessica | Status: agendado
+8. [2025-12-20T09:00:00+00:00] Pet: Moannah | Client: Elaine | Status: agendado
+9. [2025-12-20T09:00:00+00:00] Pet: Tiny | Client: Fab├¡ola Josu├®  | Status: agendado
+10. [2025-12-20T11:00:00+00:00] Pet: fred | Client: Marjorie | Status: agendado
+11. [2025-12-20T12:00:00+00:00] Pet: Maggie | Client: Rosemary Rodrigues | Status: agendado
+12. [2025-12-20T12:00:00+00:00] Pet: Branca | Client: Rosemary Rodrigues | Status: agendado
+13. [2025-12-20T12:00:00+00:00] Pet: Baby | Client: Amanda ferreira | Status: agendado
+14. [2025-12-20T13:00:00+00:00] Pet: Malu | Client: Barbara | Status: agendado
+15. [2025-12-20T13:00:00+00:00] Pet: Zuri | Client: Barbara | Status: agendado
+16. [2025-12-20T13:00:00+00:00] Pet: Nina | Client: Elisabete  | Status: agendado
+17. [2025-12-20T14:08:00+00:00] Pet: Amora | Client: Heloisa Morais | Status: agendado
+18. [2025-12-20T15:00:00+00:00] Pet: Frederico | Client: Maiara (MA) | Status: agendado
+19. [2025-12-20T15:00:00+00:00] Pet: Amora | Client: FRANK | Status: agendado
+20. [2025-12-20T15:40:00+00:00] Pet: Levi | Client: Cleo | Status: agendado
+21. [2025-12-20T16:00:00+00:00] Pet: AVULSO | Client: AVULSO | Status: agendado
