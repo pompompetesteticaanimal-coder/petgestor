@@ -26,7 +26,7 @@ import {
     Edit2, MoreVertical, Wallet, Filter, CreditCard, AlertCircle, CheckCircle, Loader2,
     Scissors, TrendingUp, AlertOctagon, BarChart2, TrendingDown, Calendar, PieChart as PieChartIcon,
     ShoppingBag, Tag, User, Users, Key, Unlock, Home, Activity, Menu, ArrowRightLeft, Star, Moon, UserX,
-    Eye, EyeOff
+    Eye, EyeOff, Download
 } from 'lucide-react';
 import { useNotificationScheduler } from './hooks/useNotificationScheduler';
 import { parseDateLocal, getTodayString } from './utils/dateHelpers';
@@ -981,6 +981,48 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         }
     };
 
+    const exportToCSV = () => {
+        if (!dailyApps || dailyApps.length === 0) {
+            alert("Não há dados para exportar nesta data.");
+            return;
+        }
+
+        const headers = ["Data", "Cliente", "Pet", "Serviço", "Valor Esperado", "Valor Pago", "Método", "Status", "Observações"];
+        const rows = dailyApps.map(app => {
+            const client = clients.find(c => c.id === app.clientId);
+            const pet = client?.pets.find(p => p.id === app.petId);
+            const mainSvc = services.find(s => s.id === app.serviceId);
+            const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).map(s => s?.name).join(', ') || '';
+            const serviceName = mainSvc?.name + (addSvcs ? ` + ${addSvcs}` : '');
+
+            const expected = calculateExpected(app).toFixed(2).replace('.', ',');
+            const paid = app.paidAmount ? app.paidAmount.toFixed(2).replace('.', ',') : '0,00';
+            const status = app.status === 'nao_veio' ? 'Não Veio' : (app.paidAmount ? 'Pago' : 'Pendente');
+
+            return [
+                parseDateLocal(app.date).toLocaleDateString('pt-BR'),
+                client?.name || 'N/A',
+                pet?.name || 'N/A',
+                serviceName,
+                expected,
+                paid,
+                app.paymentMethod || '',
+                status,
+                `"${(app.notes || '').replace(/"/g, '""')}"` // Escape quotes
+            ].join(';'); // Use semicolon for Excel compatibility in BR
+        });
+
+        const csvContent = "\uFEFF" + [headers.join(';'), ...rows].join('\n'); // Add BOM for Excel
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `pagamentos_${selectedDate}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
     const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid' | 'noShow'>('toReceive'); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: Appointment } | null>(null);
     const [showEvaluationModal, setShowEvaluationModal] = useState(false);
@@ -1178,6 +1220,13 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
                     title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
                 >
                     {isPrivacyEnabled ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+                <button
+                    onClick={exportToCSV}
+                    className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:text-brand-600 hover:bg-brand-50 transition-all duration-300"
+                    title="Exportar CSV do dia"
+                >
+                    <Download size={20} />
                 </button>
             </div>
             <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 flex-shrink-0">
