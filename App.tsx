@@ -539,14 +539,14 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             appDate.getDate() === selDate.getDate();
     }), [appointments, selectedDate]);
     const filteredDailyApps = useMemo(() => {
-        if (!dailySearchTerm) return dailyApps;
-        const term = dailySearchTerm.toLowerCase();
+        if (!searchTerm) return dailyApps;
+        const term = searchTerm.toLowerCase();
         return dailyApps.filter(app => {
             const c = clients.find(cl => cl.id === app.clientId);
             const p = c?.pets.find(pt => pt.id === app.petId);
             return c?.name.toLowerCase().includes(term) || p?.name.toLowerCase().includes(term);
         });
-    }, [dailyApps, dailySearchTerm, clients]);
+    }, [dailyApps, searchTerm, clients]);
     const dailyStats = useMemo(() => calculateStats(filteredDailyApps), [filteredDailyApps, services]);
     const weeklyChartData = useMemo(() => getWeeklyChartData(), [getWeeklyChartData]);
 
@@ -615,254 +615,252 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 const s = parseDateLocal(selectedDate);
                 return d.getFullYear() === s.getFullYear() && d.getMonth() === s.getMonth() && d.getDate() === s.getDate();
             });
-            return d.getFullYear() === s.getFullYear() && d.getMonth() === s.getMonth() && d.getDate() === s.getDate();
-        });
-} else if (activeTab === 'weekly' || activeTab === 'weekly_list') {
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    const day = date.getDay();
-    const diff = date.getDate() - day;
-    const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
-    apps = appointments.filter(a => {
-        if (!a.date || a.status === 'cancelado') return false;
-        const ad = parseDateLocal(a.date);
-        return ad >= startOfWeek && ad <= endOfWeek;
-    });
-} else if (activeTab === 'monthly' || activeTab === 'monthly_list') {
-    const [yStr, mStr] = selectedMonth.split('-');
-    apps = appointments.filter(a => a.date && a.date.startsWith(`${yStr}-${mStr}`) && a.status !== 'cancelado');
-}
+        } else if (activeTab === 'weekly' || activeTab === 'weekly_list') {
+            const [y, m, d] = selectedDate.split('-').map(Number);
+            const date = new Date(y, m - 1, d);
+            const day = date.getDay();
+            const diff = date.getDate() - day;
+            const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
+            const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
+            apps = appointments.filter(a => {
+                if (!a.date || a.status === 'cancelado') return false;
+                const ad = parseDateLocal(a.date);
+                return ad >= startOfWeek && ad <= endOfWeek;
+            });
+        } else if (activeTab === 'monthly' || activeTab === 'monthly_list') {
+            const [yStr, mStr] = selectedMonth.split('-');
+            apps = appointments.filter(a => a.date && a.date.startsWith(`${yStr}-${mStr}`) && a.status !== 'cancelado');
+        }
 
-if (!searchTerm) return apps.sort((a, b) => a.date.localeCompare(b.date));
+        if (!searchTerm) return apps.sort((a, b) => a.date.localeCompare(b.date));
 
-const term = searchTerm.toLowerCase();
-return apps.filter(app => {
-    const c = clients.find(cl => cl.id === app.clientId);
-    const p = c?.pets.find(pt => pt.id === app.petId);
-    return c?.name.toLowerCase().includes(term) || p?.name.toLowerCase().includes(term);
-}).sort((a, b) => a.date.localeCompare(b.date));
+        const term = searchTerm.toLowerCase();
+        return apps.filter(app => {
+            const c = clients.find(cl => cl.id === app.clientId);
+            const p = c?.pets.find(pt => pt.id === app.petId);
+            return c?.name.toLowerCase().includes(term) || p?.name.toLowerCase().includes(term);
+        }).sort((a, b) => a.date.localeCompare(b.date));
     }, [activeTab, appointments, selectedDate, selectedMonth, searchTerm]);
 
-const currentStats = useMemo(() => calculateStats(currentListApps), [currentListApps, services]);
+    const currentStats = useMemo(() => calculateStats(currentListApps), [currentListApps, services]);
 
-// Payment Sets for Current List
-const currentToReceive = useMemo(() => currentListApps.filter(a => (!a.paymentMethod || a.paymentMethod.trim() === '') && a.status !== 'nao_veio'), [currentListApps]);
-const currentPaid = useMemo(() => currentListApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== ''), [currentListApps]);
-const currentPending = useMemo(() => currentListApps.filter(a => {
-    // Logic for pending in generic list? Maybe just same as To Receive but past?
-    // User defines "Pendentes" as Past + Unpaid.
-    if (a.status === 'nao_veio') return false;
-    const appDate = parseDateLocal(a.date);
-    const now = new Date(); now.setHours(0, 0, 0, 0);
-    return appDate < now && (!a.paymentMethod || a.paymentMethod.trim() === '');
-}), [currentListApps]);
-const currentNoShow = useMemo(() => currentListApps.filter(a => a.status === 'nao_veio'), [currentListApps]);
+    // Payment Sets for Current List
+    const currentToReceive = useMemo(() => currentListApps.filter(a => (!a.paymentMethod || a.paymentMethod.trim() === '') && a.status !== 'nao_veio'), [currentListApps]);
+    const currentPaid = useMemo(() => currentListApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== ''), [currentListApps]);
+    const currentPending = useMemo(() => currentListApps.filter(a => {
+        // Logic for pending in generic list? Maybe just same as To Receive but past?
+        // User defines "Pendentes" as Past + Unpaid.
+        if (a.status === 'nao_veio') return false;
+        const appDate = parseDateLocal(a.date);
+        const now = new Date(); now.setHours(0, 0, 0, 0);
+        return appDate < now && (!a.paymentMethod || a.paymentMethod.trim() === '');
+    }), [currentListApps]);
+    const currentNoShow = useMemo(() => currentListApps.filter(a => a.status === 'nao_veio'), [currentListApps]);
 
 
 
-const getGrowth = (current: number, previous: number) => {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return ((current - previous) / previous) * 100;
-};
+    const getGrowth = (current: number, previous: number) => {
+        if (previous === 0) return current > 0 ? 100 : 0;
+        return ((current - previous) / previous) * 100;
+    };
 
-// Count Tuesdays-Saturdays in a range
-const countBusinessDays = (start: Date, end: Date) => {
-    let count = 0;
-    const cur = new Date(start);
-    while (cur <= end) {
-        const day = cur.getDay();
-        if (day >= 2 && day <= 6) count++; // 2=Tue, 6=Sat
-        cur.setDate(cur.getDate() + 1);
-    }
-    return count;
-};
+    // Count Tuesdays-Saturdays in a range
+    const countBusinessDays = (start: Date, end: Date) => {
+        let count = 0;
+        const cur = new Date(start);
+        while (cur <= end) {
+            const day = cur.getDay();
+            if (day >= 2 && day <= 6) count++; // 2=Tue, 6=Sat
+            cur.setDate(cur.getDate() + 1);
+        }
+        return count;
+    };
 
-// Helper to get cost for a specific month (YYYY-MM format in sheet usually)
-const getCostForMonth = (date: Date) => {
-    // Month name logic or simple matching based on costs data structure
-    // Assuming costs have 'month' field like 'Janeiro', 'Fevereiro' etc or simply summing all costs in that month's date range
-    // For simplicity, let's filter costs by date if available, or just sum everything if cost date matches period.
-    // Better approach given `costs` structure: filter by ISO date range
-    const m = date.getMonth();
-    const y = date.getFullYear();
-    return costs.filter(c => {
-        const cDate = parseDateLocal(c.date);
-        return cDate.getMonth() === m && cDate.getFullYear() === y && isOperationalCost(c);
-    }).reduce((acc, c) => acc + c.amount, 0);
-};
+    // Helper to get cost for a specific month (YYYY-MM format in sheet usually)
+    const getCostForMonth = (date: Date) => {
+        // Month name logic or simple matching based on costs data structure
+        // Assuming costs have 'month' field like 'Janeiro', 'Fevereiro' etc or simply summing all costs in that month's date range
+        // For simplicity, let's filter costs by date if available, or just sum everything if cost date matches period.
+        // Better approach given `costs` structure: filter by ISO date range
+        const m = date.getMonth();
+        const y = date.getFullYear();
+        return costs.filter(c => {
+            const cDate = parseDateLocal(c.date);
+            return cDate.getMonth() === m && cDate.getFullYear() === y && isOperationalCost(c);
+        }).reduce((acc, c) => acc + c.amount, 0);
+    };
 
-// Calculate Data for Tabs
-const metricData = useMemo(() => {
-    // Current Date Reference
-    const currDate = new Date(selectedDate);
-    if (activeTab === 'weekly' || activeTab === 'weekly_list') {
-        const getWeekRange = (date: Date) => {
-            const day = date.getDay();
-            const start = new Date(date); start.setDate(date.getDate() - day); start.setHours(0, 0, 0, 0);
-            const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
-            return { start, end };
-        };
-        const curr = getWeekRange(currDate);
-        const prevStart = new Date(curr.start); prevStart.setDate(prevStart.getDate() - 7);
-        const prev = getWeekRange(prevStart);
+    // Calculate Data for Tabs
+    const metricData = useMemo(() => {
+        // Current Date Reference
+        const currDate = new Date(selectedDate);
+        if (activeTab === 'weekly' || activeTab === 'weekly_list') {
+            const getWeekRange = (date: Date) => {
+                const day = date.getDay();
+                const start = new Date(date); start.setDate(date.getDate() - day); start.setHours(0, 0, 0, 0);
+                const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
+                return { start, end };
+            };
+            const curr = getWeekRange(currDate);
+            const prevStart = new Date(curr.start); prevStart.setDate(prevStart.getDate() - 7);
+            const prev = getWeekRange(prevStart);
 
-        const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= curr.start && d <= curr.end; });
-        const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prev.start && d <= prev.end; });
-        // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
-        // Let's use precise dates if possible, or fallback to pro-rated.
-        const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = parseDateLocal(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
+            const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= curr.start && d <= curr.end; });
+            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prev.start && d <= prev.end; });
+            // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
+            // Let's use precise dates if possible, or fallback to pro-rated.
+            const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = parseDateLocal(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
 
-        const cDays = countBusinessDays(curr.start, curr.end);
-        const pDays = countBusinessDays(prev.start, prev.end);
+            const cDays = countBusinessDays(curr.start, curr.end);
+            const pDays = countBusinessDays(prev.start, prev.end);
 
-        const cStats = calculatePeriodStats(currApps, cDays, getRangeCost(curr.start, curr.end));
-        const pStats = calculatePeriodStats(prevApps, pDays, getRangeCost(prev.start, prev.end));
+            const cStats = calculatePeriodStats(currApps, cDays, getRangeCost(curr.start, curr.end));
+            const pStats = calculatePeriodStats(prevApps, pDays, getRangeCost(prev.start, prev.end));
 
-        return { current: cStats, previous: pStats, rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` };
-    }
-    else if (activeTab === 'monthly') {
-        const [yStr, mStr] = selectedMonth.split('-');
-        const y = parseInt(yStr), m = parseInt(mStr) - 1;
-        const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
-        const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
+            return { current: cStats, previous: pStats, rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` };
+        }
+        else if (activeTab === 'monthly') {
+            const [yStr, mStr] = selectedMonth.split('-');
+            const y = parseInt(yStr), m = parseInt(mStr) - 1;
+            const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
+            const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
 
-        const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= currStart && d <= currEnd; });
-        const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prevStart && d <= prevEnd; });
+            const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= currStart && d <= currEnd; });
+            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prevStart && d <= prevEnd; });
 
-        const cDays = countBusinessDays(currStart, currEnd);
-        const pDays = countBusinessDays(prevStart, prevEnd);
+            const cDays = countBusinessDays(currStart, currEnd);
+            const pDays = countBusinessDays(prevStart, prevEnd);
 
-        const cCost = getCostForMonth(currStart); // This sums all costs in that month
-        const pCost = getCostForMonth(prevStart);
+            const cCost = getCostForMonth(currStart); // This sums all costs in that month
+            const pCost = getCostForMonth(prevStart);
 
-        const cStats = calculatePeriodStats(currApps, cDays, cCost);
-        const pStats = calculatePeriodStats(prevApps, pDays, pCost);
+            const cStats = calculatePeriodStats(currApps, cDays, cCost);
+            const pStats = calculatePeriodStats(prevApps, pDays, pCost);
 
-        return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
-    }
-    else if (activeTab === 'yearly') {
-        const currApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
-        const prevApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear - 1);
+            return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
+        }
+        else if (activeTab === 'yearly') {
+            const currApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
+            const prevApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear - 1);
 
-        // Yearly Cost
-        const getYearCost = (year: number) => costs.filter(c => parseDateLocal(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
+            // Yearly Cost
+            const getYearCost = (year: number) => costs.filter(c => parseDateLocal(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
 
-        // Count biz days in year
-        const countYearBizDays = (year: number) => {
-            let d = new Date(year, 0, 1);
-            let count = 0;
-            while (d.getFullYear() === year) {
-                const w = d.getDay();
-                if (w >= 2 && w <= 6) count++;
-                d.setDate(d.getDate() + 1);
-            }
-            return count;
-        };
+            // Count biz days in year
+            const countYearBizDays = (year: number) => {
+                let d = new Date(year, 0, 1);
+                let count = 0;
+                while (d.getFullYear() === year) {
+                    const w = d.getDay();
+                    if (w >= 2 && w <= 6) count++;
+                    d.setDate(d.getDate() + 1);
+                }
+                return count;
+            };
 
-        const cDays = countYearBizDays(selectedYear);
-        const pDays = countYearBizDays(selectedYear - 1);
+            const cDays = countYearBizDays(selectedYear);
+            const pDays = countYearBizDays(selectedYear - 1);
 
-        const cStats = calculatePeriodStats(currApps, cDays, getYearCost(selectedYear));
-        const pStats = calculatePeriodStats(prevApps, pDays, getYearCost(selectedYear - 1));
+            const cStats = calculatePeriodStats(currApps, cDays, getYearCost(selectedYear));
+            const pStats = calculatePeriodStats(prevApps, pDays, getYearCost(selectedYear - 1));
 
-        return { current: cStats, previous: pStats, rangeLabel: selectedYear.toString() };
-    }
-    return null;
-}, [activeTab, appointments, selectedDate, selectedMonth, selectedYear, costs]);
+            return { current: cStats, previous: pStats, rangeLabel: selectedYear.toString() };
+        }
+        return null;
+    }, [activeTab, appointments, selectedDate, selectedMonth, selectedYear, costs]);
 
-interface StatCardProps { title: string; value: string | number; icon: any; colorClass: string; growth?: number; subValue?: string; }
-const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: StatCardProps) => (
-    <div className="bg-white p-4 rounded-[2rem] shadow-soft border border-gray-100/50 btn-spring hover:shadow-lg hover:-translate-y-2 flex flex-col justify-between group h-full relative overflow-hidden">
-        <div className={`absolute -right-6 -top-6 w-24 h-24 bg-${colorClass.split('-')[1]}-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-700`} />
-        <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className={`p-3 rounded-2xl ${colorClass} bg-opacity-10 text-${colorClass.split('-')[1]}-600 group-hover:scale-110 transition-transform duration-300`}>
-                <Icon size={22} className="animate-pulse-slow" />
+    interface StatCardProps { title: string; value: string | number; icon: any; colorClass: string; growth?: number; subValue?: string; }
+    const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: StatCardProps) => (
+        <div className="bg-white p-4 rounded-[2rem] shadow-soft border border-gray-100/50 btn-spring hover:shadow-lg hover:-translate-y-2 flex flex-col justify-between group h-full relative overflow-hidden">
+            <div className={`absolute -right-6 -top-6 w-24 h-24 bg-${colorClass.split('-')[1]}-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-700`} />
+            <div className="flex justify-between items-start mb-4 relative z-10">
+                <div className={`p-3 rounded-2xl ${colorClass} bg-opacity-10 text-${colorClass.split('-')[1]}-600 group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon size={22} className="animate-pulse-slow" />
+                </div>
+                {growth !== undefined && (
+                    <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 ${growth >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        {growth >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                        {Math.abs(growth).toFixed(0)}%
+                    </div>
+                )}
             </div>
-            {growth !== undefined && (
-                <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 ${growth >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                    {growth >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                    {Math.abs(growth).toFixed(0)}%
-                </div>
+            <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</p>
+                <h3 className="text-2xl font-bold text-gray-800 tracking-tight leading-none">{value}</h3>
+                {subValue && <p className="text-xs font-medium text-gray-400 mt-2">{subValue}</p>}
+            </div>
+        </div>
+    );
+
+    const TabButton = ({ id, label, icon: Icon }: any) => (<button onClick={() => setActiveTab(id)} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 btn-spring ${activeTab === id ? 'bg-white text-brand-600 shadow-md transform scale-100' : 'text-gray-400 hover:bg-white/50 hover:text-gray-600'}`}><Icon size={16} /><span className="hidden sm:inline">{label}</span></button>);
+
+    const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
+
+    return (
+        <div className="space-y-6 animate-fade-in pb-32" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+            {defaultTab === 'daily' ? (
+                <>
+                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Resumo</h1></div>
+                    <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner max-w-md">
+                        <TabButton id="daily" label="Diário" icon={CalendarIcon} />
+                        <TabButton id="weekly_list" label="Semanal" icon={BarChart2} />
+                        <TabButton id="monthly_list" label="Mensal" icon={TrendingUp} />
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Faturamento</h1></div>
+                    <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner">
+                        <TabButton id="daily" label="Diário" icon={CalendarIcon} />
+                        <TabButton id="weekly" label="Semanal" icon={BarChart2} />
+                        <TabButton id="monthly" label="Mensal" icon={TrendingUp} />
+                        <TabButton id="yearly" label="Anual" icon={PieChartIcon} />
+                    </div>
+                </>
             )}
-        </div>
-        <div>
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</p>
-            <h3 className="text-2xl font-bold text-gray-800 tracking-tight leading-none">{value}</h3>
-            {subValue && <p className="text-xs font-medium text-gray-400 mt-2">{subValue}</p>}
-        </div>
-    </div>
-);
-
-const TabButton = ({ id, label, icon: Icon }: any) => (<button onClick={() => setActiveTab(id)} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 btn-spring ${activeTab === id ? 'bg-white text-brand-600 shadow-md transform scale-100' : 'text-gray-400 hover:bg-white/50 hover:text-gray-600'}`}><Icon size={16} /><span className="hidden sm:inline">{label}</span></button>);
-
-const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
-
-return (
-    <div className="space-y-6 animate-fade-in pb-32" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        {defaultTab === 'daily' ? (
-            <>
-                <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Resumo</h1></div>
-                <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner max-w-md">
-                    <TabButton id="daily" label="Diário" icon={CalendarIcon} />
-                    <TabButton id="weekly_list" label="Semanal" icon={BarChart2} />
-                    <TabButton id="monthly_list" label="Mensal" icon={TrendingUp} />
-                </div>
-            </>
-        ) : (
-            <>
-                <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Faturamento</h1></div>
-                <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner">
-                    <TabButton id="daily" label="Diário" icon={CalendarIcon} />
-                    <TabButton id="weekly" label="Semanal" icon={BarChart2} />
-                    <TabButton id="monthly" label="Mensal" icon={TrendingUp} />
-                    <TabButton id="yearly" label="Anual" icon={PieChartIcon} />
-                </div>
-            </>
-        )}
 
 
-        {(activeTab === 'daily' || activeTab === 'weekly_list' || activeTab === 'monthly_list') && (
-            <section key={selectedDate} className={animationClass}>
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-3 rounded-3xl border border-white/40 shadow-sm mb-4">
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <div className="relative group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Buscar cliente ou pet..."
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="pl-9 pr-4 py-2 bg-white/80 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-100 w-full md:w-64 transition-all hover:bg-white"
-                            />
+            {(activeTab === 'daily' || activeTab === 'weekly_list' || activeTab === 'monthly_list') && (
+                <section key={selectedDate} className={animationClass}>
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-3 rounded-3xl border border-white/40 shadow-sm mb-4">
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="relative group">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar cliente ou pet..."
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="pl-9 pr-4 py-2 bg-white/80 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-100 w-full md:w-64 transition-all hover:bg-white"
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => setIsPrivacyEnabled(!isPrivacyEnabled)}
+                                className={`p-2 rounded-xl transition-all duration-300 ${isPrivacyEnabled ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-400 hover:text-gray-600'}`}
+                                title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
+                            >
+                                {isPrivacyEnabled ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                            <button
+                                onClick={exportToCSV}
+                                className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:text-brand-600 hover:bg-brand-50 transition-all duration-300"
+                                title="Exportar CSV"
+                            >
+                                <Download size={18} />
+                            </button>
                         </div>
 
-                        <button
-                            onClick={() => setIsPrivacyEnabled(!isPrivacyEnabled)}
-                            className={`p-2 rounded-xl transition-all duration-300 ${isPrivacyEnabled ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-400 hover:text-gray-600'}`}
-                            title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
-                        >
-                            {isPrivacyEnabled ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                        <button
-                            onClick={exportToCSV}
-                            className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:text-brand-600 hover:bg-brand-50 transition-all duration-300"
-                            title="Exportar CSV"
-                        >
-                            <Download size={18} />
-                        </button>
-                    </div>
 
-                    {activeTab !== 'yearly' && (
                         <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 flex-shrink-0">
                             <button onClick={() => {
-                                if (activeTab === 'monthly' || activeTab === 'monthly_list') {
+                                if (activeTab === 'monthly_list') {
                                     const [y, m] = selectedMonth.split('-').map(Number);
                                     const date = new Date(y, m - 2, 1); // Prev month
                                     setSelectedMonth(date.toISOString().slice(0, 7));
                                 } else {
                                     const [y, m, d] = selectedDate.split('-').map(Number);
-                                    const date = new Date(y, m - 1, d - (activeTab === 'weekly' || activeTab === 'weekly_list' ? 7 : 1));
+                                    const date = new Date(y, m - 1, d - (activeTab === 'weekly_list' ? 7 : 1));
                                     setSelectedDate(date.toISOString().split('T')[0]);
                                 }
                                 setSlideDirection('left');
@@ -871,13 +869,13 @@ return (
                             <button onClick={() => { setSelectedDate(new Date().toISOString().split('T')[0]); setSelectedMonth(new Date().toISOString().slice(0, 7)); setSlideDirection(null); }} className="px-3 py-1.5 bg-white text-brand-600 font-bold rounded-xl text-xs shadow-sm border border-gray-100 hover:bg-gray-50 transition-all">Hoje</button>
 
                             <button onClick={() => {
-                                if (activeTab === 'monthly' || activeTab === 'monthly_list') {
+                                if (activeTab === 'monthly_list') {
                                     const [y, m] = selectedMonth.split('-').map(Number);
                                     const date = new Date(y, m, 1);
                                     setSelectedMonth(date.toISOString().slice(0, 7));
                                 } else {
                                     const [y, m, d] = selectedDate.split('-').map(Number);
-                                    const date = new Date(y, m - 1, d + (activeTab === 'weekly' || activeTab === 'weekly_list' ? 7 : 1));
+                                    const date = new Date(y, m - 1, d + (activeTab === 'weekly_list' ? 7 : 1));
                                     setSelectedDate(date.toISOString().split('T')[0]);
                                 }
                                 setSlideDirection('right');
@@ -885,128 +883,128 @@ return (
 
                             <div className="text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors cursor-pointer group flex items-center gap-1 select-none relative" onClick={() => (document.getElementById('nav-date-picker') as HTMLInputElement)?.showPicker()}>
                                 <span className="pointer-events-none">
-                                    {(activeTab === 'monthly' || activeTab === 'monthly_list') ? new Date(selectedMonth + '-02').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : formatDateWithWeek(selectedDate)}
+                                    {activeTab === 'monthly_list' ? new Date(selectedMonth + '-02').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : formatDateWithWeek(selectedDate)}
                                 </span>
                                 <input
                                     id="nav-date-picker"
-                                    type={(activeTab === 'monthly' || activeTab === 'monthly_list') ? 'month' : 'date'}
-                                    value={(activeTab === 'monthly' || activeTab === 'monthly_list') ? selectedMonth : selectedDate}
-                                    onChange={(e) => { if (e.target.value) (activeTab === 'monthly' || activeTab === 'monthly_list') ? setSelectedMonth(e.target.value) : setSelectedDate(e.target.value); }}
+                                    type={activeTab === 'monthly_list' ? 'month' : 'date'}
+                                    value={activeTab === 'monthly_list' ? selectedMonth : selectedDate}
+                                    onChange={(e) => { if (e.target.value) activeTab === 'monthly_list' ? setSelectedMonth(e.target.value) : setSelectedDate(e.target.value); }}
                                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-50 appearance-none"
                                 />
                             </div>
                         </div>
-                    )}
-                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-4">
-                    <StatCard title="Total Pets" value={currentStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" />
-                    <StatCard title="Tosas" value={currentStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Máq/Tesoura" />
-                    <StatCard title="Tosa Higi" value={currentStats.totalHygienic} icon={Sparkles} colorClass="bg-purple-500" />
-                    <StatCard title="Pago" value={isPrivacyEnabled ? 'R$ •••' : `R$ ${currentStats.paidRevenue.toFixed(0)}`} icon={CheckCircle} colorClass="bg-green-500" />
-                    <StatCard title="A Receber" value={isPrivacyEnabled ? 'R$ •••' : `R$ ${currentStats.pendingRevenue.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                </div>
-
-                {/* Unified Payment Lists */}
-                <div className="flex p-1 bg-gray-100 rounded-xl overflow-x-auto gap-1 mb-2">
-                    <button onClick={() => setPaymentsTab('toReceive')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'toReceive' ? 'bg-white shadow text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}> A Receber ({currentToReceive.length}) </button>
-                    <button onClick={() => setPaymentsTab('pending')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'pending' ? 'bg-white shadow text-red-600' : 'text-gray-400 hover:text-gray-600'}`}> Pendentes ({currentPending.length}) </button>
-                    <button onClick={() => setPaymentsTab('paid')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'paid' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'}`}> Pagos ({currentPaid.length}) </button>
-                    <button onClick={() => setPaymentsTab('noShow')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'noShow' ? 'bg-white shadow text-gray-500' : 'text-gray-400 hover:text-gray-600'}`}> Não Veio ({currentNoShow.length}) </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto min-h-0 bg-transparent p-1 space-y-2">
-                    {paymentsTab === 'toReceive' && (currentToReceive.length > 0 ? currentToReceive.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pagamento a receber</div>)}
-                    {paymentsTab === 'pending' && (currentPending.length > 0 ? currentPending.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pendente</div>)}
-                    {paymentsTab === 'paid' && (currentPaid.length > 0 ? currentPaid.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pagamento confirmado</div>)}
-                    {paymentsTab === 'noShow' && (currentNoShow.length > 0 ? currentNoShow.map((app, i) => renderPaymentRow(app, "bg-gray-100 opacity-75", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum registro</div>)}
-                </div>
-            </section>
-        )}
-)}
-
-
-        {
-            activeTab === 'weekly' && metricData && (
-                <section className="animate-fade-in text-left">
-                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
-
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                        <StatCard title="Total de Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-blue-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                        <StatCard title="Total Tosas" value={metricData.current.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Banhos e Tosas" />
-                        <StatCard title="Faturamento" value={`R$ ${metricData.current.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                        <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
                     </div>
 
-                    <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-radial from-brand-50 to-transparent opacity-50 pointer-events-none" />
-                        <h3 className="text-sm font-bold text-gray-500 mb-6 uppercase tracking-wider flex items-center gap-2"><BarChart2 size={16} /> Performance da Semana</h3>
-                        <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barSize={12}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 600 }} dy={10} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={(value) => `R$${value}`} />
-                                    <Tooltip
-                                        cursor={{ fill: '#f9fafb' }}
-                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }}
-                                        formatter={(value: number) => [`R$ ${value}`, 'Faturamento']}
-                                    />
-                                    <Bar dataKey="faturamento" radius={[6, 6, 6, 6]}>
-                                        {weeklyChartData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.faturamento >= (weeklyChartData[index - 1]?.faturamento || 0) ? '#10b981' : '#f43f5e'} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-4">
+                        <StatCard title="Total Pets" value={currentStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" />
+                        <StatCard title="Tosas" value={currentStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Máq/Tesoura" />
+                        <StatCard title="Tosa Higi" value={currentStats.totalHygienic} icon={Sparkles} colorClass="bg-purple-500" />
+                        <StatCard title="Pago" value={isPrivacyEnabled ? 'R$ •••' : `R$ ${currentStats.paidRevenue.toFixed(0)}`} icon={CheckCircle} colorClass="bg-green-500" />
+                        <StatCard title="A Receber" value={isPrivacyEnabled ? 'R$ •••' : `R$ ${currentStats.pendingRevenue.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                    </div>
+
+                    {/* Unified Payment Lists */}
+                    <div className="flex p-1 bg-gray-100 rounded-xl overflow-x-auto gap-1 mb-2">
+                        <button onClick={() => setPaymentsTab('toReceive')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'toReceive' ? 'bg-white shadow text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}> A Receber ({currentToReceive.length}) </button>
+                        <button onClick={() => setPaymentsTab('pending')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'pending' ? 'bg-white shadow text-red-600' : 'text-gray-400 hover:text-gray-600'}`}> Pendentes ({currentPending.length}) </button>
+                        <button onClick={() => setPaymentsTab('paid')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'paid' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'}`}> Pagos ({currentPaid.length}) </button>
+                        <button onClick={() => setPaymentsTab('noShow')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'noShow' ? 'bg-white shadow text-gray-500' : 'text-gray-400 hover:text-gray-600'}`}> Não Veio ({currentNoShow.length}) </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto min-h-0 bg-transparent p-1 space-y-2">
+                        {paymentsTab === 'toReceive' && (currentToReceive.length > 0 ? currentToReceive.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pagamento a receber</div>)}
+                        {paymentsTab === 'pending' && (currentPending.length > 0 ? currentPending.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pendente</div>)}
+                        {paymentsTab === 'paid' && (currentPaid.length > 0 ? currentPaid.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pagamento confirmado</div>)}
+                        {paymentsTab === 'noShow' && (currentNoShow.length > 0 ? currentNoShow.map((app, i) => renderPaymentRow(app, "bg-gray-100 opacity-75", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum registro</div>)}
+                    </div>
+                </section>
+            )}
+
+
+
+            {
+                activeTab === 'weekly' && metricData && (
+                    <section className="animate-fade-in text-left">
+                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
+
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                            <StatCard title="Total de Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-blue-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                            <StatCard title="Total Tosas" value={metricData.current.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Banhos e Tosas" />
+                            <StatCard title="Faturamento" value={`R$ ${metricData.current.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                            <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
                         </div>
-                    </div>
-                </section>
-            )
-        }
+
+                        <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-radial from-brand-50 to-transparent opacity-50 pointer-events-none" />
+                            <h3 className="text-sm font-bold text-gray-500 mb-6 uppercase tracking-wider flex items-center gap-2"><BarChart2 size={16} /> Performance da Semana</h3>
+                            <div className="h-64 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barSize={12}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 600 }} dy={10} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={(value) => `R$${value}`} />
+                                        <Tooltip
+                                            cursor={{ fill: '#f9fafb' }}
+                                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }}
+                                            formatter={(value: number) => [`R$ ${value}`, 'Faturamento']}
+                                        />
+                                        <Bar dataKey="faturamento" radius={[6, 6, 6, 6]}>
+                                            {weeklyChartData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.faturamento >= (weeklyChartData[index - 1]?.faturamento || 0) ? '#10b981' : '#f43f5e'} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </section>
+                )
+            }
 
 
-        {
-            activeTab === 'monthly' && metricData && (
-                <section className="animate-fade-in text-left">
-                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
+            {
+                activeTab === 'monthly' && metricData && (
+                    <section className="animate-fade-in text-left">
+                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
-                        <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                        <StatCard title="Total Recebido" value={`R$ ${metricData.current.paidRevenue.toFixed(0)}`} icon={CheckCircle} colorClass="bg-emerald-500" growth={getGrowth(metricData.current.paidRevenue, metricData.previous.paidRevenue)} />
-                        <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
-                        <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                        <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
-                        <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                        <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
-                    </div>
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+                            <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                            <StatCard title="Total Recebido" value={`R$ ${metricData.current.paidRevenue.toFixed(0)}`} icon={CheckCircle} colorClass="bg-emerald-500" growth={getGrowth(metricData.current.paidRevenue, metricData.previous.paidRevenue)} />
+                            <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                            <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                            <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
+                            <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                            <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
+                        </div>
 
-                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas do Mês</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={30} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{ r: 4 }} /></ComposedChart></ResponsiveContainer></div>
-                </section>
-            )
-        }
+                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas do Mês</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={30} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{ r: 4 }} /></ComposedChart></ResponsiveContainer></div>
+                    </section>
+                )
+            }
 
-        {
-            activeTab === 'yearly' && metricData && (
-                <section className="animate-fade-in text-left">
-                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
+            {
+                activeTab === 'yearly' && metricData && (
+                    <section className="animate-fade-in text-left">
+                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
-                        <StatCard title="Faturamento Total" value={`R$ ${(metricData.current.grossRevenue / 1000).toFixed(1)}k`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                        <StatCard title="Total Recebido" value={`R$ ${(metricData.current.paidRevenue / 1000).toFixed(1)}k`} icon={CheckCircle} colorClass="bg-emerald-500" growth={getGrowth(metricData.current.paidRevenue, metricData.previous.paidRevenue)} />
-                        <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
-                        <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                        <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
-                        <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                        <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
-                    </div>
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+                            <StatCard title="Faturamento Total" value={`R$ ${(metricData.current.grossRevenue / 1000).toFixed(1)}k`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                            <StatCard title="Total Recebido" value={`R$ ${(metricData.current.paidRevenue / 1000).toFixed(1)}k`} icon={CheckCircle} colorClass="bg-emerald-500" growth={getGrowth(metricData.current.paidRevenue, metricData.previous.paidRevenue)} />
+                            <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
+                            <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                            <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
+                            <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
+                            <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
+                        </div>
 
-                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
-                </section>
-            )
-        }
-    </div >
-);
+                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
+                    </section>
+                )
+            }
+        </div >
+    );
 };
 
 const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
@@ -1062,314 +1060,7 @@ const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
     );
 };
 
-const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[]; services: Service[]; onUpdateAppointment: (app: Appointment) => void; onRemovePayment: (app: Appointment) => void; onNoShow: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void; onLog: (a: string, d: string) => void; onReschedule: (app: Appointment, date: string) => void; }> = ({ appointments, clients, services, onUpdateAppointment, onRemovePayment, onNoShow, onViewPet, onLog, onReschedule }) => {
-    const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(() => {
-        return localStorage.getItem('payment_privacy_enabled') === 'true';
-    });
 
-    const verifyBiometrics = async (): Promise<boolean> => {
-        try {
-            // Check if WebAuthn is supported
-            if (!window.PublicKeyCredential) {
-                console.warn('WebAuthn not supported');
-                return true; // Fallback if not supported? Or alert? User asked specifically for it.
-            }
-
-            // Simple challenge to trigger biometric prompt
-            const challenge = new Uint8Array(32);
-            window.crypto.getRandomValues(challenge);
-
-            const options: CredentialCreationOptions = {
-                publicKey: {
-                    challenge,
-                    rp: { name: "PetGestor" },
-                    user: {
-                        id: new Uint8Array(16),
-                        name: "user@petgestor",
-                        displayName: "User"
-                    },
-                    pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                    authenticatorSelection: {
-                        authenticatorAttachment: "platform",
-                        userVerification: "required"
-                    },
-                    timeout: 60000
-                }
-            };
-
-            // This will trigger FaceID / Fingerprint / PIN
-            // We use 'create' as a simple way to verify user presence and verification without a full backend enrollment
-            // Note: In a real app, you'd use navigator.credentials.get with a registered credential
-            // But 'platform' + 'userVerification: required' is the key for biometrics.
-            // Using a dummy 'get' instead might be better if we had a credentialId.
-            // Since we just want the prompt, we'll try a generic get if supported.
-
-            // Re-evaluating: navigator.credentials.get is better for "authentication"
-            // But navigator.credentials.create is easier for "verification" without prior registration in this simple context.
-            // Let's use a simpler prompt if possible or standard WebAuthn.
-
-            await navigator.credentials.create(options);
-            return true;
-        } catch (err) {
-            console.error('Biometric verification failed:', err);
-            return false;
-        }
-    };
-
-    const togglePrivacy = async () => {
-        if (isPrivacyEnabled) {
-            // Unhiding -> check biometrics
-            const success = await verifyBiometrics();
-            if (success) {
-                setIsPrivacyEnabled(false);
-                localStorage.setItem('payment_privacy_enabled', 'false');
-            }
-        } else {
-            // Hiding -> just toggle
-            setIsPrivacyEnabled(true);
-            localStorage.setItem('payment_privacy_enabled', 'true');
-        }
-    };
-
-    const exportToCSV = () => {
-        if (!dailyApps || dailyApps.length === 0) {
-            alert("Não há dados para exportar nesta data.");
-            return;
-        }
-
-        const headers = ["Data", "Cliente", "Pet", "Serviço", "Valor Esperado", "Valor Pago", "Método", "Status", "Observações"];
-        const rows = dailyApps.map(app => {
-            const client = clients.find(c => c.id === app.clientId);
-            const pet = client?.pets.find(p => p.id === app.petId);
-            const mainSvc = services.find(s => s.id === app.serviceId);
-            const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).map(s => s?.name).join(', ') || '';
-            const serviceName = mainSvc?.name + (addSvcs ? ` + ${addSvcs}` : '');
-
-            const expected = calculateExpected(app).toFixed(2).replace('.', ',');
-            const paid = app.paidAmount ? app.paidAmount.toFixed(2).replace('.', ',') : '0,00';
-            const status = app.status === 'nao_veio' ? 'Não Veio' : (app.paidAmount ? 'Pago' : 'Pendente');
-
-            return [
-                parseDateLocal(app.date).toLocaleDateString('pt-BR'),
-                client?.name || 'N/A',
-                pet?.name || 'N/A',
-                serviceName,
-                expected,
-                paid,
-                app.paymentMethod || '',
-                status,
-                `"${(app.notes || '').replace(/"/g, '""')}"` // Escape quotes
-            ].join(';'); // Use semicolon for Excel compatibility in BR
-        });
-
-        const csvContent = "\uFEFF" + [headers.join(';'), ...rows].join('\n'); // Add BOM for Excel
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `pagamentos_${selectedDate}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const getLocalISODate = (d: Date = new Date()) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
-    const [selectedDate, setSelectedDate] = useState(getLocalISODate()); const [editingId, setEditingId] = useState<string | null>(null); const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [isSaving, setIsSaving] = useState(false); const [activeTab, setActiveTab] = useState<'toReceive' | 'pending' | 'paid' | 'noShow'>('toReceive'); const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: Appointment } | null>(null);
-    const [showEvaluationModal, setShowEvaluationModal] = useState(false);
-    const [evaluatingApp, setEvaluatingApp] = useState<Appointment | null>(null);
-    const [reschedulingId, setReschedulingId] = useState<string | null>(null);
-    const [rescheduleDate, setRescheduleDate] = useState('');
-    const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
-    const touchStart = useRef<number | null>(null);
-    const getAppLocalDateStr = (dateStr: string) => parseDateLocal(dateStr).toISOString().split('T')[0];
-
-    // Filters
-    const dailyApps = useMemo(() => appointments.filter(a => {
-        if (!a.date || a.status === 'cancelado') return false;
-        const appDate = parseDateLocal(a.date);
-        const selDate = parseDateLocal(selectedDate);
-        return appDate.getFullYear() === selDate.getFullYear() &&
-            appDate.getMonth() === selDate.getMonth() &&
-            appDate.getDate() === selDate.getDate();
-    }), [appointments, selectedDate]);
-
-    const noShowApps = useMemo(() => dailyApps.filter(a => a.status === 'nao_veio'), [dailyApps]);
-    const toReceiveApps = useMemo(() => dailyApps.filter(a => (!a.paymentMethod || a.paymentMethod.trim() === '') && a.status !== 'nao_veio'), [dailyApps]);
-    const paidApps = useMemo(() => dailyApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== ''), [dailyApps]);
-    const pendingApps = useMemo(() => appointments.filter(a => {
-        if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false;
-        const appDate = parseDateLocal(a.date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const isPast = appDate < today;
-        const isUnpaid = (!a.paymentMethod || a.paymentMethod.trim() === '');
-        return isPast && isUnpaid;
-    }).sort((a, b) => b.date.localeCompare(a.date)), [appointments]);
-
-    const navigateDate = (days: number) => {
-        setSlideDirection(days > 0 ? 'right' : 'left');
-        const [year, month, day] = selectedDate.split('-').map(Number);
-        const date = new Date(year, month - 1, day);
-        date.setDate(date.getDate() + days);
-        setSelectedDate(getLocalISODate(date));
-    };
-    const goToToday = () => {
-        setSlideDirection(null);
-        setSelectedDate(getLocalISODate());
-    };
-
-    const calculateExpected = (app: Appointment) => calculateTotal(app, services);
-    const handleStartEdit = (app: Appointment) => { setEditingId(app.id); const expected = calculateExpected(app); setAmount(app.paidAmount ? app.paidAmount.toString() : expected.toString()); setMethod(app.paymentMethod || 'Credito'); setContextMenu(null); };
-    const handleSave = async (app: Appointment) => {
-        setIsSaving(true);
-        const finalAmount = parseFloat(amount);
-        const updatedApp: Appointment = {
-            ...app,
-            paidAmount: finalAmount,
-            paymentMethod: method as any,
-            paymentStatus: (finalAmount > 0 || method) ? 'paid' : 'pending' // Explicitly set status
-        };
-
-        // No Google Sync needed here anymore. Upsert handled by parent onUpdateAppointment (via Supabase)
-
-        onUpdateAppointment(updatedApp);
-        setEditingId(null);
-        setIsSaving(false);
-        const client = clients.find(c => c.id === app.clientId);
-        const pet = client?.pets.find(p => p.id === app.petId);
-        onLog('Registrar Pagamento', `Valor: ${finalAmount}, Método: ${method}, Pet: ${pet?.name}`);
-
-        // Trigger Evaluation Modal
-        setEvaluatingApp(updatedApp);
-        setShowEvaluationModal(true);
-    };
-
-    const handleEvaluationSave = async (rating: number, tags: string[], extraNotes: string) => {
-        if (!evaluatingApp) return;
-        const ratingString = `[Avaliação: ${rating}/5]`;
-        const tagString = tags.length > 0 ? `[Tags: ${tags.join(', ')}]` : '';
-        const noteString = extraNotes ? `[Obs: ${extraNotes}]` : '';
-        const fullNote = `${evaluatingApp.notes || ''} ${ratingString} ${tagString} ${noteString}`.trim();
-
-        const finalApp = { ...evaluatingApp, rating, ratingTags: tags, notes: fullNote };
-        onUpdateAppointment(finalApp);
-
-        setEvaluatingApp(null);
-        setShowEvaluationModal(false);
-    };
-
-
-
-    const handleTouchStart = (e: React.TouchEvent) => touchStart.current = e.touches[0].clientX;
-    const handleTouchEnd = (e: React.TouchEvent) => {
-        if (!touchStart.current) return;
-        const diff = touchStart.current - e.changedTouches[0].clientX;
-        if (Math.abs(diff) > 100) navigateDate(diff > 0 ? 1 : -1);
-        touchStart.current = null;
-    };
-
-    const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
-
-    const handleStartReschedule = (app: Appointment) => {
-        setReschedulingId(app.id);
-        setRescheduleDate(new Date().toISOString().substring(0, 16)); // Default to now
-    };
-
-    const confirmReschedule = () => {
-        if (!reschedulingId || !rescheduleDate) return;
-        const app = appointments.find(a => a.id === reschedulingId);
-        if (app) {
-            onReschedule(app, rescheduleDate);
-            setReschedulingId(null);
-        }
-    };
-
-    const renderPaymentRow = (app: Appointment, statusColor: string, index: number) => {
-        const client = clients.find(c => c.id === app.clientId);
-        const pet = client?.pets.find(p => p.id === app.petId);
-        const mainSvc = services.find(srv => srv.id === app.serviceId);
-        const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter((x): x is Service => !!x) || [];
-        const expected = calculateExpected(app);
-        const isPaid = (!!app.paidAmount && !!app.paidAmount) || (!!app.paymentMethod && app.paymentStatus === 'paid');
-        const isNoShow = app.status === 'nao_veio';
-        const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
-        let serviceBorderColor = 'border-l-sky-400';
-        if (allServiceNames.includes('tesoura')) serviceBorderColor = 'border-l-pink-500';
-        else if (allServiceNames.includes('tosa normal')) serviceBorderColor = 'border-l-orange-500';
-        else if (allServiceNames.includes('higi')) serviceBorderColor = 'border-l-yellow-500';
-        else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) serviceBorderColor = 'border-l-purple-500';
-        else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) serviceBorderColor = 'border-l-indigo-500';
-
-
-        return (
-            <div key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className={`animate-slide-up p-5 rounded-3xl shadow-sm hover:shadow-glass hover:-translate-y-0.5 transition-all duration-300 border border-white/60 bg-white/60 backdrop-blur-md mb-3 relative overflow-hidden group ${statusColor}`}>
-                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${serviceBorderColor.replace('border-l-', 'bg-')} opacity-80 rounded-l-3xl`} />
-                <div className="flex justify-between items-start mb-3 pl-3">
-                    <div className="min-w-0 flex-1 pr-2">
-                        <div className="flex items-center gap-2">
-                            <div
-                                className="text-lg font-bold text-gray-900 truncate tracking-tight cursor-pointer hover:text-brand-600 transition-colors flex items-center gap-2"
-                                onClick={() => pet && client && onViewPet?.(pet, client)}
-                            >
-                                {pet?.name}
-                                {(() => {
-                                    const pApps = appointments.filter(a => a.petId === pet?.id && a.rating);
-                                    if (pApps.length > 0) {
-                                        const avg = pApps.reduce((acc, c) => acc + (c.rating || 0), 0) / pApps.length;
-                                        return (
-                                            <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded-md border border-yellow-100">
-                                                <Star size={10} className="fill-yellow-400 text-yellow-400" />
-                                                <span className="text-[9px] font-bold text-yellow-700">{avg.toFixed(1)}</span>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                })()}
-                            </div>
-                            {isPaid && <div className="bg-green-100 text-green-700 p-1 rounded-full"><CheckCircle size={12} /></div>}
-                        </div>
-                        <div className="text-xs font-medium text-gray-500 truncate mt-0.5">{client?.name}</div>
-                        <div className="text-[10px] text-gray-400 mt-2 flex items-center gap-1.5 font-mono bg-white/50 w-fit px-2 py-1 rounded-lg"> <Clock size={12} className="text-brand-400" /> {app.date.split('T')[1].substring(0, 5)} </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                        <div className="text-xl font-black text-gray-800 tracking-tight">
-                            {isPrivacyEnabled ? 'R$ ••••' : `R$ ${expected.toFixed(2)}`}
-                        </div>
-                        {isPaid ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-green-700 border border-green-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> {app.paymentMethod} </div>) :
-                            isNoShow ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-gray-500 border border-gray-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Não Veio </div>) :
-                                (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-red-500 border border-red-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Pendente </div>)}
-                    </div>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mb-4 pl-3 opacity-80 group-hover:opacity-100 transition-opacity">
-                    {mainSvc && <span className="text-[10px] bg-white border border-gray-200/60 px-2 py-1 rounded-lg text-gray-600 font-medium shadow-sm">{mainSvc.name}</span>}
-                    {addSvcs.map((s, idx) => (<span key={idx} className="text-[10px] bg-white border border-gray-200/60 px-2 py-1 rounded-lg text-gray-600 font-medium shadow-sm">{s.name}</span>))}
-                </div>
-                <div className="flex gap-2 ml-1">
-                    {isNoShow ? (
-                        <button onClick={() => handleStartReschedule(app)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all shadow-md active:scale-95"> <Calendar size={14} /> Reagendar </button>
-                    ) : (
-                        <>
-                            <button onClick={() => handleStartEdit(app)} className="flex-1 bg-white hover:bg-gray-50 text-gray-600 hover:text-brand-600 py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all border border-gray-100 shadow-sm group-hover:shadow-md active:scale-95"> <DollarSign size={14} /> {isPaid ? 'Editar Detalhes' : 'Registrar Pagamento'} </button>
-                            {isPaid && (
-                                <button onClick={() => onRemovePayment(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap gap-2" title="Desfazer Pagamento">
-                                    <Trash2 size={16} /> Desfazer
-                                </button>
-                            )}
-                            {!isPaid && statusColor !== 'bg-gray-100 opacity-75' && (
-                                <button onClick={() => onNoShow(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap">Não Veio</button>
-                            )}
-                        </>
-                    )}
-                </div>
-            </div>
-        );
-    };
-
-    // Payments Section Merged into RevenueView
-    // Logic moved inside RevenueView component above
-
-
-};
 
 // ServiceManager has been moved to components/ServiceManager.tsx
 
