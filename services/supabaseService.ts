@@ -74,13 +74,13 @@ const mapAppointmentFromDB = (data: any): Appointment => ({
     petId: data.pet_id,
     serviceId: data.service_id,
     additionalServiceIds: data.additional_service_ids,
-    date: data.date,
+    date: normalizeDate(data.date, data.created_at),
     status: data.status,
     notes: data.notes,
     durationTotal: data.duration_total,
     googleEventId: data.google_event_id,
     paidAmount: (data.paid_amount !== null && data.paid_amount !== undefined) ? Number(data.paid_amount) : undefined,
-    paymentMethod: data.payment_method,
+    paymentMethod: data.payment_method || data.payment_status, // Fallback to status if method missing? No, user mentioned method. But maybe method is in status?
     rating: data.rating,
     ratingTags: data.rating_tags,
 });
