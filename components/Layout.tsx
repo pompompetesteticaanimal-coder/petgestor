@@ -133,7 +133,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       <div className="pb-4" key="operacional">
         <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Operacional</p>
         <div className="space-y-1">
-          <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={setView} />
           <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={setView} />
           <NavItem view="tasks" current={currentView} icon={ClipboardList} label="Tarefas" onClick={setView} />
         </div>
@@ -238,7 +237,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       {/* Mobile Floating Tab Bar */}
       <div className="md:hidden fixed bottom-6 left-4 right-4 h-20 bg-white/90 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl glass-card flex justify-around items-center px-2 z-50 animate-slide-up">
         <BottomNavItem view="home" current={currentView} icon={BarChart2} label="Resumo" onClick={setView} />
-        <BottomNavItem view="payments" current={currentView} icon={Wallet} label="Pagto" onClick={setView} />
+        <BottomNavItem view="tasks" current={currentView} icon={ClipboardList} label="Tarefas" onClick={setView} />
         <div className="relative -top-6">
           <button
             onClick={() => currentView === 'schedule' && onAddAppointment ? onAddAppointment() : setView('schedule')}
