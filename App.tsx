@@ -617,101 +617,76 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                             </div>
                         )}
                         <div className="p-4 space-y-3">
-                            <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700">
-                                <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
-                                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                        <tr>
-                                            <th scope="col" className="px-6 py-3 rounded-tl-xl">Horário</th>
-                                            <th scope="col" className="px-6 py-3">Cliente</th>
-                                            <th scope="col" className="px-6 py-3">Pet</th>
-                                            <th scope="col" className="px-6 py-3">Serviço</th>
-                                            <th scope="col" className="px-6 py-3 text-right">Valor</th>
-                                            <th scope="col" className="px-6 py-3 text-center rounded-tr-xl">Status</th>
-                                            {!isSummaryOnly && <th scope="col" className="px-6 py-3">Ações</th>}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredDailyApps.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={isSummaryOnly ? 6 : 7} className="px-6 py-8 text-center text-gray-400 font-medium">
-                                                    {dailySearchTerm ? 'Nenhum agendamento encontrado.' : 'Nenhum agendamento neste dia.'}
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            filteredDailyApps.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((app, index) => {
-                                                const client = clients.find(c => c.id === app.clientId);
-                                                const pet = client?.pets.find(p => p.id === app.petId);
-                                                const mainSvc = services.find(s => s.id === app.serviceId);
-                                                const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
-                                                const val = calculateTotal(app, services);
-                                                const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido');
+                            {filteredDailyApps.length === 0 ? (
+                                <div className="p-8 text-center text-gray-400 font-medium">{dailySearchTerm ? 'Nenhum agendamento encontrado.' : 'Nenhum agendamento neste dia.'}</div>
+                            ) : (
+                                filteredDailyApps.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((app, index) => {
+                                    const client = clients.find(c => c.id === app.clientId);
+                                    const pet = client?.pets.find(p => p.id === app.petId);
+                                    const mainSvc = services.find(s => s.id === app.serviceId);
+                                    const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
+                                    const val = calculateTotal(app, services);
+                                    // Payment Fix: Payment Method is MANDATORY.
+                                    const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido');
 
-                                                return (
-                                                    <tr key={app.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                                                        <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">
-                                                            {app.date.split('T')[1].substring(0, 5)}
-                                                        </td>
-                                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white truncate max-w-[150px]" title={client?.name}>
-                                                            {client?.name}
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <div
-                                                                className="font-bold text-brand-600 cursor-pointer hover:underline flex items-center gap-2"
-                                                                onClick={() => pet && client && onViewPet?.(pet, client)}
-                                                            >
-                                                                {pet?.name}
-                                                                {(() => {
-                                                                    const pApps = appointments.filter(a => a.petId === pet?.id && a.rating);
-                                                                    if (pApps.length > 0) {
-                                                                        const avg = pApps.reduce((acc, c) => acc + (c.rating || 0), 0) / pApps.length;
-                                                                        return (
-                                                                            <span className="text-[10px] text-yellow-500 bg-yellow-50 px-1 rounded border border-yellow-100 flex items-center">★ {avg.toFixed(1)}</span>
-                                                                        );
-                                                                    }
-                                                                    return null;
-                                                                })()}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{mainSvc?.name}</span>
-                                                                {addSvcs && addSvcs.length > 0 && (
-                                                                    <span className="text-[10px] text-gray-400">+ {addSvcs.map(s => s?.name).join(', ')}</span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className={`px-6 py-4 text-right font-bold ${isPaid ? 'text-green-600' : 'text-gray-600'}`}>
-                                                            R$ {val.toFixed(2)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${isPaid
-                                                                ? 'bg-green-100 text-green-800 border border-green-200'
-                                                                : app.status === 'nao_veio'
-                                                                    ? 'bg-gray-100 text-gray-500 border border-gray-200'
-                                                                    : 'bg-red-50 text-red-600 border border-red-100'
-                                                                }`}>
-                                                                {isPaid ? 'Pago' : app.status === 'nao_veio' ? 'Não Veio' : 'Pendente'}
-                                                            </span>
-                                                        </td>
-                                                        {!isSummaryOnly && (
-                                                            <td className="px-6 py-4">
-                                                                {!isPaid && app.status !== 'nao_veio' && app.status !== 'cancelado' && onNoShow && (
-                                                                    <button
-                                                                        onClick={() => onNoShow(app)}
-                                                                        className="text-red-500 hover:text-red-700 font-bold text-xs uppercase hover:underline"
-                                                                    >
-                                                                        Não Veio
-                                                                    </button>
-                                                                )}
-                                                            </td>
+                                    return (
+                                        <div key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className={`animate-slide-up bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
+                                            <div className="flex flex-col justify-center items-center px-2 border-r border-gray-100 dark:border-gray-700 min-w-[70px]">
+                                                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{app.date.split('T')[1].substring(0, 5)}</span>
+                                                <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Horário</span>
+                                            </div>
+                                            <div className="flex-1 py-1 min-w-0">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h4
+                                                            className="font-bold text-gray-900 dark:text-white truncate cursor-pointer hover:text-brand-600 transition-colors flex items-center gap-2"
+                                                            onClick={() => pet && client && onViewPet?.(pet, client)}
+                                                        >
+                                                            {pet?.name}
+                                                            {(() => {
+                                                                const pApps = appointments.filter(a => a.petId === pet?.id && a.rating);
+                                                                if (pApps.length > 0) {
+                                                                    const avg = pApps.reduce((acc, c) => acc + (c.rating || 0), 0) / pApps.length;
+                                                                    return (
+                                                                        <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded-md border border-yellow-100">
+                                                                            <Star size={10} className="fill-yellow-400 text-yellow-400" />
+                                                                            <span className="text-[9px] font-bold text-yellow-700">{avg.toFixed(1)}</span>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            })()}
+                                                        </h4>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client?.name}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        {!isSummaryOnly && <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>}
+                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                                            {isPaid ? 'Pago' : app.status === 'nao_veio' ? 'Não Veio' : 'Pendente'}
+                                                        </span>
+                                                        {(!isPaid && app.status !== 'nao_veio' && app.status !== 'cancelado' && onNoShow) && (
+                                                            <button onClick={() => onNoShow(app)} className="ml-2 px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-500 text-[9px] font-bold rounded uppercase border border-red-100 transition-colors">
+                                                                Não Veio
+                                                            </button>
                                                         )}
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap gap-1">
+                                                    <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-600 truncate max-w-full">
+                                                        {mainSvc?.name}
+                                                    </span>
+                                                    {addSvcs && addSvcs.length > 0 && addSvcs.map((s, i) => (
+                                                        <span key={i} className="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-gray-100 dark:border-gray-700 truncate">
+                                                            + {s?.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
                     </div>
                 </section>
             )}
@@ -1160,75 +1135,78 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         const mainSvc = services.find(srv => srv.id === app.serviceId);
         const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter((x): x is Service => !!x) || [];
         const expected = calculateExpected(app);
-        const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido');
+        const isPaid = !!app.paidAmount && !!app.paymentMethod;
         const isNoShow = app.status === 'nao_veio';
+        const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
+        let serviceBorderColor = 'border-l-sky-400';
+        if (allServiceNames.includes('tesoura')) serviceBorderColor = 'border-l-pink-500';
+        else if (allServiceNames.includes('tosa normal')) serviceBorderColor = 'border-l-orange-500';
+        else if (allServiceNames.includes('higi')) serviceBorderColor = 'border-l-yellow-500';
+        else if (allServiceNames.includes('pacote') && allServiceNames.includes('mensal')) serviceBorderColor = 'border-l-purple-500';
+        else if (allServiceNames.includes('pacote') && allServiceNames.includes('quinzenal')) serviceBorderColor = 'border-l-indigo-500';
+
 
         return (
-            <tr key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors animate-slide-up">
-                <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                    {app.date.split('T')[1].substring(0, 5)}
-                </td>
-                <td className="px-4 py-3 truncate max-w-[150px]" title={client?.name}>
-                    {client?.name}
-                </td>
-                <td className="px-4 py-3">
-                    <div
-                        className="font-bold text-brand-600 cursor-pointer hover:underline flex items-center gap-1"
-                        onClick={() => pet && client && onViewPet?.(pet, client)}
-                    >
-                        {pet?.name}
+            <div key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className={`animate-slide-up p-5 rounded-3xl shadow-sm hover:shadow-glass hover:-translate-y-0.5 transition-all duration-300 border border-white/60 bg-white/60 backdrop-blur-md mb-3 relative overflow-hidden group ${statusColor}`}>
+                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${serviceBorderColor.replace('border-l-', 'bg-')} opacity-80 rounded-l-3xl`} />
+                <div className="flex justify-between items-start mb-3 pl-3">
+                    <div className="min-w-0 flex-1 pr-2">
+                        <div className="flex items-center gap-2">
+                            <div
+                                className="text-lg font-bold text-gray-900 truncate tracking-tight cursor-pointer hover:text-brand-600 transition-colors flex items-center gap-2"
+                                onClick={() => pet && client && onViewPet?.(pet, client)}
+                            >
+                                {pet?.name}
+                                {(() => {
+                                    const pApps = appointments.filter(a => a.petId === pet?.id && a.rating);
+                                    if (pApps.length > 0) {
+                                        const avg = pApps.reduce((acc, c) => acc + (c.rating || 0), 0) / pApps.length;
+                                        return (
+                                            <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded-md border border-yellow-100">
+                                                <Star size={10} className="fill-yellow-400 text-yellow-400" />
+                                                <span className="text-[9px] font-bold text-yellow-700">{avg.toFixed(1)}</span>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                            </div>
+                            {isPaid && <div className="bg-green-100 text-green-700 p-1 rounded-full"><CheckCircle size={12} /></div>}
+                        </div>
+                        <div className="text-xs font-medium text-gray-500 truncate mt-0.5">{client?.name}</div>
+                        <div className="text-[10px] text-gray-400 mt-2 flex items-center gap-1.5 font-mono bg-white/50 w-fit px-2 py-1 rounded-lg"> <Clock size={12} className="text-brand-400" /> {app.date.split('T')[1].substring(0, 5)} </div>
                     </div>
-                </td>
-                <td className="px-4 py-3">
-                    <div className="flex flex-col">
-                        <span className="text-xs font-medium">{mainSvc?.name}</span>
-                        {addSvcs.length > 0 && <span className="text-[10px] text-gray-500">+ {addSvcs.map(s => s.name).join(', ')}</span>}
+                    <div className="text-right flex-shrink-0">
+                        <div className="text-xl font-black text-gray-800 tracking-tight">
+                            {isPrivacyEnabled ? 'R$ ••••' : `R$ ${expected.toFixed(2)}`}
+                        </div>
+                        {isPaid ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-green-700 border border-green-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> {app.paymentMethod} </div>) :
+                            isNoShow ? (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-gray-500 border border-gray-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Não Veio </div>) :
+                                (<div className="inline-flex items-center gap-1 mt-1 bg-white/80 text-red-500 border border-red-100 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase shadow-sm"> Pendente </div>)}
                     </div>
-                </td>
-                <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
-                    {isPrivacyEnabled ? 'R$ ••••' : `R$ ${expected.toFixed(2)}`}
-                </td>
-                <td className="px-4 py-3 text-center">
-                    {isPaid ? (
-                        <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded border border-green-200">
-                            {app.paymentMethod}
-                        </span>
-                    ) : isNoShow ? (
-                        <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded border border-gray-200">
-                            Não Veio
-                        </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-4 pl-3 opacity-80 group-hover:opacity-100 transition-opacity">
+                    {mainSvc && <span className="text-[10px] bg-white border border-gray-200/60 px-2 py-1 rounded-lg text-gray-600 font-medium shadow-sm">{mainSvc.name}</span>}
+                    {addSvcs.map((s, idx) => (<span key={idx} className="text-[10px] bg-white border border-gray-200/60 px-2 py-1 rounded-lg text-gray-600 font-medium shadow-sm">{s.name}</span>))}
+                </div>
+                <div className="flex gap-2 ml-1">
+                    {isNoShow ? (
+                        <button onClick={() => handleStartReschedule(app)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all shadow-md active:scale-95"> <Calendar size={14} /> Reagendar </button>
                     ) : (
-                        <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded border border-yellow-200">
-                            Pendente
-                        </span>
-                    )}
-                </td>
-                <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                        {isNoShow ? (
-                            <button onClick={() => handleStartReschedule(app)} className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" title="Reagendar">
-                                <Calendar size={18} />
-                            </button>
-                        ) : (
-                            <>
-                                <button onClick={() => handleStartEdit(app)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title={isPaid ? "Editar Detalhes" : "Registrar Pagamento"}>
-                                    <Edit2 size={18} />
+                        <>
+                            <button onClick={() => handleStartEdit(app)} className="flex-1 bg-white hover:bg-gray-50 text-gray-600 hover:text-brand-600 py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all border border-gray-100 shadow-sm group-hover:shadow-md active:scale-95"> <DollarSign size={14} /> {isPaid ? 'Editar Detalhes' : 'Registrar Pagamento'} </button>
+                            {isPaid && (
+                                <button onClick={() => onRemovePayment(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap gap-2" title="Desfazer Pagamento">
+                                    <Trash2 size={16} /> Desfazer
                                 </button>
-                                {isPaid && (
-                                    <button onClick={() => onRemovePayment(app)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Desfazer Pagamento">
-                                        <Trash2 size={18} />
-                                    </button>
-                                )}
-                                {!isPaid && (
-                                    <button onClick={() => onNoShow(app)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Marcar como Não Veio">
-                                        <X size={18} />
-                                    </button>
-                                )}
-                            </>
-                        )}
-                    </div>
-                </td>
-            </tr>
+                            )}
+                            {!isPaid && statusColor !== 'bg-gray-100 opacity-75' && (
+                                <button onClick={() => onNoShow(app)} className="px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center font-bold text-xs transition-all border border-red-100 active:scale-95 whitespace-nowrap">Não Veio</button>
+                            )}
+                        </>
+                    )}
+                </div>
+            </div>
         );
     };
 
@@ -1278,27 +1256,10 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         </div>
 
         <div key={selectedDate} className={`flex-1 overflow-y-auto min-h-0 bg-transparent p-1 ${animationClass}`}>
-            <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-                <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0 z-10">
-                        <tr>
-                            <th scope="col" className="px-4 py-3">Horário</th>
-                            <th scope="col" className="px-4 py-3">Cliente</th>
-                            <th scope="col" className="px-4 py-3">Pet</th>
-                            <th scope="col" className="px-4 py-3">Serviço</th>
-                            <th scope="col" className="px-4 py-3 text-right">Valor</th>
-                            <th scope="col" className="px-4 py-3 text-center">Status</th>
-                            <th scope="col" className="px-4 py-3 text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {activeTab === 'toReceive' && toReceiveApps.map((app, i) => renderPaymentRow(app, "", i))}
-                        {activeTab === 'pending' && pendingApps.map((app, i) => renderPaymentRow(app, "", i))}
-                        {activeTab === 'paid' && paidApps.map((app, i) => renderPaymentRow(app, "", i))}
-                        {activeTab === 'noShow' && noShowApps.map((app, i) => renderPaymentRow(app, "", i))}
-                    </tbody>
-                </table>
-            </div>
+            {activeTab === 'toReceive' && toReceiveApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white", i))}
+            {activeTab === 'pending' && pendingApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white", i))}
+            {activeTab === 'paid' && paidApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100", i))}
+            {activeTab === 'noShow' && noShowApps.map((app, i) => renderPaymentRow(app, "bg-gray-100 opacity-75", i))}
         </div>
 
         {contextMenu && (<div className="fixed bg-white/90 backdrop-blur-xl shadow-2xl border border-white/20 rounded-2xl z-[100] py-2 min-w-[180px] animate-scale-up glass-card" style={{ top: contextMenu.y, left: contextMenu.x }}> <button onClick={() => handleStartEdit(contextMenu.app)} className="w-full text-left px-5 py-3 hover:bg-brand-50 text-gray-700 text-sm flex items-center gap-3 font-medium transition-colors"><Edit2 size={16} className="text-gray-400" /> Editar Valor</button> </div>)}
