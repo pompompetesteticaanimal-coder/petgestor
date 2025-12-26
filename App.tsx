@@ -635,18 +635,6 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                 <h3 className="text-3xl font-black text-gray-800 leading-none">{dailyStats.totalHygienic}</h3>
                             </div>
                         </div>
-
-                        {/* 4. Faturamento Previsto (Green - NEW) */}
-                        <div className="bg-green-50/50 p-5 rounded-3xl border border-green-100 flex flex-col justify-between h-32 relative overflow-hidden">
-                            <div className="absolute -right-4 -top-4 w-20 h-20 bg-green-100 rounded-full opacity-50" />
-                            <div className="w-10 h-10 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mb-2 z-10">
-                                <DollarSign size={20} />
-                            </div>
-                            <div className="z-10">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Faturamento Previsto</p>
-                                <h3 className="text-2xl font-black text-gray-800 leading-none tracking-tight">R$ {dailyStats.grossRevenue.toFixed(0)}</h3>
-                            </div>
-                        </div>
                     </div>
                     <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
                         <div className="p-5 border-b border-gray-100/50 dark:border-gray-700/50 flex justify-between items-center">
@@ -743,17 +731,45 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                     <section className="animate-fade-in text-left">
                         <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                            <StatCard title="Total de Pets" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" />
-                            <StatCard title="Total de Tosas" value={weeklyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Máquina e Tesoura" />
-                            {isSummaryOnly ? (
-                                <StatCard title="Tosa Higiênica" value={weeklyStats.totalHygienic} icon={Sparkles} colorClass="bg-purple-500" />
-                            ) : (
-                                <>
-                                    <StatCard title="Caixa Pago" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" />
-                                    <StatCard title="A Receber" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                                </>
-                            )}
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            {/* 1. Total Pets (Blue) */}
+                            <div className="bg-blue-50/50 p-5 rounded-3xl border border-blue-100 flex flex-col justify-between h-32 relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-100 rounded-full opacity-50" />
+                                <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-2 z-10">
+                                    <PawPrint size={20} />
+                                </div>
+                                <div className="z-10">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total de Pets</p>
+                                    <h3 className="text-3xl font-black text-gray-800 leading-none">{weeklyStats.totalPets}</h3>
+                                </div>
+                            </div>
+
+                            {/* 2. Total Tosas (Orange) */}
+                            <div className="bg-orange-50/50 p-5 rounded-3xl border border-orange-100 flex flex-col justify-between h-32 relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 w-20 h-20 bg-orange-100 rounded-full opacity-50" />
+                                <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mb-2 z-10">
+                                    <Scissors size={20} />
+                                </div>
+                                <div className="z-10">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total de Tosas</p>
+                                    <div className="flex items-baseline gap-1">
+                                        <h3 className="text-3xl font-black text-gray-800 leading-none">{weeklyStats.totalTosas}</h3>
+                                        <span className="text-[9px] font-medium text-gray-400">Máquina e Tesoura</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. Tosa Higienica (Purple) */}
+                            <div className="bg-purple-50/50 p-5 rounded-3xl border border-purple-100 flex flex-col justify-between h-32 relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 w-20 h-20 bg-purple-100 rounded-full opacity-50" />
+                                <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mb-2 z-10">
+                                    <Sparkles size={20} />
+                                </div>
+                                <div className="z-10">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Tosa Higiênica</p>
+                                    <h3 className="text-3xl font-black text-gray-800 leading-none">{weeklyStats.totalHygienic}</h3>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
@@ -775,48 +791,60 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                         return (
                                             <div key={dayIdx}>
                                                 <h4 className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-3 pl-1">{dayName}</h4>
-                                                <div className="space-y-3">
-                                                    {dayApps.map((app, index) => {
+                                                <div className="space-y-0 relative">
+                                                    {dayApps.map((app, index, arr) => {
                                                         const client = clients.find(c => c.id === app.clientId);
                                                         const pet = client?.pets.find(p => p.id === app.petId);
-                                                        const mainSvc = services.find(s => s.id === app.serviceId);
-                                                        const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
-                                                        const val = calculateTotal(app, services);
                                                         const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido' || app.paymentStatus === 'paid');
+                                                        const isLast = index === arr.length - 1;
 
                                                         return (
-                                                            <div key={app.id} className={`bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
-                                                                <div className="flex flex-col justify-center items-center px-2 border-r border-gray-100 dark:border-gray-700 min-w-[70px]">
-                                                                    <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{app.date.split('T')[1].substring(0, 5)}</span>
-                                                                    <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Horário</span>
+                                                            <div key={app.id} className="relative flex group">
+                                                                {/* TIMELINE LEFT: TIME + LINE */}
+                                                                <div className="flex flex-col items-center mr-4 min-w-[50px]">
+                                                                    <span className="text-sm font-bold text-gray-900 mt-1 font-mono tracking-tight">
+                                                                        {app.date.split('T')[1].substring(0, 5)}
+                                                                    </span>
+                                                                    {/* Vertical Line */}
+                                                                    {!isLast && <div className="w-0.5 bg-gray-200 h-full mt-2 rounded-full group-hover:bg-brand-200 transition-colors" />}
                                                                 </div>
-                                                                <div className="flex-1 py-1 min-w-0">
-                                                                    <div className="flex justify-between items-start">
-                                                                        <div>
-                                                                            <h4
-                                                                                className="font-bold text-gray-900 dark:text-white truncate cursor-pointer hover:text-brand-600 transition-colors flex items-center gap-2"
-                                                                                onClick={() => pet && client && onViewPet?.(pet, client)}
-                                                                            >
-                                                                                {pet?.name}
-                                                                            </h4>
-                                                                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client?.name}</p>
+
+                                                                {/* TIMELINE RIGHT: CARD DETAILS */}
+                                                                <div className="flex-1 pb-6 relative cursor-pointer" onClick={() => pet && client && onViewPet?.(pet, client)}>
+                                                                    {/* Dot on line */}
+                                                                    <div className="absolute -left-[21px] top-2 w-3 h-3 rounded-full border-2 border-white bg-gray-300 group-hover:bg-brand-500 transition-colors shadow-sm z-10" />
+
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-3">
+                                                                            {/* Avatar */}
+                                                                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl shadow-sm border border-gray-100">
+                                                                                {getBreedEmoji(pet?.breed || '')}
+                                                                            </div>
+
+                                                                            <div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <h4 className="font-bold text-gray-900 text-[15px] leading-tight">
+                                                                                        {pet?.name}
+                                                                                    </h4>
+                                                                                    {app.rating ? (
+                                                                                        <div className="flex items-center gap-0.5 bg-yellow-50 px-1 py-0.5 rounded border border-yellow-100">
+                                                                                            <Star size={8} className="fill-yellow-400 text-yellow-500" />
+                                                                                            <span className="text-[9px] font-bold text-yellow-700">{app.rating.toFixed(1)}</span>
+                                                                                        </div>
+                                                                                    ) : null}
+                                                                                </div>
+                                                                                <p className="text-xs text-gray-500 font-medium">{client?.name}</p>
+                                                                            </div>
                                                                         </div>
+
+                                                                        {/* Status Badge */}
                                                                         <div className="text-right">
-                                                                            {!isSummaryOnly && <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>}
-                                                                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
-                                                                                {isPaid ? 'Pago' : app.status === 'nao_veio' ? 'Não Veio' : 'Pendente'}
-                                                                            </span>
+                                                                            {isPaid ? (
+                                                                                <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide">Pago</span>
+                                                                            ) : (
+                                                                                <span className="bg-gray-100 text-gray-500 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide">Pendente</span>
+                                                                            )}
                                                                         </div>
-                                                                    </div>
-                                                                    <div className="mt-2 flex flex-wrap gap-1">
-                                                                        <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-600 truncate max-w-full">
-                                                                            {mainSvc?.name}
-                                                                        </span>
-                                                                        {addSvcs && addSvcs.length > 0 && addSvcs.map((s, i) => (
-                                                                            <span key={i} className="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-gray-100 dark:border-gray-700 truncate">
-                                                                                + {s?.name}
-                                                                            </span>
-                                                                        ))}
                                                                     </div>
                                                                 </div>
                                                             </div>
