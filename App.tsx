@@ -218,14 +218,14 @@ const BottomSheetList: React.FC<{ isOpen: boolean; onClose: () => void; timeSlot
 };
 
 const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; clients: Client[]; costs: CostItem[]; defaultTab?: 'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'yearly'; onRemovePayment: (app: Appointment) => void; onUpdateAppointment: (app: Appointment) => void; onReschedule: (app: Appointment, date: string) => void; onNoShow?: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void; onLog: (action: string, diff: string) => void, isSummaryOnly?: boolean }> = ({ appointments, services, clients, costs, defaultTab = 'daily', onRemovePayment, onUpdateAppointment, onReschedule, onNoShow, onViewPet, onLog, isSummaryOnly = false }) => {
-    const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'yearly'>(defaultTab);
+    const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'monthly_list' | 'yearly'>(defaultTab);
     const [selectedDate, setSelectedDate] = useState(getTodayString());
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
-    const [dailySearchTerm, setDailySearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
     const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(false);
-    const [paymentsTab, setPaymentsTab] = useState<'toReceive' | 'pending' | 'paid' | 'noShow'>('toReceive');
+    const [paymentsTab, setPaymentsTab] = useState<'toReceive' | 'pending' | 'paid' | 'noShow'>('paid');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [amount, setAmount] = useState('');
     const [method, setMethod] = useState('');
@@ -597,7 +597,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         const avgPetsPerDay = daysCount > 0 ? stats.totalPets / daysCount : 0;
 
         let dailyCost = 0;
-        const validBusinessDays = businessDaysOverride || daysCount; // Use override if provided (e.g. Tue-Sat specific count)
+        const validBusinessDays = businessDaysOverride || daysCount;
         if (periodCost && validBusinessDays > 0) {
             dailyCost = periodCost / validBusinessDays;
         }
@@ -605,330 +605,329 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
         return { ...stats, avgRevPerDay, avgPetsPerDay, dailyCost };
     };
 
-    const getGrowth = (current: number, previous: number) => {
-        if (previous === 0) return current > 0 ? 100 : 0;
-        return ((current - previous) / previous) * 100;
-    };
+    // --- UNIFIED LIST LOGIC ---
+    const currentListApps = useMemo(() => {
+        let apps: Appointment[] = [];
+        if (activeTab === 'daily') {
+            apps = appointments.filter(a => {
+                if (!a.date) return false;
+                const d = parseDateLocal(a.date);
+                const s = parseDateLocal(selectedDate);
+                return d.getFullYear() === s.getFullYear() && d.getMonth() === s.getMonth() && d.getDate() === s.getDate();
+            });
+            return d.getFullYear() === s.getFullYear() && d.getMonth() === s.getMonth() && d.getDate() === s.getDate();
+        });
+} else if (activeTab === 'weekly' || activeTab === 'weekly_list') {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const day = date.getDay();
+    const diff = date.getDate() - day;
+    const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
+    apps = appointments.filter(a => {
+        if (!a.date || a.status === 'cancelado') return false;
+        const ad = parseDateLocal(a.date);
+        return ad >= startOfWeek && ad <= endOfWeek;
+    });
+} else if (activeTab === 'monthly' || activeTab === 'monthly_list') {
+    const [yStr, mStr] = selectedMonth.split('-');
+    apps = appointments.filter(a => a.date && a.date.startsWith(`${yStr}-${mStr}`) && a.status !== 'cancelado');
+}
 
-    // Count Tuesdays-Saturdays in a range
-    const countBusinessDays = (start: Date, end: Date) => {
-        let count = 0;
-        const cur = new Date(start);
-        while (cur <= end) {
-            const day = cur.getDay();
-            if (day >= 2 && day <= 6) count++; // 2=Tue, 6=Sat
-            cur.setDate(cur.getDate() + 1);
-        }
-        return count;
-    };
+if (!searchTerm) return apps.sort((a, b) => a.date.localeCompare(b.date));
 
-    // Helper to get cost for a specific month (YYYY-MM format in sheet usually)
-    const getCostForMonth = (date: Date) => {
-        // Month name logic or simple matching based on costs data structure
-        // Assuming costs have 'month' field like 'Janeiro', 'Fevereiro' etc or simply summing all costs in that month's date range
-        // For simplicity, let's filter costs by date if available, or just sum everything if cost date matches period.
-        // Better approach given `costs` structure: filter by ISO date range
-        const m = date.getMonth();
-        const y = date.getFullYear();
-        return costs.filter(c => {
-            const cDate = parseDateLocal(c.date);
-            return cDate.getMonth() === m && cDate.getFullYear() === y && isOperationalCost(c);
-        }).reduce((acc, c) => acc + c.amount, 0);
-    };
+const term = searchTerm.toLowerCase();
+return apps.filter(app => {
+    const c = clients.find(cl => cl.id === app.clientId);
+    const p = c?.pets.find(pt => pt.id === app.petId);
+    return c?.name.toLowerCase().includes(term) || p?.name.toLowerCase().includes(term);
+}).sort((a, b) => a.date.localeCompare(b.date));
+    }, [activeTab, appointments, selectedDate, selectedMonth, searchTerm]);
 
-    // Calculate Data for Tabs
-    const metricData = useMemo(() => {
-        // Current Date Reference
-        const currDate = new Date(selectedDate);
-        if (activeTab === 'weekly' || activeTab === 'weekly_list') {
-            const getWeekRange = (date: Date) => {
-                const day = date.getDay();
-                const start = new Date(date); start.setDate(date.getDate() - day); start.setHours(0, 0, 0, 0);
-                const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
-                return { start, end };
-            };
-            const curr = getWeekRange(currDate);
-            const prevStart = new Date(curr.start); prevStart.setDate(prevStart.getDate() - 7);
-            const prev = getWeekRange(prevStart);
+const currentStats = useMemo(() => calculateStats(currentListApps), [currentListApps, services]);
 
-            const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= curr.start && d <= curr.end; });
-            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prev.start && d <= prev.end; });
-            // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
-            // Let's use precise dates if possible, or fallback to pro-rated.
-            const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = parseDateLocal(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
+// Payment Sets for Current List
+const currentToReceive = useMemo(() => currentListApps.filter(a => (!a.paymentMethod || a.paymentMethod.trim() === '') && a.status !== 'nao_veio'), [currentListApps]);
+const currentPaid = useMemo(() => currentListApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== ''), [currentListApps]);
+const currentPending = useMemo(() => currentListApps.filter(a => {
+    // Logic for pending in generic list? Maybe just same as To Receive but past?
+    // User defines "Pendentes" as Past + Unpaid.
+    if (a.status === 'nao_veio') return false;
+    const appDate = parseDateLocal(a.date);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    return appDate < now && (!a.paymentMethod || a.paymentMethod.trim() === '');
+}), [currentListApps]);
+const currentNoShow = useMemo(() => currentListApps.filter(a => a.status === 'nao_veio'), [currentListApps]);
 
-            const cDays = countBusinessDays(curr.start, curr.end);
-            const pDays = countBusinessDays(prev.start, prev.end);
 
-            const cStats = calculatePeriodStats(currApps, cDays, getRangeCost(curr.start, curr.end));
-            const pStats = calculatePeriodStats(prevApps, pDays, getRangeCost(prev.start, prev.end));
 
-            return { current: cStats, previous: pStats, rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` };
-        }
-        else if (activeTab === 'monthly') {
-            const [yStr, mStr] = selectedMonth.split('-');
-            const y = parseInt(yStr), m = parseInt(mStr) - 1;
-            const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
-            const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
+const getGrowth = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+};
 
-            const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= currStart && d <= currEnd; });
-            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prevStart && d <= prevEnd; });
+// Count Tuesdays-Saturdays in a range
+const countBusinessDays = (start: Date, end: Date) => {
+    let count = 0;
+    const cur = new Date(start);
+    while (cur <= end) {
+        const day = cur.getDay();
+        if (day >= 2 && day <= 6) count++; // 2=Tue, 6=Sat
+        cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+};
 
-            const cDays = countBusinessDays(currStart, currEnd);
-            const pDays = countBusinessDays(prevStart, prevEnd);
+// Helper to get cost for a specific month (YYYY-MM format in sheet usually)
+const getCostForMonth = (date: Date) => {
+    // Month name logic or simple matching based on costs data structure
+    // Assuming costs have 'month' field like 'Janeiro', 'Fevereiro' etc or simply summing all costs in that month's date range
+    // For simplicity, let's filter costs by date if available, or just sum everything if cost date matches period.
+    // Better approach given `costs` structure: filter by ISO date range
+    const m = date.getMonth();
+    const y = date.getFullYear();
+    return costs.filter(c => {
+        const cDate = parseDateLocal(c.date);
+        return cDate.getMonth() === m && cDate.getFullYear() === y && isOperationalCost(c);
+    }).reduce((acc, c) => acc + c.amount, 0);
+};
 
-            const cCost = getCostForMonth(currStart); // This sums all costs in that month
-            const pCost = getCostForMonth(prevStart);
+// Calculate Data for Tabs
+const metricData = useMemo(() => {
+    // Current Date Reference
+    const currDate = new Date(selectedDate);
+    if (activeTab === 'weekly' || activeTab === 'weekly_list') {
+        const getWeekRange = (date: Date) => {
+            const day = date.getDay();
+            const start = new Date(date); start.setDate(date.getDate() - day); start.setHours(0, 0, 0, 0);
+            const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
+            return { start, end };
+        };
+        const curr = getWeekRange(currDate);
+        const prevStart = new Date(curr.start); prevStart.setDate(prevStart.getDate() - 7);
+        const prev = getWeekRange(prevStart);
 
-            const cStats = calculatePeriodStats(currApps, cDays, cCost);
-            const pStats = calculatePeriodStats(prevApps, pDays, pCost);
+        const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= curr.start && d <= curr.end; });
+        const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prev.start && d <= prev.end; });
+        // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
+        // Let's use precise dates if possible, or fallback to pro-rated.
+        const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = parseDateLocal(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
 
-            return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
-        }
-        else if (activeTab === 'yearly') {
-            const currApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
-            const prevApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear - 1);
+        const cDays = countBusinessDays(curr.start, curr.end);
+        const pDays = countBusinessDays(prev.start, prev.end);
 
-            // Yearly Cost
-            const getYearCost = (year: number) => costs.filter(c => parseDateLocal(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
+        const cStats = calculatePeriodStats(currApps, cDays, getRangeCost(curr.start, curr.end));
+        const pStats = calculatePeriodStats(prevApps, pDays, getRangeCost(prev.start, prev.end));
 
-            // Count biz days in year
-            const countYearBizDays = (year: number) => {
-                let d = new Date(year, 0, 1);
-                let count = 0;
-                while (d.getFullYear() === year) {
-                    const w = d.getDay();
-                    if (w >= 2 && w <= 6) count++;
-                    d.setDate(d.getDate() + 1);
-                }
-                return count;
-            };
+        return { current: cStats, previous: pStats, rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` };
+    }
+    else if (activeTab === 'monthly') {
+        const [yStr, mStr] = selectedMonth.split('-');
+        const y = parseInt(yStr), m = parseInt(mStr) - 1;
+        const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
+        const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
 
-            const cDays = countYearBizDays(selectedYear);
-            const pDays = countYearBizDays(selectedYear - 1);
+        const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= currStart && d <= currEnd; });
+        const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prevStart && d <= prevEnd; });
 
-            const cStats = calculatePeriodStats(currApps, cDays, getYearCost(selectedYear));
-            const pStats = calculatePeriodStats(prevApps, pDays, getYearCost(selectedYear - 1));
+        const cDays = countBusinessDays(currStart, currEnd);
+        const pDays = countBusinessDays(prevStart, prevEnd);
 
-            return { current: cStats, previous: pStats, rangeLabel: selectedYear.toString() };
-        }
-        return null;
-    }, [activeTab, appointments, selectedDate, selectedMonth, selectedYear, costs]);
+        const cCost = getCostForMonth(currStart); // This sums all costs in that month
+        const pCost = getCostForMonth(prevStart);
 
-    interface StatCardProps { title: string; value: string | number; icon: any; colorClass: string; growth?: number; subValue?: string; }
-    const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: StatCardProps) => (
-        <div className="bg-white p-4 rounded-[2rem] shadow-soft border border-gray-100/50 btn-spring hover:shadow-lg hover:-translate-y-2 flex flex-col justify-between group h-full relative overflow-hidden">
-            <div className={`absolute -right-6 -top-6 w-24 h-24 bg-${colorClass.split('-')[1]}-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-700`} />
-            <div className="flex justify-between items-start mb-4 relative z-10">
-                <div className={`p-3 rounded-2xl ${colorClass} bg-opacity-10 text-${colorClass.split('-')[1]}-600 group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon size={22} className="animate-pulse-slow" />
+        const cStats = calculatePeriodStats(currApps, cDays, cCost);
+        const pStats = calculatePeriodStats(prevApps, pDays, pCost);
+
+        return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
+    }
+    else if (activeTab === 'yearly') {
+        const currApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
+        const prevApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear - 1);
+
+        // Yearly Cost
+        const getYearCost = (year: number) => costs.filter(c => parseDateLocal(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
+
+        // Count biz days in year
+        const countYearBizDays = (year: number) => {
+            let d = new Date(year, 0, 1);
+            let count = 0;
+            while (d.getFullYear() === year) {
+                const w = d.getDay();
+                if (w >= 2 && w <= 6) count++;
+                d.setDate(d.getDate() + 1);
+            }
+            return count;
+        };
+
+        const cDays = countYearBizDays(selectedYear);
+        const pDays = countYearBizDays(selectedYear - 1);
+
+        const cStats = calculatePeriodStats(currApps, cDays, getYearCost(selectedYear));
+        const pStats = calculatePeriodStats(prevApps, pDays, getYearCost(selectedYear - 1));
+
+        return { current: cStats, previous: pStats, rangeLabel: selectedYear.toString() };
+    }
+    return null;
+}, [activeTab, appointments, selectedDate, selectedMonth, selectedYear, costs]);
+
+interface StatCardProps { title: string; value: string | number; icon: any; colorClass: string; growth?: number; subValue?: string; }
+const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: StatCardProps) => (
+    <div className="bg-white p-4 rounded-[2rem] shadow-soft border border-gray-100/50 btn-spring hover:shadow-lg hover:-translate-y-2 flex flex-col justify-between group h-full relative overflow-hidden">
+        <div className={`absolute -right-6 -top-6 w-24 h-24 bg-${colorClass.split('-')[1]}-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-700`} />
+        <div className="flex justify-between items-start mb-4 relative z-10">
+            <div className={`p-3 rounded-2xl ${colorClass} bg-opacity-10 text-${colorClass.split('-')[1]}-600 group-hover:scale-110 transition-transform duration-300`}>
+                <Icon size={22} className="animate-pulse-slow" />
+            </div>
+            {growth !== undefined && (
+                <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 ${growth >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                    {growth >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                    {Math.abs(growth).toFixed(0)}%
                 </div>
-                {growth !== undefined && (
-                    <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 ${growth >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                        {growth >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                        {Math.abs(growth).toFixed(0)}%
-                    </div>
-                )}
-            </div>
-            <div>
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</p>
-                <h3 className="text-2xl font-bold text-gray-800 tracking-tight leading-none">{value}</h3>
-                {subValue && <p className="text-xs font-medium text-gray-400 mt-2">{subValue}</p>}
-            </div>
-        </div>
-    );
-
-    const TabButton = ({ id, label, icon: Icon }: any) => (<button onClick={() => setActiveTab(id)} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 btn-spring ${activeTab === id ? 'bg-white text-brand-600 shadow-md transform scale-100' : 'text-gray-400 hover:bg-white/50 hover:text-gray-600'}`}><Icon size={16} /><span className="hidden sm:inline">{label}</span></button>);
-
-    const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
-
-    return (
-        <div className="space-y-6 animate-fade-in pb-32" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-            {defaultTab === 'daily' ? (
-                <>
-                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Resumo</h1></div>
-                    <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner max-w-md">
-                        <TabButton id="daily" label="Diário" icon={CalendarIcon} />
-                        <TabButton id="weekly_list" label="Semanal" icon={BarChart2} />
-                    </div>
-                </>
-            ) : (
-                <>
-                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Faturamento</h1></div>
-                    <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner">
-                        <TabButton id="daily" label="Diário" icon={CalendarIcon} />
-                        <TabButton id="weekly" label="Semanal" icon={BarChart2} />
-                        <TabButton id="monthly" label="Mensal" icon={TrendingUp} />
-                        <TabButton id="yearly" label="Anual" icon={PieChartIcon} />
-                    </div>
-                </>
             )}
+        </div>
+        <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</p>
+            <h3 className="text-2xl font-bold text-gray-800 tracking-tight leading-none">{value}</h3>
+            {subValue && <p className="text-xs font-medium text-gray-400 mt-2">{subValue}</p>}
+        </div>
+    </div>
+);
+
+const TabButton = ({ id, label, icon: Icon }: any) => (<button onClick={() => setActiveTab(id)} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 btn-spring ${activeTab === id ? 'bg-white text-brand-600 shadow-md transform scale-100' : 'text-gray-400 hover:bg-white/50 hover:text-gray-600'}`}><Icon size={16} /><span className="hidden sm:inline">{label}</span></button>);
+
+const animationClass = slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : '';
+
+return (
+    <div className="space-y-6 animate-fade-in pb-32" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        {defaultTab === 'daily' ? (
+            <>
+                <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Resumo</h1></div>
+                <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner max-w-md">
+                    <TabButton id="daily" label="Diário" icon={CalendarIcon} />
+                    <TabButton id="weekly_list" label="Semanal" icon={BarChart2} />
+                    <TabButton id="monthly_list" label="Mensal" icon={TrendingUp} />
+                </div>
+            </>
+        ) : (
+            <>
+                <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Faturamento</h1></div>
+                <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner">
+                    <TabButton id="daily" label="Diário" icon={CalendarIcon} />
+                    <TabButton id="weekly" label="Semanal" icon={BarChart2} />
+                    <TabButton id="monthly" label="Mensal" icon={TrendingUp} />
+                    <TabButton id="yearly" label="Anual" icon={PieChartIcon} />
+                </div>
+            </>
+        )}
 
 
+        {(activeTab === 'daily' || activeTab === 'weekly_list' || activeTab === 'monthly_list') && (
             <section key={selectedDate} className={animationClass}>
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-4 rounded-3xl border border-white/40 shadow-sm mb-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0 bg-white/60 backdrop-blur-md p-3 rounded-3xl border border-white/40 shadow-sm mb-4">
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Diário</h2>
+                        <div className="relative group">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input
+                                type="text"
+                                placeholder="Buscar cliente ou pet..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="pl-9 pr-4 py-2 bg-white/80 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-100 w-full md:w-64 transition-all hover:bg-white"
+                            />
+                        </div>
+
                         <button
                             onClick={() => setIsPrivacyEnabled(!isPrivacyEnabled)}
                             className={`p-2 rounded-xl transition-all duration-300 ${isPrivacyEnabled ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-400 hover:text-gray-600'}`}
                             title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
                         >
-                            {isPrivacyEnabled ? <EyeOff size={20} /> : <Eye size={20} />}
+                            {isPrivacyEnabled ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                         <button
                             onClick={exportToCSV}
                             className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:text-brand-600 hover:bg-brand-50 transition-all duration-300"
-                            title="Exportar CSV do dia"
+                            title="Exportar CSV"
                         >
-                            <Download size={20} />
+                            <Download size={18} />
                         </button>
                     </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 flex-shrink-0">
-                        <button onClick={() => {
-                            const [y, m, d] = selectedDate.split('-').map(Number);
-                            const date = new Date(y, m - 1, d - 1);
-                            setSelectedDate(date.toISOString().split('T')[0]);
-                            setSlideDirection('left');
-                        }} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronLeft size={18} /></button>
-                        <button onClick={() => { setSelectedDate(new Date().toISOString().split('T')[0]); setSlideDirection(null); }} className="flex-1 px-4 py-2 bg-white text-brand-600 font-bold rounded-xl text-xs shadow-sm border border-gray-100 hover:bg-gray-50 transition-all">Hoje</button>
-                        <button onClick={() => {
-                            const [y, m, d] = selectedDate.split('-').map(Number);
-                            const date = new Date(y, m - 1, d + 1);
-                            setSelectedDate(date.toISOString().split('T')[0]);
-                            setSlideDirection('right');
-                        }} className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronRight size={18} /></button>
-                        <div className="relative text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors cursor-pointer group flex items-center gap-1 z-50 select-none" onClick={() => (document.getElementById('daily-date-picker') as HTMLInputElement)?.showPicker()}>
-                            <span className="pointer-events-none">{formatDateWithWeek(selectedDate)}</span>
-                            <ChevronDown size={14} className="opacity-50 pointer-events-none" />
-                            <input
-                                id="daily-date-picker"
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }}
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-50 appearance-none"
-                                onClick={(e) => e.stopPropagation()}
-                            />
+
+                    {activeTab !== 'yearly' && (
+                        <div className="flex items-center gap-2 w-full md:w-auto bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 flex-shrink-0">
+                            <button onClick={() => {
+                                if (activeTab === 'monthly' || activeTab === 'monthly_list') {
+                                    const [y, m] = selectedMonth.split('-').map(Number);
+                                    const date = new Date(y, m - 2, 1); // Prev month
+                                    setSelectedMonth(date.toISOString().slice(0, 7));
+                                } else {
+                                    const [y, m, d] = selectedDate.split('-').map(Number);
+                                    const date = new Date(y, m - 1, d - (activeTab === 'weekly' || activeTab === 'weekly_list' ? 7 : 1));
+                                    setSelectedDate(date.toISOString().split('T')[0]);
+                                }
+                                setSlideDirection('left');
+                            }} className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronLeft size={16} /></button>
+
+                            <button onClick={() => { setSelectedDate(new Date().toISOString().split('T')[0]); setSelectedMonth(new Date().toISOString().slice(0, 7)); setSlideDirection(null); }} className="px-3 py-1.5 bg-white text-brand-600 font-bold rounded-xl text-xs shadow-sm border border-gray-100 hover:bg-gray-50 transition-all">Hoje</button>
+
+                            <button onClick={() => {
+                                if (activeTab === 'monthly' || activeTab === 'monthly_list') {
+                                    const [y, m] = selectedMonth.split('-').map(Number);
+                                    const date = new Date(y, m, 1);
+                                    setSelectedMonth(date.toISOString().slice(0, 7));
+                                } else {
+                                    const [y, m, d] = selectedDate.split('-').map(Number);
+                                    const date = new Date(y, m - 1, d + (activeTab === 'weekly' || activeTab === 'weekly_list' ? 7 : 1));
+                                    setSelectedDate(date.toISOString().split('T')[0]);
+                                }
+                                setSlideDirection('right');
+                            }} className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-gray-500 transition-all"><ChevronRight size={16} /></button>
+
+                            <div className="text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors cursor-pointer group flex items-center gap-1 select-none relative" onClick={() => (document.getElementById('nav-date-picker') as HTMLInputElement)?.showPicker()}>
+                                <span className="pointer-events-none">
+                                    {(activeTab === 'monthly' || activeTab === 'monthly_list') ? new Date(selectedMonth + '-02').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : formatDateWithWeek(selectedDate)}
+                                </span>
+                                <input
+                                    id="nav-date-picker"
+                                    type={(activeTab === 'monthly' || activeTab === 'monthly_list') ? 'month' : 'date'}
+                                    value={(activeTab === 'monthly' || activeTab === 'monthly_list') ? selectedMonth : selectedDate}
+                                    onChange={(e) => { if (e.target.value) (activeTab === 'monthly' || activeTab === 'monthly_list') ? setSelectedMonth(e.target.value) : setSelectedDate(e.target.value); }}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-50 appearance-none"
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                    <StatCard title="Total de Pets" value={dailyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" />
-                    <StatCard title="Total de Tosas" value={dailyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Máquina e Tesoura" />
-                    <StatCard title="Caixa Pago" value={isPrivacyEnabled ? 'R$ ••••' : `R$ ${dailyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" />
-                    <StatCard title="A Receber" value={isPrivacyEnabled ? 'R$ ••••' : `R$ ${dailyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" />
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-4">
+                    <StatCard title="Total Pets" value={currentStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" />
+                    <StatCard title="Tosas" value={currentStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Máq/Tesoura" />
+                    <StatCard title="Tosa Higi" value={currentStats.totalHygienic} icon={Sparkles} colorClass="bg-purple-500" />
+                    <StatCard title="Pago" value={isPrivacyEnabled ? 'R$ •••' : `R$ ${currentStats.paidRevenue.toFixed(0)}`} icon={CheckCircle} colorClass="bg-green-500" />
+                    <StatCard title="A Receber" value={isPrivacyEnabled ? 'R$ •••' : `R$ ${currentStats.pendingRevenue.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
                 </div>
 
-                {/* Integrated Payment Lists */}
-                <div className="flex p-1.5 bg-gray-200/50 rounded-2xl overflow-x-auto gap-1 mb-4">
-                    <button onClick={() => setPaymentsTab('toReceive')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${paymentsTab === 'toReceive' ? 'bg-white shadow-md text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">A Receber</span> <span className="text-lg">{toReceiveApps.length}</span> </button>
-                    <button onClick={() => setPaymentsTab('pending')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${paymentsTab === 'pending' ? 'bg-white shadow-md text-red-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pendentes</span> <span className="text-lg">{pendingApps.length}</span> </button>
-                    <button onClick={() => setPaymentsTab('paid')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${paymentsTab === 'paid' ? 'bg-white shadow-md text-green-600' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Pagos</span> <span className="text-lg">{paidApps.length}</span> </button>
-                    <button onClick={() => setPaymentsTab('noShow')} className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-xl transition-all duration-300 ${paymentsTab === 'noShow' ? 'bg-white shadow-md text-gray-500' : 'text-gray-500 hover:text-gray-700'}`}> <span className="block text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Não Veio</span> <span className="text-lg">{noShowApps.length}</span> </button>
+                {/* Unified Payment Lists */}
+                <div className="flex p-1 bg-gray-100 rounded-xl overflow-x-auto gap-1 mb-2">
+                    <button onClick={() => setPaymentsTab('toReceive')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'toReceive' ? 'bg-white shadow text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}> A Receber ({currentToReceive.length}) </button>
+                    <button onClick={() => setPaymentsTab('pending')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'pending' ? 'bg-white shadow text-red-600' : 'text-gray-400 hover:text-gray-600'}`}> Pendentes ({currentPending.length}) </button>
+                    <button onClick={() => setPaymentsTab('paid')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'paid' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'}`}> Pagos ({currentPaid.length}) </button>
+                    <button onClick={() => setPaymentsTab('noShow')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentsTab === 'noShow' ? 'bg-white shadow text-gray-500' : 'text-gray-400 hover:text-gray-600'}`}> Não Veio ({currentNoShow.length}) </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto min-h-0 bg-transparent p-1">
-                    {paymentsTab === 'toReceive' && toReceiveApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white", i))}
-                    {paymentsTab === 'pending' && pendingApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white", i))}
-                    {paymentsTab === 'paid' && paidApps.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100", i))}
-                    {paymentsTab === 'noShow' && noShowApps.map((app, i) => renderPaymentRow(app, "bg-gray-100 opacity-75", i))}
+                <div className="flex-1 overflow-y-auto min-h-0 bg-transparent p-1 space-y-2">
+                    {paymentsTab === 'toReceive' && (currentToReceive.length > 0 ? currentToReceive.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-yellow-50 to-white", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pagamento a receber</div>)}
+                    {paymentsTab === 'pending' && (currentPending.length > 0 ? currentPending.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-red-50 to-white", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pendente</div>)}
+                    {paymentsTab === 'paid' && (currentPaid.length > 0 ? currentPaid.map((app, i) => renderPaymentRow(app, "bg-gradient-to-br from-green-50 to-white border-green-100", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum pagamento confirmado</div>)}
+                    {paymentsTab === 'noShow' && (currentNoShow.length > 0 ? currentNoShow.map((app, i) => renderPaymentRow(app, "bg-gray-100 opacity-75", i)) : <div className="text-center text-gray-400 text-xs py-8">Nenhum registro</div>)}
                 </div>
             </section>
+        )}
+)}
 
-            {activeTab === 'weekly_list' && metricData && (
-                <section className="animate-fade-in text-left">
-                    <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                        <StatCard title="Total de Pets" value={weeklyStats.totalPets} icon={PawPrint} colorClass="bg-blue-500" />
-                        <StatCard title="Total de Tosas" value={weeklyStats.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Máquina e Tesoura" />
-                        {isSummaryOnly ? (
-                            <StatCard title="Tosa Higiênica" value={weeklyStats.totalHygienic} icon={Sparkles} colorClass="bg-purple-500" />
-                        ) : (
-                            <>
-                                <StatCard title="Caixa Pago" value={`R$ ${weeklyStats.paidRevenue.toFixed(2)}`} icon={CheckCircle} colorClass="bg-green-500" />
-                                <StatCard title="A Receber" value={`R$ ${weeklyStats.pendingRevenue.toFixed(2)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                            </>
-                        )}
-                    </div>
-
-                    <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden mt-6">
-                        <h3 className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 border-b border-gray-100/50 dark:border-gray-700/50 flex items-center gap-2 uppercase tracking-wider"><FileText size={16} /> Detalhamento da Semana</h3>
-                        <div className="p-4 space-y-6">
-                            {(() => {
-                                const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-                                const grouped = weeklyApps.reduce((acc, app) => {
-                                    const day = parseDateLocal(app.date).getDay();
-                                    if (!acc[day]) acc[day] = [];
-                                    acc[day].push(app);
-                                    return acc;
-                                }, {} as Record<number, Appointment[]>);
-
-                                return days.map((dayName, dayIdx) => {
-                                    const dayApps = grouped[dayIdx] || [];
-                                    if (dayApps.length === 0) return null;
-
-                                    return (
-                                        <div key={dayIdx}>
-                                            <h4 className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-3 pl-1">{dayName}</h4>
-                                            <div className="space-y-3">
-                                                {dayApps.map((app, index) => {
-                                                    const client = clients.find(c => c.id === app.clientId);
-                                                    const pet = client?.pets.find(p => p.id === app.petId);
-                                                    const mainSvc = services.find(s => s.id === app.serviceId);
-                                                    const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
-                                                    const val = calculateTotal(app, services);
-                                                    const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido' || app.paymentStatus === 'paid');
-
-                                                    return (
-                                                        <div key={app.id} className={`bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
-                                                            <div className="flex flex-col justify-center items-center px-2 border-r border-gray-100 dark:border-gray-700 min-w-[70px]">
-                                                                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{app.date.split('T')[1].substring(0, 5)}</span>
-                                                                <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Horário</span>
-                                                            </div>
-                                                            <div className="flex-1 py-1 min-w-0">
-                                                                <div className="flex justify-between items-start">
-                                                                    <div>
-                                                                        <h4
-                                                                            className="font-bold text-gray-900 dark:text-white truncate cursor-pointer hover:text-brand-600 transition-colors flex items-center gap-2"
-                                                                            onClick={() => pet && client && onViewPet?.(pet, client)}
-                                                                        >
-                                                                            {pet?.name}
-                                                                        </h4>
-                                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client?.name}</p>
-                                                                    </div>
-                                                                    <div className="text-right">
-                                                                        {!isSummaryOnly && <div className={`font-bold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>R$ {val.toFixed(2)}</div>}
-                                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
-                                                                            {isPaid ? 'Pago' : app.status === 'nao_veio' ? 'Não Veio' : 'Pendente'}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="mt-2 flex flex-wrap gap-1">
-                                                                    <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-gray-600 truncate max-w-full">
-                                                                        {mainSvc?.name}
-                                                                    </span>
-                                                                    {addSvcs && addSvcs.length > 0 && addSvcs.map((s, i) => (
-                                                                        <span key={i} className="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-gray-100 dark:border-gray-700 truncate">
-                                                                            + {s?.name}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    );
-                                });
-                            })()}
-                        </div>
-                    </div>
-                </section>
-            )}
-            {activeTab === 'weekly' && metricData && (
+        {
+            activeTab === 'weekly' && metricData && (
                 <section className="animate-fade-in text-left">
                     <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
 
@@ -963,10 +962,12 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                         </div>
                     </div>
                 </section>
-            )}
+            )
+        }
 
 
-            {activeTab === 'monthly' && metricData && (
+        {
+            activeTab === 'monthly' && metricData && (
                 <section className="animate-fade-in text-left">
                     <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
 
@@ -982,9 +983,11 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
                     <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas do Mês</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={30} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{ r: 4 }} /></ComposedChart></ResponsiveContainer></div>
                 </section>
-            )}
+            )
+        }
 
-            {activeTab === 'yearly' && metricData && (
+        {
+            activeTab === 'yearly' && metricData && (
                 <section className="animate-fade-in text-left">
                     <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
 
@@ -1000,9 +1003,10 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
                     <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
                 </section>
-            )}
-        </div>
-    );
+            )
+        }
+    </div >
+);
 };
 
 const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
