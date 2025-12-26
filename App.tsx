@@ -2728,19 +2728,66 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
     const yearlyStats = calculateStats(yearlyApps);
 
     // --- NEW STATS LOGIC ---
-    const calculatePeriodStats = (rangeApps: Appointment[], daysCount: number, periodCost?: number, businessDaysOverride?: number) => {
+    const calculatePeriodStats = (rangeApps: Appointment[], daysCount: number, periodCost: number = 0, businessDaysOverride?: number) => {
         const stats = calculateStats(rangeApps);
         const avgRevPerDay = daysCount > 0 ? stats.grossRevenue / daysCount : 0;
         const avgPetsPerDay = daysCount > 0 ? stats.totalPets / daysCount : 0;
-
-        let dailyCost = 0;
-        const validBusinessDays = businessDaysOverride || daysCount; // Use override if provided (e.g. Tue-Sat specific count)
-        if (periodCost && validBusinessDays > 0) {
-            dailyCost = periodCost / validBusinessDays;
-        }
-
-        return { ...stats, avgRevPerDay, avgPetsPerDay, dailyCost };
+        return { ...stats, avgRevPerDay, avgPetsPerDay, totalCost: periodCost };
     };
+
+    const getServiceCategoryData = (apps: Appointment[]) => {
+        const categories = { 'Banho & Tosa': 0, 'Banho': 0, 'Higiênica': 0, 'Outros': 0 };
+        apps.forEach(app => {
+            if (app.status === 'cancelado' || app.status === 'nao_veio') return;
+            const revenue = calculateTotal(app, services);
+
+            // Check services
+            const checkService = (id: string) => {
+                const s = services.find(srv => srv.id === id);
+                if (!s) return 'Outros';
+                const n = s.name.toLowerCase();
+                if (n.includes('higi') || n.includes('higienica')) return 'Higiênica';
+                if (n.includes('tosa') || n.includes('maquina') || n.includes('máquina') || n.includes('tesoura')) return 'Banho & Tosa';
+                if (n.includes('banho')) return 'Banho';
+                return 'Outros';
+            };
+
+            // Main service determines category primarily (simplification)
+            let cat = checkService(app.serviceId);
+            // If main is 'Banho' but has 'Tosa' additional, upgrade to 'Banho & Tosa'
+            if (cat === 'Banho' && app.additionalServiceIds) {
+                const hasTosaAddon = app.additionalServiceIds.some(id => {
+                    const s = services.find(srv => srv.id === id);
+                    if (!s) return false;
+                    const n = s.name.toLowerCase();
+                    return n.includes('tosa') || n.includes('maquina') || n.includes('tesoura');
+                });
+                if (hasTosaAddon) cat = 'Banho & Tosa';
+            }
+            categories[cat as keyof typeof categories] += revenue;
+        });
+
+        return Object.entries(categories)
+            .map(([name, value]) => ({ name, value }))
+            .filter(i => i.value > 0);
+    };
+
+    const getPaymentMethodData = (apps: Appointment[]) => {
+        const methods: Record<string, number> = {};
+        apps.forEach(app => {
+            if (app.status === 'cancelado' || app.status === 'nao_veio') return;
+            const revenue = calculateTotal(app, services);
+            const method = app.paymentMethod ? app.paymentMethod.trim() : 'Pendente';
+            const key = method || 'Pendente';
+            methods[key] = (methods[key] || 0) + revenue;
+        });
+        return Object.entries(methods)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+    };
+
+    const COLORS_SERVICE = ['#f97316', '#3b82f6', '#a855f7', '#10b981', '#64748b'];
+    const COLORS_PAYMENT = ['#10b981', '#3b82f6', '#06b6d4', '#f59e0b', '#ef4444', '#8b5cf6'];
 
     const getGrowth = (current: number, previous: number) => {
         if (previous === 0) return current > 0 ? 100 : 0;
@@ -2800,7 +2847,13 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
             const cStats = calculatePeriodStats(currApps, cDays, getRangeCost(curr.start, curr.end));
             const pStats = calculatePeriodStats(prevApps, pDays, getRangeCost(prev.start, prev.end));
 
-            return { current: cStats, previous: pStats, rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` };
+            return {
+                current: cStats,
+                previous: pStats,
+                serviceData: [],
+                paymentData: [],
+                rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
+            };
         }
         else if (activeTab === 'monthly') {
             const [yStr, mStr] = selectedMonth.split('-');
@@ -2820,7 +2873,16 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
             const cStats = calculatePeriodStats(currApps, cDays, cCost);
             const pStats = calculatePeriodStats(prevApps, pDays, pCost);
 
-            return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
+            const serviceData = getServiceCategoryData(currApps);
+            const paymentData = getPaymentMethodData(currApps);
+
+            return {
+                current: cStats,
+                previous: pStats,
+                serviceData,
+                paymentData,
+                rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+            };
         }
         else if (activeTab === 'yearly') {
             const currApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
@@ -2847,7 +2909,16 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
             const cStats = calculatePeriodStats(currApps, cDays, getYearCost(selectedYear));
             const pStats = calculatePeriodStats(prevApps, pDays, getYearCost(selectedYear - 1));
 
-            return { current: cStats, previous: pStats, rangeLabel: selectedYear.toString() };
+            const serviceData = getServiceCategoryData(currApps);
+            const paymentData = getPaymentMethodData(currApps);
+
+            return {
+                current: cStats,
+                previous: pStats,
+                serviceData,
+                paymentData,
+                rangeLabel: selectedYear.toString()
+            };
         }
         return null;
     }, [activeTab, appointments, selectedDate, selectedMonth, selectedYear, costs]);
@@ -3010,7 +3081,7 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
                             <StatCard title="Total de Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-blue-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
                             <StatCard title="Total Tosas" value={metricData.current.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Banhos e Tosas" />
                             <StatCard title="Faturamento" value={`R$ ${metricData.current.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                            <StatCard title="Lucro Estimado" value={`R$ ${(metricData.current.grossRevenue - metricData.current.dailyCost * 30).toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" />
+                            <StatCard title="Lucro Líquido" value={`R$ ${(metricData.current.grossRevenue - (metricData as any).current.totalCost).toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" subValue={`${((metricData.current.grossRevenue - (metricData as any).current.totalCost) / (metricData.current.grossRevenue || 1) * 100).toFixed(1)}% Margem`} />
                         </div>
 
                         <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
@@ -3034,6 +3105,41 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
                                 </ResponsiveContainer>
                             </div>
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 relative overflow-hidden">
+                                <h3 className="text-sm font-bold text-gray-500 mb-4 uppercase tracking-wider flex items-center gap-2">Receita por Categoria</h3>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={(metricData as any).serviceData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                {(metricData as any).serviceData.map((entry: any, index: number) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS_SERVICE[index % COLORS_SERVICE.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }} formatter={(value: number) => [`R$ ${value.toFixed(2)}`, '']} />
+                                            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 relative overflow-hidden">
+                                <h3 className="text-sm font-bold text-gray-500 mb-4 uppercase tracking-wider flex items-center gap-2">Métodos de Pagamento</h3>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={(metricData as any).paymentData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                {(metricData as any).paymentData.map((entry: any, index: number) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS_PAYMENT[index % COLORS_PAYMENT.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }} formatter={(value: number) => [`R$ ${value.toFixed(2)}`, '']} />
+                                            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
                     </section>
                 )
             }
@@ -3052,6 +3158,7 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                             <StatCard title="Total de Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-blue-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
                             <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
+                            <StatCard title="Lucro Líquido" value={`R$ ${(metricData.current.grossRevenue - (metricData as any).current.totalCost).toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" subValue={`${((metricData.current.grossRevenue - (metricData as any).current.totalCost) / (metricData.current.grossRevenue || 1) * 100).toFixed(1)}% Margem`} />
                         </div>
 
                         <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
@@ -3071,6 +3178,41 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 relative overflow-hidden">
+                                <h3 className="text-sm font-bold text-gray-500 mb-4 uppercase tracking-wider flex items-center gap-2">Receita por Categoria</h3>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={(metricData as any).serviceData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                {(metricData as any).serviceData.map((entry: any, index: number) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS_SERVICE[index % COLORS_SERVICE.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }} formatter={(value: number) => [`R$ ${value.toFixed(2)}`, '']} />
+                                            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 relative overflow-hidden">
+                                <h3 className="text-sm font-bold text-gray-500 mb-4 uppercase tracking-wider flex items-center gap-2">Métodos de Pagamento</h3>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={(metricData as any).paymentData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                {(metricData as any).paymentData.map((entry: any, index: number) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS_PAYMENT[index % COLORS_PAYMENT.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }} formatter={(value: number) => [`R$ ${value.toFixed(2)}`, '']} />
+                                            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
                             </div>
                         </div>
                     </section>
