@@ -14,12 +14,11 @@ const mapClientFromDB = (data: any): Client => ({
 });
 
 // --- HELPERS FOR DATA ROBUSTNESS ---
-const normalizeDate = (d: any, createdAt?: string) => {
-    if (!d) return createdAt ? String(createdAt).split('T')[0] : new Date().toISOString().split('T')[0];
-    const str = String(d);
-    if (str.includes('/')) {
+const normalizeDate = (d: string, createdAt?: string) => {
+    if (!d) return createdAt ? createdAt.split('T')[0] : new Date().toISOString().split('T')[0];
+    if (d.includes('/')) {
         // Handle DD/MM/YYYY or DD/MM/YY
-        const parts = str.split('/');
+        const parts = d.split('/');
         if (parts.length === 3) {
             const day = parts[0].padStart(2, '0');
             const month = parts[1].padStart(2, '0');
@@ -29,7 +28,7 @@ const normalizeDate = (d: any, createdAt?: string) => {
         }
     }
     // Assume ISO or valid string
-    return str.substring(0, 10);
+    return d.substring(0, 10);
 };
 
 const safeAmount = (val: any): number => {
@@ -75,13 +74,13 @@ const mapAppointmentFromDB = (data: any): Appointment => ({
     petId: data.pet_id,
     serviceId: data.service_id,
     additionalServiceIds: data.additional_service_ids,
-    date: normalizeDate(data.date, data.created_at),
+    date: data.date,
     status: data.status,
     notes: data.notes,
     durationTotal: data.duration_total,
     googleEventId: data.google_event_id,
-    paidAmount: (data.paid_amount !== null && data.paid_amount !== undefined) ? Number(data.paid_amount) : undefined,
-    paymentMethod: data.payment_method || data.payment_status, // Fallback to status if method missing? No, user mentioned method. But maybe method is in status?
+    paidAmount: data.paid_amount ? Number(data.paid_amount) : undefined,
+    paymentMethod: data.payment_method,
     rating: data.rating,
     ratingTags: data.rating_tags,
 });
@@ -98,7 +97,7 @@ export const supabaseService = {
             console.error('Error fetching clients:', error);
             return [];
         }
-        return (data || []).map(mapClientFromDB);
+        return data.map(mapClientFromDB);
     },
 
     upsertClient: async (client: Client) => {
@@ -140,7 +139,7 @@ export const supabaseService = {
             console.error('Error fetching services:', error);
             return [];
         }
-        return (data || []).map(mapServiceFromDB);
+        return data.map(mapServiceFromDB);
     },
 
     upsertService: async (service: Service) => {
@@ -167,7 +166,7 @@ export const supabaseService = {
             console.error('Error fetching appointments:', error);
             return [];
         }
-        return (data || []).map(mapAppointmentFromDB);
+        return data.map(mapAppointmentFromDB);
     },
 
     upsertAppointment: async (app: Appointment) => {
@@ -222,7 +221,7 @@ export const supabaseService = {
             console.error('Error fetching costs:', error);
             return [];
         }
-        return (data || []).map((d: any) => ({
+        return data.map((d: any) => ({
             id: d.id,
             month: d.month,
             week: d.week,
