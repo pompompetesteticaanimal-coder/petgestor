@@ -14,6 +14,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { db } from './services/db';
 import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog, getBreedEmoji } from './types';
 import PackageControlView from './components/PackageControlView';
+import { FinancialInsightsView } from './components/FinancialInsightsView';
 import { TaskManager } from './components/TaskManager';
 import { MenuView } from './components/MenuView';
 import { supabaseService } from './services/supabaseService';
@@ -30,10 +31,7 @@ import {
 } from 'lucide-react';
 import { useNotificationScheduler } from './hooks/useNotificationScheduler';
 import { parseDateLocal, getTodayString } from './utils/dateHelpers';
-import {
-    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-    LineChart, Line, CartesianGrid, Legend, ComposedChart, LabelList, PieChart, Pie, AreaChart, Area
-} from 'recharts';
+
 
 // --- CONSTANTS ---
 const PREDEFINED_SHEET_ID = '1qbb0RoKxFfrdyTCyHd5rJRbLNBPcOEk4Y_ctyy-ujLw';
@@ -547,63 +545,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
             return c?.name.toLowerCase().includes(term) || p?.name.toLowerCase().includes(term);
         });
     }, [dailyApps, searchTerm, clients]);
-    const dailyStats = useMemo(() => calculateStats(filteredDailyApps), [filteredDailyApps, services]);
-    const weeklyChartData = useMemo(() => getWeeklyChartData(), [getWeeklyChartData]);
 
-    const weeklyApps = useMemo(() => {
-        const [y, m, d] = selectedDate.split('-').map(Number);
-        const date = new Date(y, m - 1, d);
-        const day = date.getDay();
-        const diff = date.getDate() - day;
-        const startOfWeek = new Date(date); startOfWeek.setDate(diff); startOfWeek.setHours(0, 0, 0, 0);
-        const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
-        return appointments.filter(a => {
-            if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false;
-            const ad = parseDateLocal(a.date);
-            return ad >= startOfWeek && ad <= endOfWeek;
-        }).sort((a, b) => a.date.localeCompare(b.date));
-    }, [selectedDate, appointments]);
-
-    const weeklyStats = useMemo(() => calculateStats(weeklyApps), [weeklyApps, services]);
-
-    // Payment Filter Logic
-    const noShowApps = useMemo(() => filteredDailyApps.filter(a => a.status === 'nao_veio'), [filteredDailyApps]);
-    const toReceiveApps = useMemo(() => filteredDailyApps.filter(a => (!a.paymentMethod || a.paymentMethod.trim() === '') && a.status !== 'nao_veio'), [filteredDailyApps]);
-    const paidApps = useMemo(() => filteredDailyApps.filter(a => a.paymentMethod && a.paymentMethod.trim() !== ''), [filteredDailyApps]);
-    const pendingApps = useMemo(() => appointments.filter(a => {
-        if (!a.date || a.status === 'cancelado' || a.status === 'nao_veio') return false;
-        const appDate = parseDateLocal(a.date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const isPast = appDate < today;
-        const isUnpaid = (!a.paymentMethod || a.paymentMethod.trim() === '');
-        return isPast && isUnpaid;
-    }).sort((a, b) => b.date.localeCompare(a.date)), [appointments]);
-
-
-
-    const monthlyChartData = useMemo(() => getMonthlyChartData(), [getMonthlyChartData]);
-    const yearlyChartData = useMemo(() => getYearlyChartData(), [getYearlyChartData]);
-
-    const monthlyApps = appointments.filter(a => a.date && a.date.startsWith(selectedMonth));
-    const monthlyStats = calculateStats(monthlyApps);
-    const yearlyApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
-    const yearlyStats = calculateStats(yearlyApps);
-
-    // --- NEW STATS LOGIC ---
-    const calculatePeriodStats = (rangeApps: Appointment[], daysCount: number, periodCost?: number, businessDaysOverride?: number) => {
-        const stats = calculateStats(rangeApps);
-        const avgRevPerDay = daysCount > 0 ? stats.grossRevenue / daysCount : 0;
-        const avgPetsPerDay = daysCount > 0 ? stats.totalPets / daysCount : 0;
-
-        let dailyCost = 0;
-        const validBusinessDays = businessDaysOverride || daysCount;
-        if (periodCost && validBusinessDays > 0) {
-            dailyCost = periodCost / validBusinessDays;
-        }
-
-        return { ...stats, avgRevPerDay, avgPetsPerDay, dailyCost };
-    };
 
     // --- UNIFIED LIST LOGIC ---
     const currentListApps = useMemo(() => {
@@ -659,115 +601,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
 
 
-    const getGrowth = (current: number, previous: number) => {
-        if (previous === 0) return current > 0 ? 100 : 0;
-        return ((current - previous) / previous) * 100;
-    };
 
-    // Count Tuesdays-Saturdays in a range
-    const countBusinessDays = (start: Date, end: Date) => {
-        let count = 0;
-        const cur = new Date(start);
-        while (cur <= end) {
-            const day = cur.getDay();
-            if (day >= 2 && day <= 6) count++; // 2=Tue, 6=Sat
-            cur.setDate(cur.getDate() + 1);
-        }
-        return count;
-    };
-
-    // Helper to get cost for a specific month (YYYY-MM format in sheet usually)
-    const getCostForMonth = (date: Date) => {
-        // Month name logic or simple matching based on costs data structure
-        // Assuming costs have 'month' field like 'Janeiro', 'Fevereiro' etc or simply summing all costs in that month's date range
-        // For simplicity, let's filter costs by date if available, or just sum everything if cost date matches period.
-        // Better approach given `costs` structure: filter by ISO date range
-        const m = date.getMonth();
-        const y = date.getFullYear();
-        return costs.filter(c => {
-            const cDate = parseDateLocal(c.date);
-            return cDate.getMonth() === m && cDate.getFullYear() === y && isOperationalCost(c);
-        }).reduce((acc, c) => acc + c.amount, 0);
-    };
-
-    // Calculate Data for Tabs
-    const metricData = useMemo(() => {
-        // Current Date Reference
-        const currDate = new Date(selectedDate);
-        if (activeTab === 'weekly' || activeTab === 'weekly_list') {
-            const getWeekRange = (date: Date) => {
-                const day = date.getDay();
-                const start = new Date(date); start.setDate(date.getDate() - day); start.setHours(0, 0, 0, 0);
-                const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
-                return { start, end };
-            };
-            const curr = getWeekRange(currDate);
-            const prevStart = new Date(curr.start); prevStart.setDate(prevStart.getDate() - 7);
-            const prev = getWeekRange(prevStart);
-
-            const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= curr.start && d <= curr.end; });
-            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prev.start && d <= prev.end; });
-            // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
-            // Let's use precise dates if possible, or fallback to pro-rated.
-            const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = parseDateLocal(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
-
-            const cDays = countBusinessDays(curr.start, curr.end);
-            const pDays = countBusinessDays(prev.start, prev.end);
-
-            const cStats = calculatePeriodStats(currApps, cDays, getRangeCost(curr.start, curr.end));
-            const pStats = calculatePeriodStats(prevApps, pDays, getRangeCost(prev.start, prev.end));
-
-            return { current: cStats, previous: pStats, rangeLabel: `${curr.start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${curr.end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` };
-        }
-        else if (activeTab === 'monthly') {
-            const [yStr, mStr] = selectedMonth.split('-');
-            const y = parseInt(yStr), m = parseInt(mStr) - 1;
-            const currStart = new Date(y, m, 1); const currEnd = new Date(y, m + 1, 0);
-            const prevStart = new Date(y, m - 1, 1); const prevEnd = new Date(y, m, 0);
-
-            const currApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= currStart && d <= currEnd; });
-            const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prevStart && d <= prevEnd; });
-
-            const cDays = countBusinessDays(currStart, currEnd);
-            const pDays = countBusinessDays(prevStart, prevEnd);
-
-            const cCost = getCostForMonth(currStart); // This sums all costs in that month
-            const pCost = getCostForMonth(prevStart);
-
-            const cStats = calculatePeriodStats(currApps, cDays, cCost);
-            const pStats = calculatePeriodStats(prevApps, pDays, pCost);
-
-            return { current: cStats, previous: pStats, rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
-        }
-        else if (activeTab === 'yearly') {
-            const currApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear);
-            const prevApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear - 1);
-
-            // Yearly Cost
-            const getYearCost = (year: number) => costs.filter(c => parseDateLocal(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
-
-            // Count biz days in year
-            const countYearBizDays = (year: number) => {
-                let d = new Date(year, 0, 1);
-                let count = 0;
-                while (d.getFullYear() === year) {
-                    const w = d.getDay();
-                    if (w >= 2 && w <= 6) count++;
-                    d.setDate(d.getDate() + 1);
-                }
-                return count;
-            };
-
-            const cDays = countYearBizDays(selectedYear);
-            const pDays = countYearBizDays(selectedYear - 1);
-
-            const cStats = calculatePeriodStats(currApps, cDays, getYearCost(selectedYear));
-            const pStats = calculatePeriodStats(prevApps, pDays, getYearCost(selectedYear - 1));
-
-            return { current: cStats, previous: pStats, rangeLabel: selectedYear.toString() };
-        }
-        return null;
-    }, [activeTab, appointments, selectedDate, selectedMonth, selectedYear, costs]);
 
     interface StatCardProps { title: string; value: string | number; icon: any; colorClass: string; growth?: number; subValue?: string; }
     const StatCard = ({ title, value, icon: Icon, colorClass, growth, subValue }: StatCardProps) => (
@@ -798,26 +632,15 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
     return (
         <div className="space-y-6 animate-fade-in pb-32" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-            {defaultTab === 'daily' ? (
-                <>
-                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Resumo</h1></div>
-                    <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner max-w-md">
-                        <TabButton id="daily" label="Diário" icon={CalendarIcon} />
-                        <TabButton id="weekly_list" label="Semanal" icon={BarChart2} />
-                        <TabButton id="monthly_list" label="Mensal" icon={TrendingUp} />
-                    </div>
-                </>
-            ) : (
-                <>
-                    <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Faturamento</h1></div>
-                    <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner">
-                        <TabButton id="daily" label="Diário" icon={CalendarIcon} />
-                        <TabButton id="weekly" label="Semanal" icon={BarChart2} />
-                        <TabButton id="monthly" label="Mensal" icon={TrendingUp} />
-                        <TabButton id="yearly" label="Anual" icon={PieChartIcon} />
-                    </div>
-                </>
-            )}
+            <>
+                <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-900 tracking-tight">Resumo</h1></div>
+                <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner max-w-md">
+                    <TabButton id="daily" label="Diário" icon={CalendarIcon} />
+                    <TabButton id="weekly_list" label="Semanal" icon={BarChart2} />
+                    <TabButton id="monthly_list" label="Mensal" icon={TrendingUp} />
+                </div>
+            </>
+
 
 
             {(activeTab === 'daily' || activeTab === 'weekly_list' || activeTab === 'monthly_list') && (
@@ -924,141 +747,17 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
 
 
 
-            {
-                activeTab === 'weekly' && metricData && (
-                    <section className="animate-fade-in text-left">
-                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Semana</h2><span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{metricData.rangeLabel}</span></div>
-
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                            <StatCard title="Total de Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-blue-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                            <StatCard title="Total Tosas" value={metricData.current.totalTosas} icon={Scissors} colorClass="bg-orange-500" subValue="Banhos e Tosas" />
-                            <StatCard title="Faturamento" value={`R$ ${metricData.current.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                            <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
-                        </div>
-
-                        <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-radial from-brand-50 to-transparent opacity-50 pointer-events-none" />
-                            <h3 className="text-sm font-bold text-gray-500 mb-6 uppercase tracking-wider flex items-center gap-2"><BarChart2 size={16} /> Performance da Semana</h3>
-                            <div className="h-64 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barSize={12}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 600 }} dy={10} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={(value) => `R$${value}`} />
-                                        <Tooltip
-                                            cursor={{ fill: '#f9fafb' }}
-                                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }}
-                                            formatter={(value: number) => [`R$ ${value}`, 'Faturamento']}
-                                        />
-                                        <Bar dataKey="faturamento" radius={[6, 6, 6, 6]}>
-                                            {weeklyChartData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.faturamento >= (weeklyChartData[index - 1]?.faturamento || 0) ? '#10b981' : '#f43f5e'} />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </section>
-                )
-            }
 
 
-            {
-                activeTab === 'monthly' && metricData && (
-                    <section className="animate-fade-in text-left">
-                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Mensal</h2><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" /></div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
-                            <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(0)}`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                            <StatCard title="Total Recebido" value={`R$ ${metricData.current.paidRevenue.toFixed(0)}`} icon={CheckCircle} colorClass="bg-emerald-500" growth={getGrowth(metricData.current.paidRevenue, metricData.previous.paidRevenue)} />
-                            <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
-                            <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                            <StatCard title="Ticket Médio / Pet" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
-                            <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                            <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
-                        </div>
 
-                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><BarChart2 size={16} /> Semanas do Mês</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={monthlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#e9d5ff" radius={[4, 4, 0, 0]} barSize={30} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#9333ea" strokeWidth={3} dot={{ r: 4 }} /></ComposedChart></ResponsiveContainer></div>
-                    </section>
-                )
-            }
 
-            {
-                activeTab === 'yearly' && metricData && (
-                    <section className="animate-fade-in text-left">
-                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Anual</h2><select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100">{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
-                            <StatCard title="Faturamento Total" value={`R$ ${(metricData.current.grossRevenue / 1000).toFixed(1)}k`} icon={Wallet} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
-                            <StatCard title="Total Recebido" value={`R$ ${(metricData.current.paidRevenue / 1000).toFixed(1)}k`} icon={CheckCircle} colorClass="bg-emerald-500" growth={getGrowth(metricData.current.paidRevenue, metricData.previous.paidRevenue)} />
-                            <StatCard title="Média / Dia" value={`R$ ${metricData.current.avgRevPerDay.toFixed(0)}`} icon={BarChart2} colorClass="bg-blue-500" growth={getGrowth(metricData.current.avgRevPerDay, metricData.previous.avgRevPerDay)} />
-                            <StatCard title="Custo Diário (Ter-Sab)" value={`R$ ${metricData.current.dailyCost.toFixed(0)}`} icon={AlertCircle} colorClass="bg-red-500" />
-                            <StatCard title="Ticket Médio" value={`R$ ${metricData.current.averageTicket.toFixed(0)}`} icon={DollarSign} colorClass="bg-purple-500" growth={getGrowth(metricData.current.averageTicket, metricData.previous.averageTicket)} />
-                            <StatCard title="Qtd. Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-orange-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
-                            <StatCard title="Média Pets / Dia" value={metricData.current.avgPetsPerDay.toFixed(1)} icon={Activity} colorClass="bg-pink-500" growth={getGrowth(metricData.current.avgPetsPerDay, metricData.previous.avgPetsPerDay)} />
-                        </div>
-
-                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 h-96 mb-6"><h3 className="text-sm font-bold text-gray-500 mb-6 flex items-center gap-2 uppercase tracking-wide"><TrendingUp size={16} /> Evolução Mensal</h3><ResponsiveContainer width="100%" height="80%"><ComposedChart data={yearlyChartData} margin={{ top: 10, right: 0, bottom: 0, left: -10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis yAxisId="left" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} /><YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar yAxisId="right" dataKey="pets" fill="#a7f3d0" radius={[4, 4, 0, 0]} barSize={20} /><Line yAxisId="left" type="monotone" dataKey="faturamento" stroke="#059669" strokeWidth={3} dot={{ r: 3 }} /></ComposedChart></ResponsiveContainer></div>
-                    </section>
-                )
-            }
         </div >
     );
 };
 
-const CostsView: React.FC<{ costs: CostItem[] }> = ({ costs }) => {
-    const isOperationalCost = (c: CostItem) => {
-        const cat = c.category?.toLowerCase() || '';
-        return cat !== 'sócio' && cat !== 'socio' && !cat.includes('extraordinário') && !cat.includes('extraordinario');
-    };
-    const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('yearly');
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-    const filterCosts = () => {
-        if (viewMode === 'monthly') { const [y, m] = selectedMonth.split('-'); return costs.filter(c => { const d = new Date(c.date); return d.getFullYear() === parseInt(y) && d.getMonth() === (parseInt(m) - 1); }); }
-        return costs.filter(c => new Date(c.date).getFullYear() === selectedYear);
-    };
-    const allFilteredCosts = filterCosts();
-    const filteredCosts = allFilteredCosts.filter(isOperationalCost);
-    const personalCosts = allFilteredCosts.filter(c => !isOperationalCost(c));
 
-    const totalCost = filteredCosts.reduce((acc, c) => acc + c.amount, 0);
-    const totalPersonal = personalCosts.reduce((acc, c) => acc + c.amount, 0);
-    const paidCost = filteredCosts.filter(c => c.status && c.status.toLowerCase() === 'pago').reduce((acc, c) => acc + c.amount, 0);
-    const pendingCost = filteredCosts.filter(c => !c.status || c.status.toLowerCase() !== 'pago').reduce((acc, c) => acc + c.amount, 0);
-
-    const getCostByCategory = () => { const counts: Record<string, number> = {}; filteredCosts.forEach(c => { const cat = c.category || 'Outros'; counts[cat] = (counts[cat] || 0) + c.amount; }); const sorted = Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value); const top5 = sorted.slice(0, 5); const others = sorted.slice(5).reduce((acc, curr) => acc + curr.value, 0); if (others > 0) top5.push({ name: 'Outros', value: others }); return top5; };
-    const getCostByMonth = () => { const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']; const data = Array(12).fill(0).map((_, i) => ({ name: monthNames[i], value: 0 })); const yearCosts = costs.filter(c => new Date(c.date).getFullYear() === selectedYear && isOperationalCost(c)); yearCosts.forEach(c => { const d = new Date(c.date); if (!isNaN(d.getTime())) data[d.getMonth()].value += c.amount; }); const startIdx = selectedYear === 2025 ? 7 : 0; return data.slice(startIdx); };
-    const PIE_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e', '#64748b'];
-
-    return (
-        <div className="space-y-6 animate-fade-in pb-10">
-            <div className="flex justify-between items-center mb-4"><h1 className="text-2xl font-bold text-gray-800">Custo Mensal</h1><div className="flex bg-white rounded-lg p-1 border"><button onClick={() => setViewMode('monthly')} className={`px-4 py-1.5 text-xs font-bold rounded ${viewMode === 'monthly' ? 'bg-brand-600 text-white' : 'text-gray-600'}`}>Mês</button><button onClick={() => setViewMode('yearly')} className={`px-4 py-1.5 text-xs font-bold rounded ${viewMode === 'yearly' ? 'bg-brand-600 text-white' : 'text-gray-600'}`}>Ano</button></div></div>
-            <div className="flex items-center mb-6 bg-white p-3 rounded-xl border border-gray-200"><h2 className="text-lg font-bold text-gray-800 mr-4">Período:</h2>{viewMode === 'monthly' ? (<input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" />) : (<select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="bg-gray-50 border p-2 rounded-lg text-sm font-bold text-gray-700 outline-none">{[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}</select>)}</div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
-                    <p className="text-xs font-bold text-gray-500 uppercase">Custo Operacional</p>
-                    <h3 className="text-2xl font-bold text-rose-600">R$ {totalCost.toFixed(2)}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
-                    <p className="text-xs font-bold text-gray-500 uppercase">Pago</p>
-                    <h3 className="text-2xl font-bold text-green-600">R$ {paidCost.toFixed(2)}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
-                    <p className="text-xs font-bold text-gray-500 uppercase">Pendente</p>
-                    <h3 className="text-2xl font-bold text-orange-600">R$ {pendingCost.toFixed(2)}</h3>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-xl shadow-sm border border-purple-100 flex flex-col justify-between">
-                    <p className="text-xs font-bold text-purple-600 uppercase">Retiradas/Extras</p>
-                    <h3 className="text-2xl font-bold text-purple-700">R$ {totalPersonal.toFixed(2)}</h3>
-                </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><BarChart2 size={16} /> Evolução</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={getCostByMonth()} margin={{ top: 20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tickFormatter={(val) => `R$${val}`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 'auto']} /><Tooltip formatter={(val: number) => `R$ ${val.toFixed(2)}`} /><Bar dataKey="value" fill="#f43f5e" radius={[4, 4, 0, 0]}><LabelList dataKey="value" position="top" style={{ fontSize: 10, fill: '#e11d48' }} formatter={(val: number) => val > 0 ? `R$${val.toFixed(0)}` : ''} /></Bar></BarChart></ResponsiveContainer></div><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><Tag size={16} /> Categorias</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={getCostByCategory()} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value">{getCostByCategory().map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}</Pie><Tooltip formatter={(val: number) => `R$ ${val.toFixed(2)}`} /><Legend layout="vertical" verticalAlign="middle" align="right" /></PieChart></ResponsiveContainer></div></div>
-        </div>
-    );
-};
 
 
 
@@ -2493,7 +2192,7 @@ const App: React.FC = () => {
                 onAddAppointment={() => setIsScheduleModalOpen(true)}
             >
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onUpdateAppointment={handleUpdateApp} onReschedule={handleReschedule} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} onLog={logAction} />}
-                {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} onUpdateAppointment={handleUpdateApp} onReschedule={handleReschedule} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} onLog={logAction} />}
+                {currentView === 'revenue' && <FinancialInsightsView appointments={appointments} services={services} clients={clients} costs={costs} />}
                 {currentView === 'costs' && <CostsManager costs={costs} onAddCost={handleAddCost} onUpdateCost={handleUpdateCost} onDeleteCost={handleDeleteCost} />}
                 {currentView === 'activity_log' && <ActivityLogView logs={logs} onBack={() => setCurrentView('menu')} />}
 
