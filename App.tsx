@@ -217,8 +217,9 @@ const BottomSheetList: React.FC<{ isOpen: boolean; onClose: () => void; timeSlot
     );
 };
 
-const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; clients: Client[]; costs: CostItem[]; defaultTab?: 'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'yearly'; onRemovePayment: (app: Appointment) => void; onNoShow?: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void, isSummaryOnly?: boolean }> = ({ appointments, services, clients, costs, defaultTab = 'daily', onRemovePayment, onNoShow, onViewPet, isSummaryOnly = false }) => {
-    const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'yearly'>(defaultTab);
+const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; clients: Client[]; costs: CostItem[]; defaultTab?: 'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'monthly_list' | 'yearly'; onRemovePayment: (app: Appointment) => void; onNoShow?: (app: Appointment) => void; onViewPet?: (pet: Pet, client: Client) => void, isSummaryOnly?: boolean }> = ({ appointments, services, clients, costs, defaultTab = 'daily', onRemovePayment, onNoShow, onViewPet, isSummaryOnly = false }) => {
+    const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'weekly_list' | 'monthly' | 'monthly_list' | 'yearly'>(defaultTab);
+    const [expandedDays, setExpandedDays] = useState<string[]>([]);
     const [selectedDate, setSelectedDate] = useState(getTodayString());
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -555,6 +556,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                     <div className="bg-gray-100/50 p-1 rounded-2xl mb-8 flex gap-1 shadow-inner max-w-md">
                         <TabButton id="daily" label="Diário" icon={CalendarIcon} />
                         <TabButton id="weekly_list" label="Semanal" icon={BarChart2} />
+                        <TabButton id="monthly_list" label="Mensal" icon={TrendingUp} />
                     </div>
                 </>
             ) : (
@@ -861,6 +863,142 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                 )
             }
 
+            {
+                activeTab === 'monthly_list' && (
+                    <section className="animate-fade-in text-left">
+                        <div className="sticky top-0 z-30 flex justify-between items-center mb-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm">
+                            <h2 className="text-lg font-bold text-gray-800">Mensal</h2>
+                            <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-gray-50 border-0 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-brand-100" />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            {/* 1. Total Pets (Blue) */}
+                            <div className="bg-blue-50/50 p-5 rounded-3xl border border-blue-100 flex flex-col justify-between h-32 relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-100 rounded-full opacity-50" />
+                                <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-2 z-10">
+                                    <PawPrint size={20} />
+                                </div>
+                                <div className="z-10">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total de Pets</p>
+                                    <h3 className="text-3xl font-black text-gray-800 leading-none">{monthlyStats.totalPets}</h3>
+                                </div>
+                            </div>
+
+                            {/* 2. Total Tosas (Orange) */}
+                            <div className="bg-orange-50/50 p-5 rounded-3xl border border-orange-100 flex flex-col justify-between h-32 relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 w-20 h-20 bg-orange-100 rounded-full opacity-50" />
+                                <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mb-2 z-10">
+                                    <Scissors size={20} />
+                                </div>
+                                <div className="z-10">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total de Tosas</p>
+                                    <div className="flex items-baseline gap-1">
+                                        <h3 className="text-3xl font-black text-gray-800 leading-none">{monthlyStats.totalTosas}</h3>
+                                        <span className="text-[9px] font-medium text-gray-400">Máquina e Tesoura</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. Tosa Higienica (Purple) */}
+                            <div className="bg-purple-50/50 p-5 rounded-3xl border border-purple-100 flex flex-col justify-between h-32 relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 w-20 h-20 bg-purple-100 rounded-full opacity-50" />
+                                <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mb-2 z-10">
+                                    <Sparkles size={20} />
+                                </div>
+                                <div className="z-10">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Tosa Higiênica</p>
+                                    <h3 className="text-3xl font-black text-gray-800 leading-none">{monthlyStats.totalHygienic}</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {(() => {
+                                const grouped = monthlyApps.reduce((acc, app) => {
+                                    const d = app.date.split('T')[0];
+                                    if (!acc[d]) acc[d] = [];
+                                    acc[d].push(app);
+                                    return acc;
+                                }, {} as Record<string, Appointment[]>);
+
+                                const sortedDates = Object.keys(grouped).sort();
+
+                                if (sortedDates.length === 0) {
+                                    return <div className="p-8 text-center text-gray-400 font-medium bg-gray-50 rounded-3xl border border-gray-100 border-dashed">Nenhum agendamento neste mês.</div>;
+                                }
+
+                                return sortedDates.map(dateStr => {
+                                    const dayApps = grouped[dateStr];
+                                    const dateObj = parseDateLocal(dayApps[0].date);
+                                    const w = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+                                    const dStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit' });
+                                    const formattedDate = `${dStr} ${w.charAt(0).toUpperCase() + w.slice(1)}`;
+                                    const isExpanded = expandedDays.includes(dateStr);
+
+                                    return (
+                                        <div key={dateStr} className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden transition-all duration-300">
+                                            <div
+                                                onClick={() => setExpandedDays(prev => prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr])}
+                                                className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className="bg-brand-50 text-brand-700 px-3 py-1.5 rounded-lg font-bold text-sm min-w-[3.5rem] text-center">{formattedDate}</div>
+                                                    <div className="h-px bg-gray-200 w-12 hidden sm:block"></div>
+                                                    <span className="text-gray-500 text-sm font-medium">{dayApps.length} Pet{dayApps.length !== 1 && 's'}</span>
+                                                </div>
+                                                <div className={`text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                                                    <ChevronDown size={20} />
+                                                </div>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div className="px-4 pb-4 animate-slide-down">
+                                                    <div className="border-t border-gray-100 pt-4">
+                                                        {dayApps.sort((a, b) => a.date.localeCompare(b.date)).map((app, index, arr) => {
+                                                            const client = clients.find(c => c.id === app.clientId);
+                                                            const pet = client?.pets.find(p => p.id === app.petId);
+                                                            const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido' || app.paymentStatus === 'paid');
+                                                            const isLast = index === arr.length - 1;
+
+                                                            return (
+                                                                <div key={app.id} className="relative flex group mb-0">
+                                                                    <div className="flex flex-col items-center mr-4 min-w-[50px]">
+                                                                        <span className="text-sm font-bold text-gray-900 mt-1 font-mono tracking-tight">{app.date.split('T')[1].substring(0, 5)}</span>
+                                                                        {!isLast && <div className="w-0.5 bg-gray-200 h-full mt-2 rounded-full group-hover:bg-brand-200 transition-colors" />}
+                                                                    </div>
+
+                                                                    <div className="flex-1 pb-6 relative cursor-pointer" onClick={() => pet && client && onViewPet?.(pet, client)}>
+                                                                        <div className="absolute -left-[21px] top-2 w-3 h-3 rounded-full border-2 border-white bg-gray-300 group-hover:bg-brand-500 transition-colors shadow-sm z-10" />
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl shadow-sm border border-gray-100">{getBreedEmoji(pet?.breed || '')}</div>
+                                                                                <div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <h4 className="font-bold text-gray-900 text-[15px] leading-tight">{pet?.name}</h4>
+                                                                                        {app.rating ? (<div className="flex items-center gap-0.5 bg-yellow-50 px-1 py-0.5 rounded border border-yellow-100"><Star size={8} className="fill-yellow-400 text-yellow-500" /><span className="text-[9px] font-bold text-yellow-700">{app.rating.toFixed(1)}</span></div>) : null}
+                                                                                    </div>
+                                                                                    <p className="text-xs text-gray-500 font-medium">{client?.name}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="text-right">
+                                                                                {isPaid ? <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide">Pago</span> : <span className="bg-gray-100 text-gray-500 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide">Pendente</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            })()}
+                        </div>
+                    </section>
+                )
+            }
 
             {
                 activeTab === 'weekly' && metricData && (
