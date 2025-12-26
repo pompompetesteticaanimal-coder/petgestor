@@ -2728,11 +2728,49 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
     const yearlyStats = calculateStats(yearlyApps);
 
     // --- NEW STATS LOGIC ---
-    const calculatePeriodStats = (rangeApps: Appointment[], daysCount: number, periodCost: number = 0, businessDaysOverride?: number) => {
+    const classifyCost = (cost: CostItem) => {
+        const cat = cost.category.toLowerCase();
+        if (['insumos', 'comissao', 'comissão', 'imposto', 'taxa', 'produto', 'produtos'].some(k => cat.includes(k))) return 'variable';
+        if (['marketing', 'ads', 'anuncio', 'panfleto', 'publicidade', 'tráfego', 'trafego'].some(k => cat.includes(k))) return 'marketing';
+        if (['salario', 'salário', 'folha', 'ferias', '13', 'pro-labore', 'socio', 'sócio'].some(k => cat.includes(k))) return 'personnel';
+        return 'fixed';
+    };
+
+    const calculatePeriodStats = (rangeApps: Appointment[], daysCount: number, periodCosts: CostItem[] = [], businessDaysOverride?: number) => {
         const stats = calculateStats(rangeApps);
         const avgRevPerDay = daysCount > 0 ? stats.grossRevenue / daysCount : 0;
         const avgPetsPerDay = daysCount > 0 ? stats.totalPets / daysCount : 0;
-        return { ...stats, avgRevPerDay, avgPetsPerDay, totalCost: periodCost };
+
+        // Cost Breakdown
+        const costBreakdown = periodCosts.reduce((acc, c) => {
+            const type = classifyCost(c);
+            acc[type] = (acc[type] || 0) + c.amount;
+            acc.total += c.amount;
+            return acc;
+        }, { variable: 0, marketing: 0, personnel: 0, fixed: 0, total: 0 });
+
+        // KPIs
+        const contributionMargin = stats.grossRevenue - costBreakdown.variable;
+        const contributionMarginPercent = stats.grossRevenue > 0 ? (contributionMargin / stats.grossRevenue) * 100 : 0;
+        const payrollPercent = stats.grossRevenue > 0 ? (costBreakdown.personnel / stats.grossRevenue) * 100 : 0;
+
+        // Break-even (Fixed / Margin%)
+        // If Margin% is 0.5 (50%), and Fixed is 1000, Break-even Revenue is 2000.
+        // We can also calculate Day of Break-even later.
+        const breakEvenRevenue = contributionMarginPercent > 0 ? costBreakdown.fixed / (contributionMarginPercent / 100) : 0;
+
+        return {
+            ...stats,
+            avgRevPerDay,
+            avgPetsPerDay,
+            costs: costBreakdown,
+            kpis: {
+                contributionMargin,
+                contributionMarginPercent,
+                payrollPercent,
+                breakEvenRevenue
+            }
+        };
     };
 
     const getServiceCategoryData = (apps: Appointment[]) => {
@@ -2807,17 +2845,14 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
     };
 
     // Helper to get cost for a specific month (YYYY-MM format in sheet usually)
-    const getCostForMonth = (date: Date) => {
-        // Month name logic or simple matching based on costs data structure
-        // Assuming costs have 'month' field like 'Janeiro', 'Fevereiro' etc or simply summing all costs in that month's date range
-        // For simplicity, let's filter costs by date if available, or just sum everything if cost date matches period.
-        // Better approach given `costs` structure: filter by ISO date range
+    // Helper to get cost for a specific month (YYYY-MM format in sheet usually)
+    const getCostsForMonth = (date: Date) => {
         const m = date.getMonth();
         const y = date.getFullYear();
         return costs.filter(c => {
             const cDate = parseDateLocal(c.date);
             return cDate.getMonth() === m && cDate.getFullYear() === y && isOperationalCost(c);
-        }).reduce((acc, c) => acc + c.amount, 0);
+        });
     };
 
     // Calculate Data for Tabs
@@ -2839,13 +2874,13 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
             const prevApps = appointments.filter(a => { if (!a.date) return false; const d = parseDateLocal(a.date); return d >= prev.start && d <= prev.end; });
             // For weekly cost, we can approximate: MonthCost / 4.3 or sum costs if they have precise dates within this week.
             // Let's use precise dates if possible, or fallback to pro-rated.
-            const getRangeCost = (s: Date, e: Date) => costs.filter(c => { const d = parseDateLocal(c.date); return d >= s && d <= e; }).reduce((acc, c) => acc + c.amount, 0);
+            const getRangeCosts = (s: Date, e: Date) => costs.filter(c => { const d = parseDateLocal(c.date); return d >= s && d <= e; });
 
             const cDays = countBusinessDays(curr.start, curr.end);
             const pDays = countBusinessDays(prev.start, prev.end);
 
-            const cStats = calculatePeriodStats(currApps, cDays, getRangeCost(curr.start, curr.end));
-            const pStats = calculatePeriodStats(prevApps, pDays, getRangeCost(prev.start, prev.end));
+            const cStats = calculatePeriodStats(currApps, cDays, getRangeCosts(curr.start, curr.end));
+            const pStats = calculatePeriodStats(prevApps, pDays, getRangeCosts(prev.start, prev.end));
 
             return {
                 current: cStats,
@@ -2867,20 +2902,65 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
             const cDays = countBusinessDays(currStart, currEnd);
             const pDays = countBusinessDays(prevStart, prevEnd);
 
-            const cCost = getCostForMonth(currStart); // This sums all costs in that month
-            const pCost = getCostForMonth(prevStart);
+            const cCosts = getCostsForMonth(currStart);
+            const pCosts = getCostsForMonth(prevStart);
 
-            const cStats = calculatePeriodStats(currApps, cDays, cCost);
-            const pStats = calculatePeriodStats(prevApps, pDays, pCost);
+            const cStats = calculatePeriodStats(currApps, cDays, cCosts);
+            const pStats = calculatePeriodStats(prevApps, pDays, pCosts);
 
             const serviceData = getServiceCategoryData(currApps);
             const paymentData = getPaymentMethodData(currApps);
+
+            // Break-even Data (Cumulative)
+            const getBreakEvenData = (start: Date, end: Date, totalFixed: number) => {
+                const data = [];
+                let cumRevenue = 0;
+                let cumVarCost = 0;
+                let cumFixed = 0;
+                const totalDays = countBusinessDays(start, end); // approximation
+                // Distribute Fixed Cost linearly? Or flat? User said "reta" (Straight line).
+                // If it's "Ponto de equilibrio", we usually compare Accum Margin vs Total Fixed Cost Line.
+                // So Fixed Cost line is CONSTANT at the Total Fixed Cost value.
+                // Intersection is when Accum Margin crosses Total Fixed Cost.
+
+                const cur = new Date(start);
+                while (cur <= end) {
+                    const dayApps = currApps.filter(a => {
+                        if (!a.date) return false;
+                        const d = parseDateLocal(a.date);
+                        return d.getDate() === cur.getDate() && d.getMonth() === cur.getMonth();
+                    });
+
+                    const dailyRev = dayApps.reduce((acc, a) => acc + calculateTotal(a, services), 0);
+                    // Estimate Var Cost per app? Or if we had per-service cost.
+                    // We deduced 'variable' cost in calculatePeriodStats.
+                    // Let's use avg variable cost % from the total period stats?
+                    // cStats.costs.variable
+                    const varCostRatio = cStats.grossRevenue > 0 ? cStats.costs.variable / cStats.grossRevenue : 0;
+                    const dailyVarCost = dailyRev * varCostRatio;
+
+                    cumRevenue += dailyRev;
+                    cumVarCost += dailyVarCost;
+                    const cumMargin = cumRevenue - cumVarCost;
+
+                    data.push({
+                        name: cur.getDate().toString(),
+                        margin: cumMargin,
+                        fixed: cStats.costs.fixed
+                    });
+                    cur.setDate(cur.getDate() + 1);
+                }
+                return data;
+            };
+
+            const breakEvenChartData = getBreakEvenData(currStart, currEnd, cStats.costs.fixed);
 
             return {
                 current: cStats,
                 previous: pStats,
                 serviceData,
                 paymentData,
+                breakEvenChartData,
                 rangeLabel: currStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
             };
         }
@@ -2889,7 +2969,7 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
             const prevApps = appointments.filter(a => a.date && parseDateLocal(a.date).getFullYear() === selectedYear - 1);
 
             // Yearly Cost
-            const getYearCost = (year: number) => costs.filter(c => parseDateLocal(c.date).getFullYear() === year).reduce((acc, c) => acc + c.amount, 0);
+            const getYearCosts = (year: number) => costs.filter(c => parseDateLocal(c.date).getFullYear() === year);
 
             // Count biz days in year
             const countYearBizDays = (year: number) => {
@@ -2906,17 +2986,52 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
             const cDays = countYearBizDays(selectedYear);
             const pDays = countYearBizDays(selectedYear - 1);
 
-            const cStats = calculatePeriodStats(currApps, cDays, getYearCost(selectedYear));
-            const pStats = calculatePeriodStats(prevApps, pDays, getYearCost(selectedYear - 1));
+            const cStats = calculatePeriodStats(currApps, cDays, getYearCosts(selectedYear));
+            const pStats = calculatePeriodStats(prevApps, pDays, getYearCosts(selectedYear - 1));
 
             const serviceData = getServiceCategoryData(currApps);
             const paymentData = getPaymentMethodData(currApps);
+
+            // Break-even Data (Yearly - Monthly granularity)
+            const getBreakEvenDataYearly = (year: number) => {
+                const data = [];
+                let cumRevenue = 0;
+                let cumVarCost = 0;
+
+                for (let m = 0; m < 12; m++) {
+                    const start = new Date(year, m, 1);
+                    // Filter apps for this month
+                    const monthApps = currApps.filter(a => {
+                        if (!a.date) return false;
+                        const d = parseDateLocal(a.date);
+                        return d.getMonth() === m;
+                    });
+
+                    const monthlyRev = monthApps.reduce((acc, a) => acc + calculateTotal(a, services), 0);
+                    const varCostRatio = cStats.grossRevenue > 0 ? cStats.costs.variable / cStats.grossRevenue : 0;
+                    const monthlyVarCost = monthlyRev * varCostRatio;
+
+                    cumRevenue += monthlyRev;
+                    cumVarCost += monthlyVarCost;
+                    const cumMargin = cumRevenue - cumVarCost;
+
+                    data.push({
+                        name: start.toLocaleDateString('pt-BR', { month: 'short' }),
+                        margin: cumMargin,
+                        fixed: cStats.costs.fixed
+                    });
+                }
+                return data;
+            };
+
+            const breakEvenChartData = getBreakEvenDataYearly(selectedYear);
 
             return {
                 current: cStats,
                 previous: pStats,
                 serviceData,
                 paymentData,
+                breakEvenChartData,
                 rangeLabel: selectedYear.toString()
             };
         }
@@ -3084,6 +3199,35 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
                             <StatCard title="Lucro Líquido" value={`R$ ${(metricData.current.grossRevenue - (metricData as any).current.totalCost).toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" subValue={`${((metricData.current.grossRevenue - (metricData as any).current.totalCost) / (metricData.current.grossRevenue || 1) * 100).toFixed(1)}% Margem`} />
                         </div>
 
+                        {/* STRATEGIC INDICATORS */}
+                        <div className="mb-8">
+                            <h3 className="text-sm font-bold text-gray-500 mb-4 uppercase tracking-wider flex items-center gap-2"><Activity size={16} /> Indicadores Estratégicos</h3>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                                <StatCard title="Margem Contrib." value={`R$ ${(metricData as any).current.kpis.contributionMargin.toFixed(2)}`} icon={TrendingUp} colorClass="bg-emerald-500" subValue={`${(metricData as any).current.kpis.contributionMarginPercent.toFixed(1)}%`} />
+                                <StatCard title="Break-even" value={`R$ ${(metricData as any).current.kpis.breakEvenRevenue.toFixed(0)}`} icon={AlertOctagon} colorClass="bg-rose-500" subValue="Meta de Receita" />
+                                <StatCard title="CAC" value="R$ 0.00" icon={Users} colorClass="bg-blue-500" subValue="Custo/Cliente (Est)" />
+                                <StatCard title="Payroll" value={`${(metricData as any).current.kpis.payrollPercent.toFixed(1)}%`} icon={Users} colorClass="bg-amber-500" subValue="Meta: 25-35%" />
+                            </div>
+
+                            {/* BREAK-EVEN CHART */}
+                            <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
+                                <h3 className="text-sm font-bold text-gray-500 mb-6 uppercase tracking-wider flex items-center gap-2"><Activity size={16} /> Ponto de Equilíbrio (Break-even)</h3>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={(metricData as any).breakEvenChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 600 }} dy={10} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={(value) => `R$${value}`} />
+                                            <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }} />
+                                            <Legend verticalAlign="top" height={36} />
+                                            <Line type="monotone" dataKey="margin" name="Margem Acumulada" stroke="#10b981" strokeWidth={3} dot={false} />
+                                            <Line type="monotone" dataKey="fixed" name="Custos Fixos" stroke="#f43f5e" strokeWidth={3} dot={false} strokeDasharray="5 5" />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-radial from-brand-50 to-transparent opacity-50 pointer-events-none" />
                             <h3 className="text-sm font-bold text-gray-500 mb-6 uppercase tracking-wider flex items-center gap-2"><TrendingUp size={16} /> Evolução Mensal</h3>
@@ -3159,6 +3303,35 @@ const FinancialView: React.FC<{ appointments: Appointment[]; services: Service[]
                             <StatCard title="Total de Pets" value={metricData.current.totalPets} icon={PawPrint} colorClass="bg-blue-500" growth={getGrowth(metricData.current.totalPets, metricData.previous.totalPets)} />
                             <StatCard title="Faturamento Total" value={`R$ ${metricData.current.grossRevenue.toFixed(2)}`} icon={DollarSign} colorClass="bg-green-500" growth={getGrowth(metricData.current.grossRevenue, metricData.previous.grossRevenue)} />
                             <StatCard title="Lucro Líquido" value={`R$ ${(metricData.current.grossRevenue - (metricData as any).current.totalCost).toFixed(2)}`} icon={Wallet} colorClass="bg-purple-500" subValue={`${((metricData.current.grossRevenue - (metricData as any).current.totalCost) / (metricData.current.grossRevenue || 1) * 100).toFixed(1)}% Margem`} />
+                        </div>
+
+                        {/* STRATEGIC INDICATORS */}
+                        <div className="mb-8">
+                            <h3 className="text-sm font-bold text-gray-500 mb-4 uppercase tracking-wider flex items-center gap-2"><Activity size={16} /> Indicadores Estratégicos</h3>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                                <StatCard title="Margem Contrib." value={`R$ ${(metricData as any).current.kpis.contributionMargin.toFixed(2)}`} icon={TrendingUp} colorClass="bg-emerald-500" subValue={`${(metricData as any).current.kpis.contributionMarginPercent.toFixed(1)}%`} />
+                                <StatCard title="Break-even" value={`R$ ${(metricData as any).current.kpis.breakEvenRevenue.toFixed(0)}`} icon={AlertOctagon} colorClass="bg-rose-500" subValue="Meta de Receita" />
+                                <StatCard title="CAC" value="R$ 0.00" icon={Users} colorClass="bg-blue-500" subValue="Custo/Cliente (Est)" />
+                                <StatCard title="Payroll" value={`${(metricData as any).current.kpis.payrollPercent.toFixed(1)}%`} icon={Users} colorClass="bg-amber-500" subValue="Meta: 25-35%" />
+                            </div>
+
+                            {/* BREAK-EVEN CHART */}
+                            <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
+                                <h3 className="text-sm font-bold text-gray-500 mb-6 uppercase tracking-wider flex items-center gap-2"><Activity size={16} /> Ponto de Equilíbrio (Break-even)</h3>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={(metricData as any).breakEvenChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 600 }} dy={10} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={(value) => `R$${value}`} />
+                                            <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.1)' }} />
+                                            <Legend verticalAlign="top" height={36} />
+                                            <Line type="monotone" dataKey="margin" name="Margem Acumulada" stroke="#10b981" strokeWidth={3} dot={false} />
+                                            <Line type="monotone" dataKey="fixed" name="Custos Fixos" stroke="#f43f5e" strokeWidth={3} dot={false} strokeDasharray="5 5" />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-gray-100/50 mb-8 overflow-hidden relative">
