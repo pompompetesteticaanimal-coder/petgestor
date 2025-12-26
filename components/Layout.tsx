@@ -133,6 +133,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       <div className="pb-4" key="operacional">
         <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Operacional</p>
         <div className="space-y-1">
+          <NavItem view="home" current={currentView} icon={BarChart2} label="Resumo" onClick={setView} />
           <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={setView} />
           <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={setView} />
           <NavItem view="tasks" current={currentView} icon={ClipboardList} label="Tarefas" onClick={setView} />
