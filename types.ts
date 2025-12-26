@@ -44,6 +44,9 @@ export interface Appointment {
 
   paidAmount?: number; // Valor Pago
   paymentMethod?: 'Credito' | 'Debito' | 'Pix' | 'Dinheiro' | ''; // Forma de Pagamento
+  paymentStatus?: 'pending' | 'paid' | 'partially_paid'; // Status do Pagamento
+  ownerName?: string; // Nome do Dono (Desnormalizado)
+  petName?: string; // Nome do Pet (Desnormalizado)
   rating?: number; // 1-5
   ratingTags?: string[]; // Tags de avaliação
   googleEventId?: string; // Sync ID

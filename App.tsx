@@ -627,7 +627,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                     const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
                                     const val = calculateTotal(app, services);
                                     // Payment Fix: Payment Method is MANDATORY.
-                                    const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido');
+                                    const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido' || app.paymentStatus === 'paid');
 
                                     return (
                                         <div key={app.id} style={{ animationDelay: `${index * 0.05}s` }} className={`animate-slide-up bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
@@ -733,7 +733,7 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                                     const mainSvc = services.find(s => s.id === app.serviceId);
                                                     const addSvcs = app.additionalServiceIds?.map(id => services.find(srv => srv.id === id)).filter(x => x);
                                                     const val = calculateTotal(app, services);
-                                                    const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido');
+                                                    const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido' || app.paymentStatus === 'paid');
 
                                                     return (
                                                         <div key={app.id} className={`bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-stretch gap-4 transition-all ${isPaid ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
@@ -1073,7 +1073,12 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
     const handleSave = async (app: Appointment) => {
         setIsSaving(true);
         const finalAmount = parseFloat(amount);
-        const updatedApp = { ...app, paidAmount: finalAmount, paymentMethod: method as any };
+        const updatedApp: Appointment = {
+            ...app,
+            paidAmount: finalAmount,
+            paymentMethod: method as any,
+            paymentStatus: (finalAmount > 0 || method) ? 'paid' : 'pending' // Explicitly set status
+        };
 
         // No Google Sync needed here anymore. Upsert handled by parent onUpdateAppointment (via Supabase)
 
@@ -1135,7 +1140,7 @@ const PaymentManager: React.FC<{ appointments: Appointment[]; clients: Client[];
         const mainSvc = services.find(srv => srv.id === app.serviceId);
         const addSvcs = app.additionalServiceIds?.map(id => services.find(s => s.id === id)).filter((x): x is Service => !!x) || [];
         const expected = calculateExpected(app);
-        const isPaid = !!app.paidAmount && !!app.paymentMethod;
+        const isPaid = (!!app.paidAmount && !!app.paidAmount) || (!!app.paymentMethod && app.paymentStatus === 'paid');
         const isNoShow = app.status === 'nao_veio';
         const allServiceNames = [mainSvc?.name, ...addSvcs.map(s => s.name)].filter(n => n).join(' ').toLowerCase();
         let serviceBorderColor = 'border-l-sky-400';
