@@ -14,11 +14,12 @@ const mapClientFromDB = (data: any): Client => ({
 });
 
 // --- HELPERS FOR DATA ROBUSTNESS ---
-const normalizeDate = (d: string, createdAt?: string) => {
-    if (!d) return createdAt ? createdAt.split('T')[0] : new Date().toISOString().split('T')[0];
-    if (d.includes('/')) {
+const normalizeDate = (d: any, createdAt?: string) => {
+    if (!d) return createdAt ? String(createdAt).split('T')[0] : new Date().toISOString().split('T')[0];
+    const str = String(d);
+    if (str.includes('/')) {
         // Handle DD/MM/YYYY or DD/MM/YY
-        const parts = d.split('/');
+        const parts = str.split('/');
         if (parts.length === 3) {
             const day = parts[0].padStart(2, '0');
             const month = parts[1].padStart(2, '0');
@@ -28,7 +29,7 @@ const normalizeDate = (d: string, createdAt?: string) => {
         }
     }
     // Assume ISO or valid string
-    return d.substring(0, 10);
+    return str.substring(0, 10);
 };
 
 const safeAmount = (val: any): number => {
