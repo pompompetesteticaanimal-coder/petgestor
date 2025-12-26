@@ -21,6 +21,15 @@ export const FinancialInsightsView: React.FC<FinancialInsightsProps> = ({ appoin
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
 
+    console.log('FinancialInsightsView Render:', {
+        totalApps: appointments.length,
+        services: services.length,
+        costs: costs.length,
+        timeRange,
+        selectedYear,
+        selectedMonth
+    });
+
     // --- HELPER FUNCTIONS ---
     const parseDateLocal = (dateStr: string) => {
         const [y, m, d] = dateStr.split('-').map(Number);
@@ -82,21 +91,29 @@ export const FinancialInsightsView: React.FC<FinancialInsightsProps> = ({ appoin
         let uniqueClients = new Set<string>();
         let completedApps = 0;
 
+        console.log('Calculating Metrics for', filteredApps.length, 'apps');
+
         filteredApps.forEach(app => {
             if (app.status === 'nao_veio') return;
 
             const val = calculateAppRevenue(app);
             grossRevenue += val;
 
-            if (isPaid(app)) {
+            const paid = isPaid(app);
+            if (paid) {
                 paidRevenue += val;
             } else {
                 pendingRevenue += val;
             }
 
+            // Log first 5 apps for debug
+            if (completedApps < 5) console.log('App Debug:', { id: app.id, val, paid, paymentMethod: app.paymentMethod, paidAmount: app.paidAmount });
+
             uniqueClients.add(app.clientId);
             completedApps++;
         });
+
+        console.log('Metrics Result:', { grossRevenue, paidRevenue, pendingRevenue });
 
         const netProfit = paidRevenue - totalCosts; // Cash Basis for profit
         const economicResult = grossRevenue - totalCosts; // Accrual Basis
