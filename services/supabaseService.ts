@@ -98,7 +98,7 @@ export const supabaseService = {
             console.error('Error fetching clients:', error);
             return [];
         }
-        return data.map(mapClientFromDB);
+        return (data || []).map(mapClientFromDB);
     },
 
     upsertClient: async (client: Client) => {
@@ -140,7 +140,7 @@ export const supabaseService = {
             console.error('Error fetching services:', error);
             return [];
         }
-        return data.map(mapServiceFromDB);
+        return (data || []).map(mapServiceFromDB);
     },
 
     upsertService: async (service: Service) => {
@@ -167,7 +167,7 @@ export const supabaseService = {
             console.error('Error fetching appointments:', error);
             return [];
         }
-        return data.map(mapAppointmentFromDB);
+        return (data || []).map(mapAppointmentFromDB);
     },
 
     upsertAppointment: async (app: Appointment) => {
@@ -222,7 +222,7 @@ export const supabaseService = {
             console.error('Error fetching costs:', error);
             return [];
         }
-        return data.map((d: any) => ({
+        return (data || []).map((d: any) => ({
             id: d.id,
             month: d.month,
             week: d.week,
