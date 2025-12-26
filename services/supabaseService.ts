@@ -79,7 +79,7 @@ const mapAppointmentFromDB = (data: any): Appointment => ({
     notes: data.notes,
     durationTotal: data.duration_total,
     googleEventId: data.google_event_id,
-    paidAmount: data.paid_amount ? Number(data.paid_amount) : undefined,
+    paidAmount: (data.paid_amount !== null && data.paid_amount !== undefined) ? Number(data.paid_amount) : undefined,
     paymentMethod: data.payment_method,
     rating: data.rating,
     ratingTags: data.rating_tags,

@@ -27,9 +27,8 @@ export const FinancialInsightsView: React.FC<FinancialInsightsProps> = ({ appoin
         return new Date(y, m - 1, d);
     };
 
-    // Aligned with App.tsx calculateTotal logic
     const calculateAppRevenue = (app: Appointment) => {
-        if (app.paidAmount !== undefined && app.paidAmount > 0) return app.paidAmount;
+        if (app.paidAmount !== undefined) return app.paidAmount;
 
         // Fallback to calculated total if not explicitly paid (for projections)
         let total = 0;
