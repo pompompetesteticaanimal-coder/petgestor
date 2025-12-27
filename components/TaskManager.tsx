@@ -177,6 +177,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                             initialTab="records"
                             hideTabSwitcher={true}
                             hideValues={true}
+                            hideHeader={true}
                         />
                     </div>
                 ) : (
