@@ -286,9 +286,11 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                 ) : (
                     <MonthlyExpensesView
                         tasks={tasks}
+                        costs={costs}
                         onAddTask={handleAddTask}
                         onToggleTask={toggleTask}
                         onDeleteTask={deleteTask}
+                        onDeleteCost={onDeleteCost}
                     />
                 )}
             </div>

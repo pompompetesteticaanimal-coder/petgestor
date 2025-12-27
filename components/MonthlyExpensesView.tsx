@@ -22,6 +22,22 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
+
+    // Helper to safely parse dates (ISO or DD/MM/YYYY)
+    const parseDateHelper = (dateStr?: string) => {
+        if (!dateStr) return 0;
+        // ISO YYYY-MM-DD
+        if (dateStr.includes('-')) {
+            return new Date(dateStr).getTime();
+        }
+        // BR DD/MM/YYYY
+        if (dateStr.includes('/')) {
+            const [d, m, y] = dateStr.split('/');
+            return new Date(`${y}-${m}-${d}`).getTime();
+        }
+        return new Date(dateStr).getTime();
+    };
+
     // Unified Data Model
     const unifiedItems = useMemo(() => {
         const billTasks = tasks.filter(t => t.isBill).map(t => ({
@@ -45,9 +61,9 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
         }));
 
         return [...billTasks, ...costItems].sort((a, b) => {
-            // Sort by Date Descending (Newest first)
-            const d1 = new Date(a.date || 0).getTime();
-            const d2 = new Date(b.date || 0).getTime();
+            // Sort by Date Descending
+            const d1 = parseDateHelper(a.date);
+            const d2 = parseDateHelper(b.date);
             return d2 - d1;
         });
     }, [tasks, costs]);
@@ -88,13 +104,21 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
     const formatCurrency = (val?: number) => val ? `R$ ${val.toFixed(2).replace('.', ',')}` : '-';
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return '-';
-        const [y, m, d] = dateStr.split('-');
-        return `${d}/${m}`;
+        if (dateStr.includes('/')) {
+            const [d, m] = dateStr.split('/');
+            return `${d}/${m}`;
+        }
+        if (dateStr.includes('-')) {
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}`;
+        }
+        return dateStr;
     };
 
     // Calculate totals
     const totalPending = unifiedItems.filter(i => i.type === 'bill' && !i.completed).reduce((acc, i) => acc + i.amount, 0);
     const totalPaid = unifiedItems.filter(i => i.completed).reduce((acc, i) => acc + i.amount, 0);
+
 
     return (
         <div className="space-y-4 animate-fade-in">
