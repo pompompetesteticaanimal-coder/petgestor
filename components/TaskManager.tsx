@@ -288,6 +288,18 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                         tasks={tasks}
                         costs={costs}
                         onAddTask={handleAddTask}
+                        onUpdateTask={async (updatedTask) => {
+                            setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+                            if (supabase) {
+                                await supabase.from('tasks').update({
+                                    title: updatedTask.title,
+                                    amount: updatedTask.amount,
+                                    due_date: updatedTask.dueDate,
+                                    recurrence: updatedTask.recurrence,
+                                    priority: updatedTask.priority
+                                }).eq('id', updatedTask.id);
+                            }
+                        }}
                         onToggleTask={toggleTask}
                         onDeleteTask={deleteTask}
                         onDeleteCost={onDeleteCost}
