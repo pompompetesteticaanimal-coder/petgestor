@@ -90,6 +90,10 @@ export interface Task {
   category: 'Banho & Tosa' | 'Limpeza' | 'Administrativo' | 'Estoque' | 'Manutenção' | 'Equipe' | 'Outros';
   priority: 'Baixa' | 'Média' | 'Alta';
   createdAt: string;
+  amount?: number;       // For Monthly Expenses
+  dueDate?: string;      // ISO String
+  isBill?: boolean;      // Distinguish from regular tasks
+  recurrence?: 'mensal' | 'unico';
 }
 
 export const BRAZIL_DOG_BREEDS = [
