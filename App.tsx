@@ -2525,7 +2525,13 @@ const App: React.FC = () => {
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} />}
-                {currentView === 'tasks' && <TaskManager onAddCostFromTask={handleAddTaskCost} />}
+                {currentView === 'tasks' && <TaskManager
+                    onAddCostFromTask={handleAddTaskCost}
+                    costs={costs}
+                    onAddCost={handleAddCost}
+                    onUpdateCost={handleUpdateCost}
+                    onDeleteCost={handleDeleteCost}
+                />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }}
                 onSync={async (type) => {

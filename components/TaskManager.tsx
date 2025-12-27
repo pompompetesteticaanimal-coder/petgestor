@@ -1,14 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Plus, Trash2, Filter, AlertCircle, Circle, CheckCircle, X, Loader2, ArrowRight } from 'lucide-react';
-import { Task } from '../types';
+import { CheckSquare, Plus, Trash2, Filter, AlertCircle, Circle, CheckCircle, X, Loader2, ArrowRight, LayoutList, DollarSign } from 'lucide-react';
+import { Task, CostItem } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { CostsManager } from './CostsManager';
 
 interface TaskManagerProps {
     onAddCostFromTask?: (task: Task) => void;
+    costs?: CostItem[];
+    onAddCost?: (cost: CostItem) => void;
+    onUpdateCost?: (cost: CostItem) => void;
+    onDeleteCost?: (id: string) => void;
 }
 
-export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) => {
+export const TaskManager: React.FC<TaskManagerProps> = ({
+    onAddCostFromTask,
+    costs = [],
+    onAddCost = () => { },
+    onUpdateCost = () => { },
+    onDeleteCost = () => { }
+}) => {
+    const [activeTab, setActiveTab] = useState<'tasks' | 'costs'>('tasks');
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -20,6 +32,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) =
 
     // Cost Confirmation Popup State
     const [costConfirmationTask, setCostConfirmationTask] = useState<Task | null>(null);
+    const [pendingCostTask, setPendingCostTask] = useState<Task | null>(null);
 
     const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
 
@@ -33,19 +46,12 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) =
         if (supabase) {
             const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
             if (!error && data) {
-                // Map DB fields to Type if necessary (assuming direct match for now based on types.ts)
-                // Need to handle potential field mismatches if DB uses snake_case and type uses camelCase?
-                // types.ts defines Task with camelCase: createdAt. DB usually uses created_at.
-                // let's map it.
                 const mapped = data.map((d: any) => ({
                     ...d,
-                    createdAt: d.created_at || d.createdAt // fallback
+                    createdAt: d.created_at || d.createdAt
                 }));
                 setTasks(mapped);
             }
-        } else {
-            // Fallback for demo/dev without Supabase
-            // setTasks(initialTasks);
         }
         setIsLoading(false);
     };
@@ -62,7 +68,6 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) =
             createdAt: new Date().toISOString()
         };
 
-        // Optimistic UI
         setTasks([newTask, ...tasks]);
         setNewTaskTitle('');
         setIsModalOpen(false);
@@ -73,28 +78,24 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) =
                 category: newTaskCategory,
                 priority: newTaskPriority,
                 completed: false,
-                // created_at is auto-handled or we send it
             };
             await supabase.from('tasks').insert([dbTask]);
-            loadTasks(); // Refresh to get real ID
+            loadTasks();
         }
     };
 
     const toggleTask = async (id: string, currentStatus: boolean, task: Task) => {
         const newStatus = !currentStatus;
-
-        // Optimistic Update
         setTasks(tasks.map(t => t.id === id ? { ...t, completed: newStatus } : t));
 
         if (supabase) {
             await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
         }
 
-        // Logic for Cost Registration Confirmation
         if (newStatus === true) {
             const isPurchase = task.category === 'Estoque' || task.category === 'Manutenção' || task.title.toLowerCase().includes('comprar') || task.title.toLowerCase().includes('pagar');
 
-            if (isPurchase && onAddCostFromTask) {
+            if (isPurchase) {
                 setCostConfirmationTask(task);
             }
         }
@@ -108,7 +109,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) =
         }
     };
 
-    // Filter Logic: Show primarily Administrative context tasks
+    // Filter Logic
     const relevantCategories = ['Administrativo', 'Estoque', 'Manutenção', 'Equipe', 'Outros', 'Limpeza'];
     const filteredTasks = tasks.filter(t => {
         if (!relevantCategories.includes(t.category)) return false;
@@ -136,93 +137,136 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) =
     };
 
     return (
-        <div className="min-h-screen bg-[#F2F2F7] pb-24 animate-fade-in">
-            {/* Header */}
-            <div className="bg-white/80 backdrop-blur-xl border-b border-gray-200 sticky top-0 z-20 px-6 py-4 flex justify-between items-center shadow-sm">
-                <div>
-                    <h1 className="text-2xl font-black text-gray-900 tracking-tight">Tarefas</h1>
-                    <p className="text-xs text-gray-500 font-medium">Gestão Administrativa</p>
+        <div className="min-h-screen bg-[#F2F2F7] pb-24 animate-fade-in flex flex-col">
+            {/* Header with Tabs */}
+            <div className="bg-white/80 backdrop-blur-xl border-b border-gray-200 sticky top-0 z-20 px-4 py-4 shadow-sm flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Gestão</h1>
+                        <p className="text-xs text-gray-500 font-medium">Tarefas & Financeiro</p>
+                    </div>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-brand-600 text-white w-10 h-10 rounded-full shadow-lg shadow-brand-200 active:scale-90 transition-transform flex items-center justify-center"
-                >
-                    <Plus size={24} />
-                </button>
+
+                <div className="flex p-1 bg-gray-100 rounded-xl">
+                    <button
+                        onClick={() => setActiveTab('tasks')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'tasks' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <LayoutList size={16} /> Tarefas
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('costs')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'costs' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <DollarSign size={16} /> Financeiro
+                    </button>
+                </div>
             </div>
 
-            <div className="p-4 max-w-3xl mx-auto space-y-6">
-
-                {/* Progress Card */}
-                <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
-                        <h3 className="text-base font-bold text-gray-800">Progresso Geral</h3>
-                        <p className="text-xs text-gray-500 font-medium mt-1">{tasks.filter(t => t.completed).length} concluídas de {tasks.length}</p>
+            {/* Content Area */}
+            <div className="flex-1">
+                {activeTab === 'costs' ? (
+                    <div className="p-4">
+                        <CostsManager
+                            costs={costs}
+                            onAddCost={onAddCost}
+                            onUpdateCost={onUpdateCost}
+                            onDeleteCost={onDeleteCost}
+                            pendingTask={pendingCostTask}
+                            onClearPendingTask={() => setPendingCostTask(null)}
+                        />
                     </div>
-                    <div className="w-12 h-12 relative flex items-center justify-center">
-                        <svg className="w-full h-full transform -rotate-90">
-                            <circle cx="24" cy="24" r="20" stroke="#f3f4f6" strokeWidth="4" fill="transparent" />
-                            <circle cx="24" cy="24" r="20" stroke="#10b981" strokeWidth="4" fill="transparent" strokeDasharray={`${(completionRate / 100) * 125} 125`} strokeLinecap="round" />
-                        </svg>
-                        <span className="absolute text-[10px] font-bold text-green-600">{completionRate.toFixed(0)}%</span>
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <div className="bg-gray-200/50 p-1 rounded-xl flex gap-1">
-                    {(['all', 'pending', 'completed'] as const).map(f => (
-                        <button
-                            key={f}
-                            onClick={() => setFilter(f)}
-                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:bg-white/50'}`}
-                        >
-                            {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : 'Concluídas'}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Task List */}
-                <div className="space-y-3">
-                    {isLoading ? (
-                        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-brand-600" /></div>
-                    ) : filteredTasks.length === 0 ? (
-                        <div className="text-center py-12">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-300">
-                                <CheckSquare size={32} />
-                            </div>
-                            <p className="text-gray-400 font-medium text-sm">Nenhuma tarefa encontrada</p>
-                        </div>
-                    ) : (
-                        filteredTasks.map(task => (
-                            <div key={task.id} className={`bg-white p-4 rounded-[15px] shadow-sm border border-gray-100/50 flex flex-col gap-3 transition-all active:scale-[0.98] ${task.completed ? 'opacity-60 grayscale-[0.5]' : ''}`}>
-                                <div className="flex items-start gap-3">
-                                    <button
-                                        onClick={() => toggleTask(task.id, task.completed, task)}
-                                        className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${task.completed ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-brand-400'}`}
-                                    >
-                                        {task.completed && <CheckCircle size={14} className="text-white" />}
-                                    </button>
-
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className={`text-sm font-bold text-gray-900 leading-snug ${task.completed ? 'line-through text-gray-400' : ''}`}>{task.title}</h4>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[10px] font-bold">
-                                                {categoryIcon[task.category]} {task.category}
-                                            </span>
-                                            <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase ${priorityColor[task.priority]}`}>
-                                                {task.priority}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <button onClick={() => deleteTask(task.id)} className="text-gray-300 hover:text-red-500 p-2 -mr-2">
-                                        <Trash2 size={16} />
-                                    </button>
+                ) : (
+                    <div className="p-4 max-w-3xl mx-auto space-y-6">
+                        {/* Task Header with Add Button - Only visible in Tasks tab */}
+                        <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-brand-50 text-brand-600 rounded-xl"><CheckSquare size={20} /></div>
+                                <div>
+                                    <h3 className="font-bold text-gray-800">Minhas Tarefas</h3>
+                                    <p className="text-xs text-gray-400 font-medium">{tasks.filter(t => !t.completed).length} pendentes</p>
                                 </div>
                             </div>
-                        ))
-                    )}
-                </div>
+                            <button
+                                onClick={() => setIsModalOpen(true)}
+                                className="bg-brand-600 text-white w-10 h-10 rounded-full shadow-lg shadow-brand-200 active:scale-90 transition-transform flex items-center justify-center"
+                            >
+                                <Plus size={24} />
+                            </button>
+                        </div>
+
+                        {/* Progress Card */}
+                        <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-bold text-gray-800">Progresso Geral</h3>
+                                <p className="text-xs text-gray-500 font-medium mt-1">{tasks.filter(t => t.completed).length} concluídas de {tasks.length}</p>
+                            </div>
+                            <div className="w-12 h-12 relative flex items-center justify-center">
+                                <svg className="w-full h-full transform -rotate-90">
+                                    <circle cx="24" cy="24" r="20" stroke="#f3f4f6" strokeWidth="4" fill="transparent" />
+                                    <circle cx="24" cy="24" r="20" stroke="#10b981" strokeWidth="4" fill="transparent" strokeDasharray={`${(completionRate / 100) * 125} 125`} strokeLinecap="round" />
+                                </svg>
+                                <span className="absolute text-[10px] font-bold text-green-600">{completionRate.toFixed(0)}%</span>
+                            </div>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="bg-gray-200/50 p-1 rounded-xl flex gap-1">
+                            {(['all', 'pending', 'completed'] as const).map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:bg-white/50'}`}
+                                >
+                                    {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : 'Concluídas'}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Task List */}
+                        <div className="space-y-3">
+                            {isLoading ? (
+                                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-brand-600" /></div>
+                            ) : filteredTasks.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-300">
+                                        <CheckSquare size={32} />
+                                    </div>
+                                    <p className="text-gray-400 font-medium text-sm">Nenhuma tarefa encontrada</p>
+                                </div>
+                            ) : (
+                                filteredTasks.map(task => (
+                                    <div key={task.id} className={`bg-white p-4 rounded-[15px] shadow-sm border border-gray-100/50 flex flex-col gap-3 transition-all active:scale-[0.98] ${task.completed ? 'opacity-60 grayscale-[0.5]' : ''}`}>
+                                        <div className="flex items-start gap-3">
+                                            <button
+                                                onClick={() => toggleTask(task.id, task.completed, task)}
+                                                className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${task.completed ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-brand-400'}`}
+                                            >
+                                                {task.completed && <CheckCircle size={14} className="text-white" />}
+                                            </button>
+
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className={`text-sm font-bold text-gray-900 leading-snug ${task.completed ? 'line-through text-gray-400' : ''}`}>{task.title}</h4>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[10px] font-bold">
+                                                        {categoryIcon[task.category]} {task.category}
+                                                    </span>
+                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase ${priorityColor[task.priority]}`}>
+                                                        {task.priority}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <button onClick={() => deleteTask(task.id)} className="text-gray-300 hover:text-red-500 p-2 -mr-2">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Add Task Modal */}
@@ -282,7 +326,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) =
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6 animate-fade-in">
                     <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-bounce-soft text-center">
                         <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Circle size={32} /> {/* Using custom Dollar icon would be better but Circle is imported */}
+                            <Circle size={32} />
                             <span className="font-bold text-2xl">$</span>
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">Registrar Custo?</h3>
@@ -297,10 +341,9 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) =
                             </button>
                             <button
                                 onClick={() => {
-                                    if (onAddCostFromTask && costConfirmationTask) {
-                                        onAddCostFromTask(costConfirmationTask);
-                                        setCostConfirmationTask(null);
-                                    }
+                                    setPendingCostTask(costConfirmationTask);
+                                    setActiveTab('costs');
+                                    setCostConfirmationTask(null);
                                 }}
                                 className="py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors flex items-center justify-center gap-2"
                             >
