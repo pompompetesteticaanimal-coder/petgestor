@@ -136,6 +136,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
           <NavItem view="home" current={currentView} icon={BarChart2} label="Resumo" onClick={setView} />
           <NavItem view="packages" current={currentView} icon={Package} label="Pacotes" onClick={setView} />
           <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={setView} />
+          <NavItem view="records" current={currentView} icon={ClipboardList} label="Registros" onClick={setView} />
         </div>
       </div>
     ),

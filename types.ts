@@ -81,7 +81,7 @@ export interface ActivityLog {
   device?: string; // User Agent or Device ID
 }
 
-export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu' | 'inactive_clients' | 'packages' | 'activity_log' | 'tasks';
+export type ViewState = 'home' | 'revenue' | 'costs' | 'payments' | 'clients' | 'schedule' | 'services' | 'menu' | 'inactive_clients' | 'packages' | 'activity_log' | 'tasks' | 'records';
 
 export interface Task {
   id: string;

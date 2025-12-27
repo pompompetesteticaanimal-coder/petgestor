@@ -15,6 +15,7 @@ import { db } from './services/db';
 import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog, getBreedEmoji, Task } from './types';
 import PackageControlView from './components/PackageControlView';
 import { TaskManager } from './components/TaskManager';
+import { RecordsView } from './components/RecordsView';
 import { MenuView } from './components/MenuView';
 import { supabaseService } from './services/supabaseService';
 import { supabase } from './services/supabaseClient';
@@ -2449,7 +2450,7 @@ const App: React.FC = () => {
     // --- TASK TO COST HANDLER ---
     const handleAddTaskCost = (task: Task) => {
         setPendingTaskForCost(task);
-        setCurrentView('costs');
+        setCurrentView('records');
     };
 
 
@@ -2531,6 +2532,7 @@ const App: React.FC = () => {
                     onAddCost={handleAddCost}
                     onUpdateCost={handleUpdateCost}
                     onDeleteCost={handleDeleteCost}
+                    onNavigateToRecords={handleAddTaskCost}
                 />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }}
