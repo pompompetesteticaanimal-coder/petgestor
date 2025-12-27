@@ -1,10 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Plus, Trash2, Filter, AlertCircle, Circle, CheckCircle, X, Loader2 } from 'lucide-react';
+import { CheckSquare, Plus, Trash2, Filter, AlertCircle, Circle, CheckCircle, X, Loader2, ArrowRight } from 'lucide-react';
 import { Task } from '../types';
 import { supabase } from '../services/supabaseClient';
 
-export const TaskManager: React.FC = () => {
+interface TaskManagerProps {
+    onAddCostFromTask?: (task: Task) => void;
+}
+
+export const TaskManager: React.FC<TaskManagerProps> = ({ onAddCostFromTask }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -13,6 +17,9 @@ export const TaskManager: React.FC = () => {
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskCategory, setNewTaskCategory] = useState<Task['category']>('Outros');
     const [newTaskPriority, setNewTaskPriority] = useState<Task['priority']>('Média');
+
+    // Cost Confirmation Popup State
+    const [costConfirmationTask, setCostConfirmationTask] = useState<Task | null>(null);
 
     const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
 
@@ -23,88 +30,88 @@ export const TaskManager: React.FC = () => {
 
     const loadTasks = async () => {
         setIsLoading(true);
-        try {
-            if (!supabase) return;
-            const { data, error } = await supabase
-                .from('tasks')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (data) {
-                const mappedTasks = data.map(d => ({
-                    id: d.id,
-                    title: d.title,
-                    completed: d.completed,
-                    category: d.category,
-                    priority: d.priority,
-                    createdAt: d.created_at
-                } as Task));
-                setTasks(mappedTasks);
+        if (supabase) {
+            const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+            if (!error && data) {
+                // Map DB fields to Type if necessary (assuming direct match for now based on types.ts)
+                // Need to handle potential field mismatches if DB uses snake_case and type uses camelCase?
+                // types.ts defines Task with camelCase: createdAt. DB usually uses created_at.
+                // let's map it.
+                const mapped = data.map((d: any) => ({
+                    ...d,
+                    createdAt: d.created_at || d.createdAt // fallback
+                }));
+                setTasks(mapped);
             }
-            if (error) throw error;
-        } catch (error) {
-            console.error('Error loading tasks:', error);
-            // Fallback to local storage if needed, or just show empty for now
-            const stored = localStorage.getItem('pet_tasks');
-            if (stored) setTasks(JSON.parse(stored));
-        } finally {
-            setIsLoading(false);
+        } else {
+            // Fallback for demo/dev without Supabase
+            // setTasks(initialTasks);
         }
+        setIsLoading(false);
     };
 
-    const addTask = async () => {
+    const handleAddTask = async () => {
         if (!newTaskTitle.trim()) return;
 
         const newTask: Task = {
-            id: crypto.randomUUID(), // Optimistic ID
+            id: `task_${Date.now()}`,
             title: newTaskTitle,
-            completed: false,
             category: newTaskCategory,
             priority: newTaskPriority,
+            completed: false,
             createdAt: new Date().toISOString()
         };
 
-        // Optimistic Update
+        // Optimistic UI
         setTasks([newTask, ...tasks]);
-        setIsModalOpen(false);
         setNewTaskTitle('');
+        setIsModalOpen(false);
 
         if (supabase) {
-            const { error } = await supabase.from('tasks').insert([{
-                id: newTask.id,
-                title: newTask.title,
-                completed: newTask.completed,
-                category: newTask.category,
-                priority: newTask.priority,
-                created_at: newTask.createdAt
-            }]);
-            if (error) {
-                console.error("Error saving task:", error);
-                alert("Erro ao salvar tarefa no banco.");
-            }
+            const dbTask = {
+                title: newTaskTitle,
+                category: newTaskCategory,
+                priority: newTaskPriority,
+                completed: false,
+                // created_at is auto-handled or we send it
+            };
+            await supabase.from('tasks').insert([dbTask]);
+            loadTasks(); // Refresh to get real ID
         }
     };
 
-    const toggleTask = async (id: string, currentStatus: boolean) => {
-        // Optimistic
-        setTasks(tasks.map(t => t.id === id ? { ...t, completed: !currentStatus } : t));
+    const toggleTask = async (id: string, currentStatus: boolean, task: Task) => {
+        const newStatus = !currentStatus;
+
+        // Optimistic Update
+        setTasks(tasks.map(t => t.id === id ? { ...t, completed: newStatus } : t));
 
         if (supabase) {
-            await supabase.from('tasks').update({ completed: !currentStatus }).eq('id', id);
+            await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
+        }
+
+        // Logic for Cost Registration Confirmation
+        if (newStatus === true) {
+            const isPurchase = task.category === 'Estoque' || task.category === 'Manutenção' || task.title.toLowerCase().includes('comprar') || task.title.toLowerCase().includes('pagar');
+
+            if (isPurchase && onAddCostFromTask) {
+                setCostConfirmationTask(task);
+            }
         }
     };
 
     const deleteTask = async (id: string) => {
         if (!confirm('Tem certeza que deseja excluir esta tarefa?')) return;
-
         setTasks(tasks.filter(t => t.id !== id));
-
         if (supabase) {
             await supabase.from('tasks').delete().eq('id', id);
         }
     };
 
+    // Filter Logic: Show primarily Administrative context tasks
+    const relevantCategories = ['Administrativo', 'Estoque', 'Manutenção', 'Equipe', 'Outros', 'Limpeza'];
     const filteredTasks = tasks.filter(t => {
+        if (!relevantCategories.includes(t.category)) return false;
         if (filter === 'pending') return !t.completed;
         if (filter === 'completed') return t.completed;
         return true;
@@ -118,147 +125,186 @@ export const TaskManager: React.FC = () => {
         'Alta': 'bg-red-100 text-red-700'
     };
 
-    const categoryIcon = {
+    const categoryIcon: Record<string, string> = {
         'Banho & Tosa': '🛁',
         'Limpeza': '🧹',
         'Administrativo': '📝',
+        'Estoque': '📦',
+        'Manutenção': '🔧',
+        'Equipe': '👥',
         'Outros': '📌'
     };
 
     return (
-        <div className="space-y-6 animate-fade-in pb-20 relative min-h-screen">
-            <div className="flex justify-between items-center mb-2">
+        <div className="min-h-screen bg-[#F2F2F7] pb-24 animate-fade-in">
+            {/* Header */}
+            <div className="bg-white/80 backdrop-blur-xl border-b border-gray-200 sticky top-0 z-20 px-6 py-4 flex justify-between items-center shadow-sm">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Tarefas</h1>
-                    <p className="text-gray-500 font-medium">Gerencie sua rotina diária</p>
+                    <h1 className="text-2xl font-black text-gray-900 tracking-tight">Tarefas</h1>
+                    <p className="text-xs text-gray-500 font-medium">Gestão Administrativa</p>
                 </div>
                 <button
                     onClick={() => setIsModalOpen(true)}
-                    className="bg-brand-600 text-white p-3 rounded-2xl shadow-lg shadow-brand-200 active:scale-95 transition-transform flex items-center gap-2"
+                    className="bg-brand-600 text-white w-10 h-10 rounded-full shadow-lg shadow-brand-200 active:scale-90 transition-transform flex items-center justify-center"
                 >
-                    <Plus size={20} />
-                    <span className="font-bold text-sm hidden sm:inline">Nova Tarefa</span>
+                    <Plus size={24} />
                 </button>
             </div>
 
-            {/* Stats / Progress */}
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                <div>
-                    <h3 className="text-lg font-bold text-gray-800">Progresso do Dia</h3>
-                    <p className="text-sm text-gray-500">{tasks.filter(t => t.completed).length} de {tasks.length} tarefas concluídas</p>
-                </div>
-                <div className="relative w-16 h-16 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90">
-                        <circle cx="32" cy="32" r="28" stroke="#f3f4f6" strokeWidth="6" fill="transparent" />
-                        <circle cx="32" cy="32" r="28" stroke="#10b981" strokeWidth="6" fill="transparent" strokeDasharray={`${(completionRate / 100) * 175} 175`} strokeLinecap="round" />
-                    </svg>
-                    <span className="absolute text-xs font-bold text-green-600">{completionRate.toFixed(0)}%</span>
-                </div>
-            </div>
+            <div className="p-4 max-w-3xl mx-auto space-y-6">
 
-            {/* Filters */}
-            <div className="flex gap-2 bg-gray-50 p-1 rounded-2xl">
-                <button onClick={() => setFilter('all')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${filter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:bg-gray-200/50'}`}>Todas</button>
-                <button onClick={() => setFilter('pending')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${filter === 'pending' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:bg-gray-200/50'}`}>Pendentes</button>
-                <button onClick={() => setFilter('completed')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${filter === 'completed' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:bg-gray-200/50'}`}>Concluídas</button>
-            </div>
-
-            {/* List */}
-            <div className="space-y-3">
-                {isLoading ? (
-                    <div className="flex justify-center py-10"><Loader2 className="animate-spin text-brand-600" /></div>
-                ) : filteredTasks.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400 font-medium bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                        Nenhuma tarefa encontrada.
+                {/* Progress Card */}
+                <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-base font-bold text-gray-800">Progresso Geral</h3>
+                        <p className="text-xs text-gray-500 font-medium mt-1">{tasks.filter(t => t.completed).length} concluídas de {tasks.length}</p>
                     </div>
-                ) : (
-                    filteredTasks.map(task => (
-                        <div key={task.id} className={`bg-white p-4 rounded-2xl border shadow-sm flex items-center gap-3 transition-all ${task.completed ? 'opacity-60 border-gray-100 bg-gray-50' : 'border-gray-200 hover:border-brand-200'}`}>
-                            <button
-                                onClick={() => toggleTask(task.id, task.completed)}
-                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${task.completed ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 text-transparent hover:border-brand-400'}`}
-                            >
-                                <CheckCircle size={14} />
-                            </button>
-                            <div className="flex-1 min-w-0">
-                                <h4 className={`text-sm font-bold text-gray-800 truncate ${task.completed ? 'line-through text-gray-400' : ''}`}>{task.title}</h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-xs text-gray-600 flex items-center gap-1">{categoryIcon[task.category]} {task.category}</span>
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide ${priorityColor[task.priority]}`}>{task.priority}</span>
+                    <div className="w-12 h-12 relative flex items-center justify-center">
+                        <svg className="w-full h-full transform -rotate-90">
+                            <circle cx="24" cy="24" r="20" stroke="#f3f4f6" strokeWidth="4" fill="transparent" />
+                            <circle cx="24" cy="24" r="20" stroke="#10b981" strokeWidth="4" fill="transparent" strokeDasharray={`${(completionRate / 100) * 125} 125`} strokeLinecap="round" />
+                        </svg>
+                        <span className="absolute text-[10px] font-bold text-green-600">{completionRate.toFixed(0)}%</span>
+                    </div>
+                </div>
+
+                {/* Filters */}
+                <div className="bg-gray-200/50 p-1 rounded-xl flex gap-1">
+                    {(['all', 'pending', 'completed'] as const).map(f => (
+                        <button
+                            key={f}
+                            onClick={() => setFilter(f)}
+                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:bg-white/50'}`}
+                        >
+                            {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : 'Concluídas'}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Task List */}
+                <div className="space-y-3">
+                    {isLoading ? (
+                        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-brand-600" /></div>
+                    ) : filteredTasks.length === 0 ? (
+                        <div className="text-center py-12">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-300">
+                                <CheckSquare size={32} />
+                            </div>
+                            <p className="text-gray-400 font-medium text-sm">Nenhuma tarefa encontrada</p>
+                        </div>
+                    ) : (
+                        filteredTasks.map(task => (
+                            <div key={task.id} className={`bg-white p-4 rounded-[15px] shadow-sm border border-gray-100/50 flex flex-col gap-3 transition-all active:scale-[0.98] ${task.completed ? 'opacity-60 grayscale-[0.5]' : ''}`}>
+                                <div className="flex items-start gap-3">
+                                    <button
+                                        onClick={() => toggleTask(task.id, task.completed, task)}
+                                        className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${task.completed ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-brand-400'}`}
+                                    >
+                                        {task.completed && <CheckCircle size={14} className="text-white" />}
+                                    </button>
+
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className={`text-sm font-bold text-gray-900 leading-snug ${task.completed ? 'line-through text-gray-400' : ''}`}>{task.title}</h4>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[10px] font-bold">
+                                                {categoryIcon[task.category]} {task.category}
+                                            </span>
+                                            <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase ${priorityColor[task.priority]}`}>
+                                                {task.priority}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={() => deleteTask(task.id)} className="text-gray-300 hover:text-red-500 p-2 -mr-2">
+                                        <Trash2 size={16} />
+                                    </button>
                                 </div>
                             </div>
-                            <button onClick={() => deleteTask(task.id)} className="text-gray-300 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg">
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    ))
-                )}
+                        ))
+                    )}
+                </div>
             </div>
 
             {/* Add Task Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" style={{ zIndex: 9999 }}>
-                    <div className="bg-white w-full max-w-sm rounded-[2rem] p-5 shadow-2xl animate-bounce-soft relative mx-auto flex flex-col gap-4">
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                        >
-                            <X size={20} />
-                        </button>
+                <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 backdrop-blur-sm p-4" style={{ zIndex: 9999 }}>
+                    <div className="bg-white w-full max-w-md rounded-3xl p-6 relative animate-scale-up shadow-2xl">
+                        <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20} /></button>
+                        <h2 className="text-xl font-bold text-gray-900 mb-6">Nova Tarefa</h2>
 
-                        <h2 className="text-lg font-extrabold text-gray-900 mt-1">Nova Tarefa</h2>
-
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             <div>
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Título</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Título</label>
                                 <input
-                                    type="text"
-                                    placeholder="O que precisa ser feito?"
                                     autoFocus
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-semibold text-gray-800 focus:ring-2 ring-brand-200 outline-none"
+                                    placeholder="Ex: Comprar Shampoo"
                                     value={newTaskTitle}
                                     onChange={e => setNewTaskTitle(e.target.value)}
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-semibold outline-none focus:ring-2 ring-brand-200 transition-all placeholder:font-normal"
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Categoria</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {(['Banho & Tosa', 'Limpeza', 'Administrativo', 'Outros'] as const).map(cat => (
-                                        <button
-                                            key={cat}
-                                            onClick={() => setNewTaskCategory(cat)}
-                                            className={`px-2 py-2 rounded-xl text-[11px] font-bold transition-all border flex items-center justify-center gap-1.5 ${newTaskCategory === cat ? 'bg-brand-50 border-brand-500 text-brand-700 ring-1 ring-brand-500 shadow-sm' : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'}`}
-                                        >
-                                            {categoryIcon[cat]} {cat}
-                                        </button>
-                                    ))}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Categoria</label>
+                                    <select
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-semibold text-gray-800 outline-none"
+                                        value={newTaskCategory}
+                                        onChange={e => setNewTaskCategory(e.target.value as any)}
+                                    >
+                                        {relevantCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Prioridade</label>
+                                    <select
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-semibold text-gray-800 outline-none"
+                                        value={newTaskPriority}
+                                        onChange={e => setNewTaskPriority(e.target.value as any)}
+                                    >
+                                        <option value="Baixa">Baixa</option>
+                                        <option value="Média">Média</option>
+                                        <option value="Alta">Alta</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Prioridade</label>
-                                <div className="flex gap-2">
-                                    {(['Baixa', 'Média', 'Alta'] as const).map(prio => (
-                                        <button
-                                            key={prio}
-                                            onClick={() => setNewTaskPriority(prio)}
-                                            className={`flex-1 py-2 rounded-xl text-[11px] font-bold transition-all border ${newTaskPriority === prio ?
-                                                (prio === 'Alta' ? 'bg-red-50 border-red-500 text-red-700 shadow-sm' : prio === 'Média' ? 'bg-yellow-50 border-yellow-500 text-yellow-700 shadow-sm' : 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm')
-                                                : 'bg-white border-gray-100 text-gray-400 hover:bg-gray-50'}`}
-                                        >
-                                            {prio}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={addTask}
-                                disabled={!newTaskTitle.trim()}
-                                className="w-full bg-brand-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-brand-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2 text-sm"
-                            >
+                            <button onClick={handleAddTask} className="w-full bg-brand-600 text-white font-bold py-3.5 rounded-xl mt-2 hover:bg-brand-700 shadow-lg shadow-brand-200 active:scale-95 transition-all">
                                 Adicionar Tarefa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cost Confirmation Popup */}
+            {costConfirmationTask && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6 animate-fade-in">
+                    <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-bounce-soft text-center">
+                        <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Circle size={32} /> {/* Using custom Dollar icon would be better but Circle is imported */}
+                            <span className="font-bold text-2xl">$</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Registrar Custo?</h3>
+                        <p className="text-gray-500 text-sm mb-6">Esta tarefa parece ser uma compra.<br />Deseja adicionar aos custos agora?</p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => setCostConfirmationTask(null)}
+                                className="py-3 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors"
+                            >
+                                Agora Não
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (onAddCostFromTask && costConfirmationTask) {
+                                        onAddCostFromTask(costConfirmationTask);
+                                        setCostConfirmationTask(null);
+                                    }
+                                }}
+                                className="py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors flex items-center justify-center gap-2"
+                            >
+                                Sim, Adicionar <ArrowRight size={16} />
                             </button>
                         </div>
                     </div>

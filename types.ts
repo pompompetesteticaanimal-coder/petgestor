@@ -87,7 +87,7 @@ export interface Task {
   id: string;
   title: string;
   completed: boolean;
-  category: 'Banho & Tosa' | 'Limpeza' | 'Administrativo' | 'Outros';
+  category: 'Banho & Tosa' | 'Limpeza' | 'Administrativo' | 'Estoque' | 'Manutenção' | 'Equipe' | 'Outros';
   priority: 'Baixa' | 'Média' | 'Alta';
   createdAt: string;
 }

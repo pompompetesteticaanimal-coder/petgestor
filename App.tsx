@@ -12,7 +12,7 @@ import { ServiceManager } from './components/ServiceManager';
 import { CostsManager } from './components/CostsManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { db } from './services/db';
-import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog, getBreedEmoji } from './types';
+import { Client, Service, Appointment, ViewState, Pet, CostItem, AppSettings, ActivityLog, getBreedEmoji, Task } from './types';
 import PackageControlView from './components/PackageControlView';
 import { TaskManager } from './components/TaskManager';
 import { MenuView } from './components/MenuView';
@@ -2139,6 +2139,9 @@ const App: React.FC = () => {
     const [pin, setPin] = useState(localStorage.getItem('petgestor_pin') || '');
     const [isPinUnlocked, setIsPinUnlocked] = useState(false);
 
+    // Task to Cost Flow State
+    const [pendingTaskForCost, setPendingTaskForCost] = useState<Task | null>(null);
+
     const STORAGE_KEY_SETTINGS = 'petgestor_settings';
 
     useEffect(() => {
@@ -2443,6 +2446,12 @@ const App: React.FC = () => {
     // --- NOTIFICATION HANDLER ---
     useNotificationScheduler(appointments, services);
 
+    // --- TASK TO COST HANDLER ---
+    const handleAddTaskCost = (task: Task) => {
+        setPendingTaskForCost(task);
+        setCurrentView('costs');
+    };
+
 
     // --- RENDER ---
 
@@ -2492,7 +2501,7 @@ const App: React.FC = () => {
             >
                 {currentView === 'home' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="daily" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} isSummaryOnly={true} onUpdateAppointment={handleUpdateApp} onLog={logAction} onReschedule={handleReschedule} />}
                 {currentView === 'revenue' && <RevenueView appointments={appointments} services={services} clients={clients} costs={costs} defaultTab="monthly" onRemovePayment={handleRemovePayment} onNoShow={handleNoShow} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} isSummaryOnly={false} onUpdateAppointment={handleUpdateApp} onLog={logAction} onReschedule={handleReschedule} />}
-                {currentView === 'costs' && <CostsManager costs={costs} onAddCost={handleAddCost} onUpdateCost={handleUpdateCost} onDeleteCost={handleDeleteCost} />}
+                {currentView === 'costs' && <CostsManager costs={costs} onAddCost={handleAddCost} onUpdateCost={handleUpdateCost} onDeleteCost={handleDeleteCost} pendingTask={pendingTaskForCost} onClearPendingTask={() => setPendingTaskForCost(null)} />}
                 {currentView === 'activity_log' && <ActivityLogView logs={logs} onBack={() => setCurrentView('menu')} />}
                 {currentView === 'payments' && <PaymentManager appointments={appointments} clients={clients} services={services}
                     onUpdateAppointment={handleUpdateApp}
@@ -2516,7 +2525,7 @@ const App: React.FC = () => {
                 {currentView === 'menu' && <MenuView setView={setCurrentView} onOpenSettings={() => setIsSettingsOpen(true)} />}
                 {currentView === 'inactive_clients' && <InactiveClientsView clients={clients} appointments={appointments} services={services} contactLogs={contactLogs} onMarkContacted={handleMarkContacted} onBack={() => setCurrentView('menu')} onViewPet={(pet, client) => setPetDetailsData({ pet, client })} />}
                 {currentView === 'packages' && <PackageControlView clients={clients} appointments={appointments} services={services} />}
-                {currentView === 'tasks' && <TaskManager />}
+                {currentView === 'tasks' && <TaskManager onAddCostFromTask={handleAddTaskCost} />}
             </Layout>
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={(s) => { setSettings(s); localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(s)); }}
                 onSync={async (type) => {

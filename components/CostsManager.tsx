@@ -1,24 +1,25 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, LineChart, Line, CartesianGrid
 } from 'recharts';
 import {
-    TrendingUp, TrendingDown, DollarSign, Calendar, Filter, Plus, Trash2, Edit2, X, Check, Search, PieChart as PieChartIcon, BarChart2, Table as TableIcon, LayoutDashboard, ArrowUpRight, ArrowDownRight
+    TrendingUp, TrendingDown, DollarSign, Calendar, Filter, Plus, Trash2, Edit2, X, Check, Search, PieChart as PieChartIcon, BarChart2, Table as TableIcon, LayoutDashboard, ArrowUpRight, ArrowDownRight, AlertTriangle
 } from 'lucide-react';
-import { CostItem } from '../types';
+import { CostItem, Task } from '../types';
 
 interface CostsManagerProps {
     costs: CostItem[];
     onAddCost: (cost: CostItem) => void;
     onUpdateCost: (cost: CostItem) => void;
     onDeleteCost: (id: string) => void;
+    pendingTask?: Task | null;
+    onClearPendingTask?: () => void;
 }
 
-export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, onUpdateCost, onDeleteCost }) => {
+export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, onUpdateCost, onDeleteCost, pendingTask, onClearPendingTask }) => {
     const [activeTab, setActiveTab] = useState<'dashboard' | 'records'>('dashboard');
     const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('yearly');
-    // Default to current year, but if no costs in current year and we have costs elsewhere, maybe smart-select?
-    // For now, keep simple behavior but add UI warning.
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
 
@@ -31,8 +32,23 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
     const [formStatus, setFormStatus] = useState<'Pago' | 'Pendente'>('Pago');
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Start with pending task if present
+    useEffect(() => {
+        if (pendingTask) {
+            setActiveTab('records');
+            setEditingCost(null);
+            setFormDate(new Date().toISOString().split('T')[0]);
+            setFormAmount('');
+            setFormStatus('Pago');
+            // Map Task Title to Description/Category input
+            setFormCategory(pendingTask.title);
+            setIsFormOpen(true);
+
+            if (onClearPendingTask) onClearPendingTask();
+        }
+    }, [pendingTask, onClearPendingTask]);
+
     // --- HELPER: Safe Date Parsing ---
-    // Fixes the issue where new Date('2024-05-01') is UTC, but displayed as Apr 30 locally
     const parseDateLocal = (dateString: string) => {
         const [y, m, d] = dateString.split('-').map(Number);
         return new Date(y, m - 1, d);
@@ -42,6 +58,27 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
         const cat = c.category?.toLowerCase() || '';
         return cat !== 'sócio' && cat !== 'socio' && !cat.includes('extraordinário') && !cat.includes('extraordinario');
     };
+
+    // --- STOCK ALERT LOGIC ---
+    const stockAlerts = useMemo(() => {
+        const alerts: string[] = [];
+        const today = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+
+        const hasShampooPurchase = costs.some(c => {
+            const date = parseDateLocal(c.date);
+            const isRecent = date >= thirtyDaysAgo;
+            const isInsumo = c.category === 'Insumos';
+            const desc = c.category.toLowerCase();
+            return isRecent && (desc.includes('shampoo') || (isInsumo && desc.includes('neutro')));
+        });
+
+        if (!hasShampooPurchase) {
+            alerts.push("Alerta: Nenhuma compra de 'Shampoo Neutro' registrada nos últimos 30 dias.");
+        }
+        return alerts;
+    }, [costs]);
 
     // --- FORM HANDLERS ---
     const handleOpenForm = (cost?: CostItem) => {
@@ -69,7 +106,6 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
 
         const amount = parseFloat(formAmount);
         const [y, m, d] = formDate.split('-').map(Number);
-
         const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
         const monthName = monthNames[m - 1];
 
@@ -80,7 +116,7 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
             amount: amount,
             status: formStatus,
             month: monthName,
-            week: 'WEEK_CALC_PLACEHOLDER'
+            week: `Semana ${Math.ceil(d / 7)}`
         };
 
         if (editingCost) {
@@ -109,7 +145,6 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
             const searchLower = searchTerm.toLowerCase();
             list = list.filter(c => c.category.toLowerCase().includes(searchLower) || c.amount.toString().includes(searchTerm));
         }
-        // Force sort by date desc
         return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [costs, viewMode, selectedYear, selectedMonth, searchTerm]);
 
@@ -121,19 +156,20 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
     }, [filteredCosts]);
 
     const chartsData = useMemo(() => {
-        // By Category
         const counts: Record<string, number> = {};
         filteredCosts.forEach(c => {
-            const cat = c.category || 'Outros';
+            let cat = c.category || 'Outros';
+            if (cat.toLowerCase().includes('luz') || cat.toLowerCase().includes('agua') || cat.toLowerCase().includes('aluguel') || cat.toLowerCase().includes('internet') || cat.toLowerCase().includes('sistema')) cat = 'Fixo';
+            else if (cat.toLowerCase().includes('shampoo') || cat.toLowerCase().includes('laços') || cat.toLowerCase().includes('toalha') || cat.toLowerCase().includes('produto') || cat.toLowerCase().includes('insumos')) cat = 'Insumos';
+            else if (cat.toLowerCase().includes('manutenção') || cat.toLowerCase().includes('afiar') || cat.toLowerCase().includes('conserto')) cat = 'Manutenção';
+            else if (cat.toLowerCase().includes('equipe') || cat.toLowerCase().includes('freelancer') || cat.toLowerCase().includes('pagamento')) cat = 'Equipe'; // New category
+
             counts[cat] = (counts[cat] || 0) + c.amount;
         });
         const byCategory = Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
-        // By Month (for Year View mainly, but valid for Monthly too as daily trend could be interesting)
         const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const byMonth = Array(12).fill(0).map((_, i) => ({ name: monthNames[i], value: 0 }));
-
-        // Use ALL costs for year trend if in year mode
         const sourceData = viewMode === 'yearly' ? costs.filter(c => parseDateLocal(c.date).getFullYear() === selectedYear && isOperationalCost(c)) : filteredCosts;
 
         sourceData.forEach(c => {
@@ -141,8 +177,7 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
             byMonth[d.getMonth()].value += c.amount;
         });
 
-        // 2025-12-14: User requested to show only August onwards (Operations started in August)
-        const operationalMonths = byMonth.slice(7); // Index 7 is August
+        const operationalMonths = viewMode === 'yearly' ? byMonth.slice(7) : byMonth;
 
         return { byCategory, byMonth: operationalMonths };
     }, [costs, filteredCosts, viewMode, selectedYear]);
@@ -152,37 +187,42 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
     return (
         <div className="space-y-6 animate-fade-in pb-20 md:pb-0 h-full overflow-y-auto custom-scrollbar">
 
+            {/* --- ALERT SECTION --- */}
+            {stockAlerts.length > 0 && (
+                <div className="bg-orange-50 border border-orange-100 p-4 rounded-2xl flex items-start gap-3 animate-slide-down shadow-sm">
+                    <div className="bg-orange-100 p-2 rounded-full text-orange-600 flex-shrink-0">
+                        <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-orange-800 text-sm">Atenção! Estoque Baixo</h4>
+                        {stockAlerts.map((alert, idx) => (
+                            <p key={idx} className="text-xs text-orange-700 mt-1 font-medium leading-relaxed">{alert}</p>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* --- TOP BAR --- */}
-            <div className="bg-white/80 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-white/50 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-20">
+            <div className="bg-white/80 backdrop-blur-xl p-5 rounded-3xl shadow-sm border border-white/50 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-20">
                 <div className="flex items-center gap-3 w-full md:w-auto">
                     <div className="bg-gradient-to-br from-red-100 to-rose-50 p-2.5 rounded-2xl text-red-600 shadow-sm border border-red-100">
                         <TrendingDown size={24} />
                     </div>
                     <div>
-                        <h2 className="text-xl font-black text-gray-800 tracking-tight">Gestão de Despesas</h2>
-                        <p className="text-xs text-gray-500 font-medium">
-                            Controle Financeiro • {costs.length} registros carregados
-                        </p>
+                        <h2 className="text-xl font-black text-gray-800 tracking-tight">Gestão de Custos</h2>
+                        <p className="text-xs text-gray-500 font-medium">Controle Financeiro</p>
                     </div>
                 </div>
 
-                {/* TABS SWITCHER */}
                 <div className="flex p-1.5 bg-gray-100/80 rounded-2xl md:w-auto w-full">
-                    <button
-                        onClick={() => setActiveTab('dashboard')}
-                        className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'dashboard' ? 'bg-white text-brand-600 shadow-md transform scale-105' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
+                    <button onClick={() => setActiveTab('dashboard')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'dashboard' ? 'bg-white text-brand-600 shadow-md transform scale-105' : 'text-gray-400 hover:text-gray-600'}`}>
                         <LayoutDashboard size={14} /> Visão Geral
                     </button>
-                    <button
-                        onClick={() => setActiveTab('records')}
-                        className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'records' ? 'bg-white text-brand-600 shadow-md transform scale-105' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
+                    <button onClick={() => setActiveTab('records')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'records' ? 'bg-white text-brand-600 shadow-md transform scale-105' : 'text-gray-400 hover:text-gray-600'}`}>
                         <TableIcon size={14} /> Registros
                     </button>
                 </div>
 
-                {/* Date Controls */}
                 <div className="flex items-center gap-2 w-full md:w-auto">
                     <div className="flex bg-gray-100/50 p-1 rounded-xl">
                         <button onClick={() => setViewMode('monthly')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${viewMode === 'monthly' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400'}`}>Mês</button>
@@ -201,44 +241,23 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
             {/* --- DASHBOARD TAB --- */}
             {activeTab === 'dashboard' && (
                 <div className="space-y-6 animate-fade-in-up">
-                    {/* KPI CARDS */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between group h-32">
                             <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity"><DollarSign size={100} /></div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">Total Despesas</p>
-                            <div className="flex items-end gap-2">
-                                <h3 className="text-3xl font-black text-gray-800 tracking-tight">R$ {kpiData.total.toFixed(2)}</h3>
-                            </div>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">Total Custos</p>
+                            <h3 className="text-3xl font-black text-gray-800 tracking-tight">R$ {kpiData.total.toFixed(2)}</h3>
                         </div>
-
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-32 border-l-4 border-l-green-500">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Check size={12} /> Pago</p>
                             <h3 className="text-3xl font-black text-green-600 tracking-tight">R$ {kpiData.paid.toFixed(2)}</h3>
                         </div>
-
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-32 border-l-4 border-l-orange-500">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Calendar size={12} /> Pendente</p>
                             <h3 className="text-3xl font-black text-orange-500 tracking-tight">R$ {kpiData.pending.toFixed(2)}</h3>
                         </div>
                     </div>
 
-                    {/* CHARTS */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                            <h3 className="text-sm font-bold text-gray-800 mb-6 flex items-center gap-2"><BarChart2 size={16} className="text-brand-500" /> Fluxo Anual</h3>
-                            <div className="h-72 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartsData.byMonth}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(value) => `R$${value}`} />
-                                        <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} cursor={{ fill: '#f3f4f6' }} formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor']} />
-                                        <Bar dataKey="value" fill="#e11d48" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
                             <h3 className="text-sm font-bold text-gray-800 mb-6 flex items-center gap-2"><PieChartIcon size={16} className="text-blue-500" /> Categorias</h3>
                             <div className="h-72 w-full relative">
@@ -252,8 +271,23 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none -ml-28 md:-ml-32">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Top<br />Cats</span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Top<br />Cat</span>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                            <h3 className="text-sm font-bold text-gray-800 mb-6 flex items-center gap-2"><BarChart2 size={16} className="text-brand-500" /> Histórico Mensal</h3>
+                            <div className="h-72 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartsData.byMonth}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(value) => `R$${value}`} />
+                                        <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} cursor={{ fill: '#f3f4f6' }} formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor']} />
+                                        <Bar dataKey="value" fill="#e11d48" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             </div>
                         </div>
                     </div>
@@ -268,7 +302,7 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
                                 type="text"
-                                placeholder="Buscar por categoria ou valor..."
+                                placeholder="Buscar..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium outline-none focus:ring-2 ring-brand-100 transition-all"
@@ -295,14 +329,7 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                     {filteredCosts.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
-                                                <div className="flex flex-col items-center gap-2 opacity-50">
-                                                    <LayoutDashboard size={32} />
-                                                    <p className="font-medium">
-                                                        {costs.length > 0
-                                                            ? `Nenhum registro em ${selectedYear}. Verifique o filtro de Ano/Mês.`
-                                                            : "Nenhum registro encontrado no banco de dados."}
-                                                    </p>
-                                                </div>
+                                                Nenhum registro encontrado.
                                             </td>
                                         </tr>
                                     ) : (
@@ -311,28 +338,23 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                                 <td className="px-6 py-4 font-medium text-gray-600 whitespace-nowrap">
                                                     {parseDateLocal(cost.date).toLocaleDateString('pt-BR')}
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="font-bold text-gray-700 block">{cost.category}</span>
-                                                    {/* Optional: Add notes if available in type */}
-                                                </td>
-                                                <td className="px-6 py-4 font-bold text-gray-800">
-                                                    R$ {cost.amount.toFixed(2)}
-                                                </td>
+                                                <td className="px-6 py-4"><span className="font-bold text-gray-700">{cost.category}</span></td>
+                                                <td className="px-6 py-4 font-bold text-gray-800">R$ {cost.amount.toFixed(2)}</td>
                                                 <td className="px-6 py-4">
                                                     {cost.status === 'Pago' ? (
-                                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-100">
+                                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
                                                             <Check size={10} strokeWidth={3} /> Pago
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">
+                                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full">
                                                             <Calendar size={10} strokeWidth={3} /> Pendente
                                                         </span>
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
-                                                        <button onClick={() => handleOpenForm(cost)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Editar"><Edit2 size={16} /></button>
-                                                        <button onClick={() => { if (confirm('Excluir este custo permanentemente?')) onDeleteCost(cost.id) }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Excluir"><Trash2 size={16} /></button>
+                                                        <button onClick={() => handleOpenForm(cost)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit2 size={16} /></button>
+                                                        <button onClick={() => onDeleteCost(cost.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -358,27 +380,23 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
 
                         <div className="space-y-5">
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block ml-1">Descrição / Categoria</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block ml-1">Categoria / Descrição</label>
                                 <input
                                     list="categories"
                                     value={formCategory}
                                     onChange={e => setFormCategory(e.target.value)}
                                     className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none transition-all focus:bg-white"
-                                    placeholder="Ex: Aluguel"
+                                    placeholder="Ex: Fatura Internet"
                                     autoFocus
                                 />
                                 <datalist id="categories">
-                                    <option value="Aluguel" />
-                                    <option value="Água" />
-                                    <option value="Luz" />
-                                    <option value="Internet" />
-                                    <option value="Sistema" />
-                                    <option value="Insumos" />
-                                    <option value="Produtos" />
-                                    <option value="Manutenção" />
-                                    <option value="Marketing" />
-                                    <option value="Limpeza" />
+                                    <option value="Insumos">Shampoo, Laços, Produtos...</option>
+                                    <option value="Equipamentos">Soprador, Máquina...</option>
+                                    <option value="Manutenção">Afiação, Conserto...</option>
+                                    <option value="Fixo">Aluguel, Luz, Água...</option>
+                                    <option value="Equipe">Freelancer, Pagamentos...</option>
                                 </datalist>
+                                <p className="text-[10px] text-gray-400 mt-1 ml-1">Selecione uma categoria padrão ou digite uma descrição personalizada.</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -391,7 +409,7 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                             step="0.01"
                                             value={formAmount}
                                             onChange={e => setFormAmount(e.target.value)}
-                                            className="w-full bg-gray-50 border border-gray-100 pl-10 pr-4 py-3.5 rounded-xl font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none transition-all focus:bg-white"
+                                            className="w-full bg-gray-50 border border-gray-100 pl-10 pr-4 py-3.5 rounded-xl font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none transition-all"
                                             placeholder="0.00"
                                         />
                                     </div>
@@ -402,32 +420,22 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                         type="date"
                                         value={formDate}
                                         onChange={e => setFormDate(e.target.value)}
-                                        className="w-full bg-gray-50 border border-gray-100 px-3 py-3.5 rounded-xl font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none transition-all focus:bg-white cursor-pointer"
+                                        className="w-full bg-gray-50 border border-gray-100 px-3 py-3.5 rounded-xl font-bold text-gray-800 focus:ring-2 ring-brand-200 outline-none"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block ml-1">Status do Pagamento</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block ml-1">Status</label>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => setFormStatus('Pago')}
-                                        className={`py-3.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 ${formStatus === 'Pago' ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'}`}
-                                    >
-                                        <Check size={16} strokeWidth={3} /> Pago
-                                    </button>
-                                    <button
-                                        onClick={() => setFormStatus('Pendente')}
-                                        className={`py-3.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 ${formStatus === 'Pendente' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'}`}
-                                    >
-                                        <Calendar size={16} strokeWidth={3} /> Pendente
-                                    </button>
+                                    <button onClick={() => setFormStatus('Pago')} className={`py-3.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 ${formStatus === 'Pago' ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'}`}><Check size={16} strokeWidth={3} /> Pago</button>
+                                    <button onClick={() => setFormStatus('Pendente')} className={`py-3.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 ${formStatus === 'Pendente' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm' : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'}`}><Calendar size={16} strokeWidth={3} /> Pendente</button>
                                 </div>
                             </div>
 
                             <button
                                 onClick={handleSave}
-                                className="w-full py-4 bg-brand-600 text-white font-bold rounded-xl mt-4 hover:bg-brand-700 shadow-xl shadow-brand-200 hover:shadow-brand-300 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-4 bg-brand-600 text-white font-bold rounded-xl mt-4 hover:bg-brand-700 shadow-xl shadow-brand-200 active:scale-95 transition-all flex items-center justify-center gap-2"
                             >
                                 <Check size={20} strokeWidth={3} />
                                 {editingCost ? 'Salvar Alterações' : 'Adicionar Registro'}
