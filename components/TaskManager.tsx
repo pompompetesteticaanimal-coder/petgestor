@@ -176,6 +176,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                             onClearPendingTask={() => setPendingCostTask(null)}
                             initialTab="records"
                             hideTabSwitcher={true}
+                            hideValues={true}
                         />
                     </div>
                 ) : (

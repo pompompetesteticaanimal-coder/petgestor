@@ -15,10 +15,23 @@ interface CostsManagerProps {
     onDeleteCost: (id: string) => void;
     pendingTask?: Task | null;
     onClearPendingTask?: () => void;
+    initialTab?: 'dashboard' | 'records';
+    hideTabSwitcher?: boolean;
+    hideValues?: boolean;
 }
 
-export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, onUpdateCost, onDeleteCost, pendingTask, onClearPendingTask }) => {
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'records'>('dashboard');
+export const CostsManager: React.FC<CostsManagerProps> = ({
+    costs,
+    onAddCost,
+    onUpdateCost,
+    onDeleteCost,
+    pendingTask,
+    onClearPendingTask,
+    initialTab = 'dashboard',
+    hideTabSwitcher = false,
+    hideValues = false
+}) => {
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'records'>(initialTab);
     const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('yearly');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -320,7 +333,7 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                     <tr>
                                         <th className="px-6 py-4">Data</th>
                                         <th className="px-6 py-4">Categoria / Descrição</th>
-                                        <th className="px-6 py-4">Valor</th>
+                                        {!hideValues && <th className="px-6 py-4">Valor</th>}
                                         <th className="px-6 py-4">Status</th>
                                         <th className="px-6 py-4 text-right">Ações</th>
                                     </tr>
@@ -328,7 +341,7 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                 <tbody className="divide-y divide-gray-50">
                                     {filteredCosts.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                                            <td colSpan={hideValues ? 4 : 5} className="px-6 py-12 text-center text-gray-400">
                                                 Nenhum registro encontrado.
                                             </td>
                                         </tr>
@@ -339,7 +352,7 @@ export const CostsManager: React.FC<CostsManagerProps> = ({ costs, onAddCost, on
                                                     {parseDateLocal(cost.date).toLocaleDateString('pt-BR')}
                                                 </td>
                                                 <td className="px-6 py-4"><span className="font-bold text-gray-700">{cost.category}</span></td>
-                                                <td className="px-6 py-4 font-bold text-gray-800">R$ {cost.amount.toFixed(2)}</td>
+                                                {!hideValues && <td className="px-6 py-4 font-bold text-gray-800">R$ {cost.amount.toFixed(2)}</td>}
                                                 <td className="px-6 py-4">
                                                     {cost.status === 'Pago' ? (
                                                         <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
