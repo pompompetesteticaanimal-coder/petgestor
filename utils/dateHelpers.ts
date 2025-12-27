@@ -22,3 +22,11 @@ export const toLocalDateString = (date: Date): string => {
 export const getTodayString = (): string => {
     return toLocalDateString(new Date());
 };
+
+export const formatDateWithWeek = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    const options: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: '2-digit' };
+    return date.toLocaleDateString('pt-BR', options).replace('.', '').toUpperCase();
+};
