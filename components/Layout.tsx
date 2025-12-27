@@ -134,9 +134,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
         <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Operacional</p>
         <div className="space-y-1">
           <NavItem view="home" current={currentView} icon={BarChart2} label="Resumo" onClick={setView} />
-          <NavItem view="payments" current={currentView} icon={Wallet} label="Pagamentos" onClick={setView} />
+          <NavItem view="packages" current={currentView} icon={Package} label="Pacotes" onClick={setView} />
           <NavItem view="schedule" current={currentView} icon={Calendar} label="Agenda" onClick={setView} />
-          <NavItem view="tasks" current={currentView} icon={ClipboardList} label="Tarefas" onClick={setView} />
         </div>
       </div>
     ),
@@ -144,7 +143,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       <div className="pt-4 pb-4" key="cadastros">
         <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Cadastros</p>
         <div className="space-y-1">
-          <NavItem view="packages" current={currentView} icon={Package} label="Pacotes" onClick={setView} />
+          <NavItem view="tasks" current={currentView} icon={ClipboardList} label="Tarefas" onClick={setView} />
           <NavItem view="clients" current={currentView} icon={Users} label="Clientes" onClick={setView} />
           <NavItem view="services" current={currentView} icon={Scissors} label="Serviços" onClick={setView} />
         </div>
@@ -239,7 +238,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
       {/* Mobile Floating Tab Bar */}
       <div className="md:hidden fixed bottom-6 left-4 right-4 h-20 bg-white/90 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl glass-card flex justify-around items-center px-2 z-50 animate-slide-up">
         <BottomNavItem view="home" current={currentView} icon={BarChart2} label="Resumo" onClick={setView} />
-        <BottomNavItem view="payments" current={currentView} icon={Wallet} label="Pagto" onClick={setView} />
+        <BottomNavItem view="packages" current={currentView} icon={Package} label="Pacotes" onClick={setView} />
         <div className="relative -top-6">
           <button
             onClick={() => currentView === 'schedule' && onAddAppointment ? onAddAppointment() : setView('schedule')}
@@ -248,8 +247,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, setView, 
             {currentView === 'schedule' ? <CalendarPlus size={28} /> : <Calendar size={28} />}
           </button>
         </div>
-        {/* REPLACED Clients with Packages */}
-        <BottomNavItem view="packages" current={currentView} icon={Package} label="Pacotes" onClick={setView} />
+        <BottomNavItem view="tasks" current={currentView} icon={ClipboardList} label="Tarefas" onClick={setView} />
         <BottomNavItem view="menu" current={currentView} icon={Menu} label="Menu" onClick={setView} />
       </div>
     </div>
