@@ -695,6 +695,91 @@ const RevenueView: React.FC<{ appointments: Appointment[]; services: Service[]; 
                                 </div>
                             </div>
                         </div>
+
+                        <div className="space-y-4">
+                            {(() => {
+                                const grouped = weeklyApps.reduce((acc, app) => {
+                                    const d = app.date.split('T')[0];
+                                    if (!acc[d]) acc[d] = [];
+                                    acc[d].push(app);
+                                    return acc;
+                                }, {} as Record<string, Appointment[]>);
+
+                                const sortedDates = Object.keys(grouped).sort();
+
+                                if (sortedDates.length === 0) {
+                                    return <div className="p-8 text-center text-gray-400 font-medium bg-gray-50 rounded-3xl border border-gray-100 border-dashed">Nenhum agendamento nesta semana.</div>;
+                                }
+
+                                return sortedDates.map(dateStr => {
+                                    const dayApps = grouped[dateStr];
+                                    const dateObj = parseDateLocal(dayApps[0].date);
+                                    const w = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+                                    const dStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit' });
+                                    const formattedDate = `${dStr} ${w.charAt(0).toUpperCase() + w.slice(1)}`;
+                                    const isExpanded = expandedDays.includes(dateStr);
+
+                                    return (
+                                        <div key={dateStr} className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-glass border border-white/40 overflow-hidden transition-all duration-300">
+                                            <div
+                                                onClick={() => setExpandedDays(prev => prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr])}
+                                                className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className="bg-brand-50 text-brand-700 px-3 py-1.5 rounded-lg font-bold text-sm min-w-[3.5rem] text-center">{formattedDate}</div>
+                                                    <div className="h-px bg-gray-200 w-12 hidden sm:block"></div>
+                                                    <span className="text-gray-500 text-sm font-medium">{dayApps.length} Pet{dayApps.length !== 1 && 's'}</span>
+                                                </div>
+                                                <div className={`text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                                                    <ChevronDown size={20} />
+                                                </div>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div className="px-4 pb-4 animate-slide-down">
+                                                    <div className="border-t border-gray-100 pt-4">
+                                                        {dayApps.sort((a, b) => a.date.localeCompare(b.date)).map((app, index, arr) => {
+                                                            const client = clients.find(c => c.id === app.clientId);
+                                                            const pet = client?.pets.find(p => p.id === app.petId);
+                                                            const isPaid = (!!app.paymentMethod && app.paymentMethod.trim() !== '') && ((!!app.paidAmount && app.paidAmount > 0) || app.status === 'concluido' || app.paymentStatus === 'paid');
+                                                            const isLast = index === arr.length - 1;
+
+                                                            return (
+                                                                <div key={app.id} className="relative flex group mb-0">
+                                                                    <div className="flex flex-col items-center mr-4 min-w-[50px]">
+                                                                        <span className="text-sm font-bold text-gray-900 mt-1 font-mono tracking-tight">{app.date.split('T')[1].substring(0, 5)}</span>
+                                                                        {!isLast && <div className="w-0.5 bg-gray-200 h-full mt-2 rounded-full group-hover:bg-brand-200 transition-colors" />}
+                                                                    </div>
+
+                                                                    <div className="flex-1 pb-6 relative cursor-pointer" onClick={() => pet && client && onViewPet?.(pet, client)}>
+                                                                        <div className="absolute -left-[21px] top-2 w-3 h-3 rounded-full border-2 border-white bg-gray-300 group-hover:bg-brand-500 transition-colors shadow-sm z-10" />
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl shadow-sm border border-gray-100">{getBreedEmoji(pet?.breed || '')}</div>
+                                                                                <div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <h4 className="font-bold text-gray-900 text-[15px] leading-tight">{pet?.name}</h4>
+                                                                                        {app.rating ? (<div className="flex items-center gap-0.5 bg-yellow-50 px-1 py-0.5 rounded border border-yellow-100"><Star size={8} className="fill-yellow-400 text-yellow-500" /><span className="text-[9px] font-bold text-yellow-700">{app.rating.toFixed(1)}</span></div>) : null}
+                                                                                    </div>
+                                                                                    <p className="text-xs text-gray-500 font-medium">{client?.name}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="text-right">
+                                                                                {isPaid ? <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide">Pago</span> : <span className="bg-gray-100 text-gray-500 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide">Pendente</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            })()}
+                        </div>
                     </section>
                 )}
 
