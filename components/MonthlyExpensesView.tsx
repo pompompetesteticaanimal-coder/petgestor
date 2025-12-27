@@ -105,6 +105,7 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
     const [dueDate, setDueDate] = useState('');
     const [recurrence, setRecurrence] = useState<'mensal' | 'unico'>('mensal');
     const [createSixMonths, setCreateSixMonths] = useState(false);
+    const [modalCompleted, setModalCompleted] = useState(false);
 
     const openModal = (taskToEdit?: Task) => {
         if (taskToEdit) {
@@ -113,6 +114,7 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
             setAmount(taskToEdit.amount?.toString() || '');
             setDueDate(taskToEdit.dueDate || '');
             setRecurrence(taskToEdit.recurrence || 'mensal');
+            setModalCompleted(taskToEdit.completed);
             setCreateSixMonths(false);
         } else {
             setEditingId(null);
@@ -120,6 +122,7 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
             setAmount('');
             setDueDate(new Date().toISOString().split('T')[0]);
             setRecurrence('mensal');
+            setModalCompleted(false);
             setCreateSixMonths(false);
         }
         setIsModalOpen(true);
@@ -137,7 +140,8 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
                 title,
                 amount: val,
                 dueDate,
-                recurrence
+                recurrence,
+                completed: modalCompleted // Update status
             };
             onUpdateTask(updatedTask);
         } else {
@@ -155,7 +159,7 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
                         title: `${title} (${i + 1}/6)`,
                         category: 'Outros',
                         priority: 'Alta',
-                        completed: false,
+                        completed: modalCompleted,
                         createdAt: new Date().toISOString(),
                         isBill: true,
                         amount: val,
@@ -171,7 +175,7 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
                     title,
                     category: 'Outros',
                     priority: 'Alta',
-                    completed: false,
+                    completed: modalCompleted,
                     createdAt: new Date().toISOString(),
                     isBill: true,
                     amount: val,
@@ -422,9 +426,17 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
                                 </div>
                             </div>
 
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Status</label>
+                                <div className="flex bg-gray-100 p-1 rounded-xl">
+                                    <button onClick={() => setModalCompleted(false)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${!modalCompleted ? 'bg-white shadow-sm text-yellow-600' : 'text-gray-500'}`}>Pendente</button>
+                                    <button onClick={() => setModalCompleted(true)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${modalCompleted ? 'bg-white shadow-sm text-green-600' : 'text-gray-500'}`}>Pago</button>
+                                </div>
+                            </div>
+
                             {/* Recorrente 6x Option (Only for new, monthly tasks) */}
                             {!editingId && recurrence === 'mensal' && (
-                                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 cursor-pointer" onClick={() => setCreateSixMonths(!createSixMonths)}>
+                                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 cursor-pointer transition-all hover:bg-blue-100" onClick={() => setCreateSixMonths(!createSixMonths)}>
                                     <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${createSixMonths ? 'bg-blue-600 border-blue-600' : 'border-blue-300 bg-white'}`}>
                                         {createSixMonths && <CheckCircle size={12} className="text-white" />}
                                     </div>
@@ -437,7 +449,7 @@ export const MonthlyExpensesView: React.FC<MonthlyExpensesViewProps> = ({
                             <div className="pt-4 flex gap-3">
                                 <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3.5 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Cancelar</button>
                                 <button onClick={handleSubmit} className="flex-1 py-3.5 rounded-xl font-bold text-white bg-gray-900 hover:bg-gray-800 transition-colors shadow-lg shadow-gray-200">
-                                    {editingId ? 'Salvar' : 'Adicionar'}
+                                    {editingId ? 'Salvar Alterações' : 'Adicionar Lembrete'}
                                 </button>
                             </div>
                         </div>
